@@ -86,23 +86,33 @@ export function makeWorld(seed) {
   sites.forEach((site, i) => {
     const faction = townFactions[i % townFactions.length];
     const name = pick(rand, SYL_A) + pick(rand, SYL_B);
-    // богатство окрестных лесов — скорость добычи древесины
-    let forest = 0;
-    for (let a = 0; a < 16; a++) {
-      const fx = site.x + Math.round(Math.cos(a / 16 * Math.PI * 2) * 22);
-      const fy = site.y + Math.round(Math.sin(a / 16 * Math.PI * 2) * 22);
-      if (baseTile(seed, fx, fy) === T.FOREST_FLOOR) forest++;
+    // богатство окрестностей — скорость добычи ресурсов
+    let forest = 0, rock = 0, swamp = 0;
+    for (let a = 0; a < 24; a++) {
+      const fx = site.x + Math.round(Math.cos(a / 24 * Math.PI * 2) * 24);
+      const fy = site.y + Math.round(Math.sin(a / 24 * Math.PI * 2) * 24);
+      const b = baseTile(seed, fx, fy);
+      if (b === T.FOREST_FLOOR) forest++;
+      if (b === T.ROCK) rock++;
+      if (b === T.SWAMP) swamp++;
     }
     const s = {
       id: 'stl' + i, x: site.x, y: site.y, faction, name,
+      homeFaction: faction,
       population: randInt(rand, 6, 10), prosperity: randInt(rand, 40, 70),
       food: randInt(rand, 50, 90),
-      // --- цивилизация ---
+      // --- цивилизация: ресурсы и добыча ---
       wood: randInt(rand, 4, 10),
-      guards: 2, towers: 0, fields: 1,
+      metal: randInt(rand, 2, 6),
+      crystal: randInt(rand, 0, 2),
+      guards: 2, towers: 0, fields: 1, mines: 0, shrines: 0,
       housingCap: 0,        // заполнит stampSettlement по числу домов
-      forestRich: Math.min(4, 1 + Math.floor(forest / 4)),
+      forestRich: Math.min(4, 1 + Math.floor(forest / 5)),
+      rockRich: Math.min(3, Math.floor(rock / 4)),        // руда: только у скал
+      crystalRich: Math.min(2, Math.floor(swamp / 5)),    // кристаллы: у болот
       project: null,        // { type, progress, need }
+      wardT: 0,             // обережный ритуал: тиков защиты
+      captured: false, ruined: false,
       anchors: null, // заполнит stampSettlement: beds, works, fire, stalls
     };
     stampSettlement(world, s, rand);

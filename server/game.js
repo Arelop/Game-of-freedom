@@ -18,7 +18,7 @@ import { updateNpc } from './sim/npc.js';
 import { AbstractSim } from './sim/abstract.js';
 import { CivSim } from './sim/civ.js';
 import { EventLog } from './sim/events.js';
-import { makeReputation, FACTIONS, priceMultiplier } from './sim/factions.js';
+import { makeReputation, FACTIONS, RELATIONS, priceMultiplier } from './sim/factions.js';
 import { STR, ITEM_NAMES } from '../shared/strings.js';
 import { ITEMS, GEAR_SLOTS, isGear, isPotion, describeItem, isWeaponItem, weaponIdOf, sellPrice } from '../shared/items.js';
 import { AMMO_NAMES } from '../shared/weapons.js';
@@ -567,6 +567,35 @@ export class Game {
         if (p.mapId === 'over' && dist2(p.x, p.y, sx, sy) < SETTLEMENT_HYDRATE_R ** 2) { near = true; break; }
       }
       const hyd = this.hydratedSettlements.get(s.id);
+      if (s.ruined) { // руины пусты
+        if (hyd) { for (const id of hyd) this.entities.delete(id); this.hydratedSettlements.delete(s.id); }
+        continue;
+      }
+      if (s.captured) { // в захваченной деревне хозяйничают бандиты
+        if (near && !hyd) {
+          const ids = [];
+          const n = 4 + Math.min(3, Math.floor(s.prosperity / 25));
+          for (let i = 0; i < n; i++) {
+            const kind = i === 0 ? 'banditHeavy' : 'bandit';
+            ids.push(this.spawnEnemy(kind, 'over',
+              sx + (this.rand() - 0.5) * 120, sy + (this.rand() - 0.5) * 120,
+              { captor: s.id, faction: 'bandits' }));
+          }
+          this.hydratedSettlements.set(s.id, ids);
+        } else if (near && hyd) {
+          // все захватчики перебиты — деревня свободна!
+          if (!hyd.some(id => this.entities.has(id))) {
+            this.hydratedSettlements.delete(s.id);
+            const liberator = [...this.players.values()].find(p =>
+              p.mapId === 'over' && dist2(p.x, p.y, sx, sy) < SETTLEMENT_HYDRATE_R ** 2);
+            this.civ.liberateSettlement(s, liberator);
+          }
+        } else if (!near && hyd) {
+          for (const id of hyd) this.entities.delete(id);
+          this.hydratedSettlements.delete(s.id);
+        }
+        continue;
+      }
       if (near && !hyd) {
         const ids = [];
         const a = s.anchors;
@@ -1076,7 +1105,8 @@ export class Game {
       this.checkDeliver(p, npc);
       const lines = [`Старейшина ${s ? s.name : ''} (${fname})`];
       if (s) {
-        lines.push(`Жителей: ${s.population}/${Math.floor(s.housingCap)} · стражи: ${s.guards} · еда: ${Math.round(s.food)} · лес: ${Math.round(s.wood)}`);
+        lines.push(`Жителей: ${s.population}/${Math.floor(s.housingCap)} · стражи: ${s.guards}${s.wardT > 0 ? ' · ✦оберег' : ''}`);
+        lines.push(`Пшеница: ${Math.round(s.food)} · лес: ${Math.round(s.wood)} · металл: ${Math.round(s.metal)} · кристаллы: ${Math.round(s.crystal)}`);
         if (s.project) {
           const pct = Math.round(100 * s.project.progress / s.project.ticks);
           lines.push(`Идёт стройка (${pct}%)`);
@@ -1084,6 +1114,15 @@ export class Game {
         if (s.food < 25) lines.push('⚠ Припасы на исходе — нам нужна еда!');
       }
       const choices = [];
+      // дипломатия: посредничество между враждующими фракциями
+      if (s && (p.rep[s.faction] || 0) >= 30) {
+        for (const [f, v] of Object.entries(RELATIONS[s.faction] || {})) {
+          if (v < -10 && FACTIONS[f] && !FACTIONS[f].hostileToPlayers) {
+            choices.push({ id: 'mediate:' + f, label: `☮ Помирить с «${FACTIONS[f].name}» (50 мон.)` });
+            break;
+          }
+        }
+      }
       if (p.quest && p.quest.type === 'supply' && !p.quest.done && p.quest.giver === npc.home) {
         const have = p.inventory[p.quest.item] || 0;
         choices.push({ id: 'supply', label: `Отдать припасы (${Math.min(have, p.quest.count)}/${p.quest.count})` });
@@ -1146,6 +1185,23 @@ export class Game {
       return;
     }
     if (choice === 'sell') { this.fx({ t: 'sellMode', pid: p.id }, null); return; }
+    if (choice.startsWith('mediate:')) {
+      const other = choice.split(':')[1];
+      const npc = this.entities.get(dialogId);
+      const s = npc && this.world.settlements.find(x => x.id === npc.home);
+      if (!s || !FACTIONS[other] || p.coins < 50 || (p.rep[s.faction] || 0) < 30) {
+        this.toast(p, p.coins < 50 ? STR.notEnoughCoins : 'Тебе не доверяют настолько');
+        return;
+      }
+      p.coins -= 50;
+      RELATIONS[s.faction][other] = Math.min(100, (RELATIONS[s.faction][other] || 0) + 25);
+      RELATIONS[other][s.faction] = RELATIONS[s.faction][other];
+      p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + 8);
+      p.rep[other] = Math.min(100, (p.rep[other] || 0) + 8);
+      this.toast(p, `☮ Мир между «${FACTIONS[s.faction].name}» и «${FACTIONS[other].name}» крепче`);
+      this.events.push(this.world.day, `${p.name} примирил ${FACTIONS[s.faction].name} и ${FACTIONS[other].name}`);
+      return;
+    }
     if (choice === 'donate') {
       const npc = this.entities.get(dialogId);
       const s = npc && this.world.settlements.find(x => x.id === npc.home);

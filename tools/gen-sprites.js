@@ -396,6 +396,16 @@ const GEN = {
     rect(s, 2, 0, 2, 6, C.yellow); rect(s, 2, 8, 2, 2, C.yellow);
     return s;
   },
+  shrine() {
+    const s = make(16, 16);
+    // менгир с кристаллом
+    rect(s, 6, 4, 4, 9, C.gray); rect(s, 5, 6, 6, 6, C.steel);
+    px(s, 6, 5, C.lgray); px(s, 9, 7, C.dgray);
+    disc(s, 8, 2, 2, C.blue); disc(s, 8, 2, 1, C.cyan); px(s, 7, 1, C.white);
+    rect(s, 4, 13, 8, 2, C.dgray);
+    px(s, 3, 14, C.gray); px(s, 12, 14, C.gray);
+    return s;
+  },
 };
 
 export function genSprite(procName, args) {

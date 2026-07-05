@@ -4,7 +4,7 @@ export class EventLog {
 
   push(day, text, data = {}) {
     this.entries.push({ day, text, ...data });
-    if (this.entries.length > 200) this.entries.shift();
+    if (this.entries.length > 500) this.entries.shift();
   }
 
   recent(n = 5) { return this.entries.slice(-n).reverse(); }

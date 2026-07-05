@@ -1,10 +1,13 @@
 // Холодная симуляция мира: токены (стаи монстров, караваны, рейды)
 // живут как записи и двигаются по карте раз в ABSTRACT_DT секунд.
 // Возле игроков токен «гидратируется» в реальных сущностей.
-import { TILE, WORLD_TILES } from '../../shared/constants.js';
+import { TILE, WORLD_TILES, seasonOf } from '../../shared/constants.js';
 import { T } from '../../shared/constants.js';
 import { baseTile } from '../world/worldgen.js';
 import { randInt, pick } from '../../shared/rng.js';
+import { RELATIONS } from './factions.js';
+
+const RES_NAMES = { food: 'пшеницы', wood: 'древесины', metal: 'металла', crystal: 'кристаллов' };
 
 export const ABSTRACT_DT = 5;
 const HYDRATE_R = 340;        // px
@@ -50,18 +53,37 @@ export class AbstractSim {
       // блуждание / движение к цели
       if (tok.type === 'caravan' && tok.target) {
         const s = world.settlements.find(x => x.id === tok.target);
-        if (s) {
+        if (s && !s.ruined) {
           const dx = s.x * TILE - tok.x, dy = s.y * TILE - tok.y;
           const d = Math.hypot(dx, dy);
-          if (d < 60) { // прибыл
-            s.prosperity = Math.min(100, s.prosperity + 5);
-            s.food = Math.min(100, s.food + 15);
-            events.push(world.day, `Караван прибыл в ${s.name}`);
+          if (d < 60) { // прибыл: передаёт груз, крепнут связи
+            s.prosperity = Math.min(100, s.prosperity + 4);
+            if (tok.cargo) {
+              s[tok.cargo.res] = Math.min(140, (s[tok.cargo.res] || 0) + tok.cargo.amount);
+              const from = world.settlements.find(x => x.id === tok.from);
+              if (from && from.faction !== s.faction) {
+                RELATIONS[from.faction][s.faction] = Math.min(100, (RELATIONS[from.faction][s.faction] || 0) + 3);
+                RELATIONS[s.faction][from.faction] = RELATIONS[from.faction][s.faction];
+              }
+              events.push(world.day, `Караван привёз ${tok.cargo.amount} ${RES_NAMES[tok.cargo.res]} в ${s.name}`, { x: s.x, y: s.y });
+            } else {
+              events.push(world.day, `Караван прибыл в ${s.name}`);
+            }
             tok.dead = true;
           } else {
             tok.x += dx / d * 40; tok.y += dy / d * 40;
+            // стая рядом — грабёж каравана
+            const raider = this.tokens.find(t => t.type === 'pack' && !t.dead &&
+              (t.x - tok.x) ** 2 + (t.y - tok.y) ** 2 < (TILE * 5) ** 2);
+            if (raider && rand() < 0.6) {
+              tok.dead = true;
+              if (raider.units.length < 6) raider.units.push(raider.units[0]);
+              events.push(world.day,
+                `${cap(raider.name)} разграбили караван с ${tok.cargo ? RES_NAMES[tok.cargo.res] : 'товаром'}!`,
+                { x: Math.round(tok.x / TILE), y: Math.round(tok.y / TILE) });
+            }
           }
-        }
+        } else tok.dead = true;
       } else {
         tok.x += (rand() - 0.5) * 90;
         tok.y += (rand() - 0.5) * 90;
@@ -76,19 +98,26 @@ export class AbstractSim {
       }
 
       // стая близко к поселению — осада против рейтинга обороны
-      if (tok.type === 'pack' && rand() < 0.07) {
-        const s = world.settlements.find(s =>
+      const winter = seasonOf(world.day) === 3;
+      if (tok.type === 'pack' && rand() < (winter ? 0.11 : 0.07)) {
+        const s = world.settlements.find(s => !s.ruined && !s.captured &&
           (s.x * TILE - tok.x) ** 2 + (s.y * TILE - tok.y) ** 2 < (TILE * 30) ** 2);
         if (s) {
-          const defense = s.guards * 2 + s.towers * 3;
+          const defense = s.guards * 2 + s.towers * 3 + (s.wardT > 0 ? 6 : 0);
           const strength = tok.units.length * 2 + tok.units.filter(u => u === 'banditHeavy').length * 2;
           if (strength > defense + (rand() < 0.5 ? 2 : 0)) {
             s.prosperity = Math.max(5, s.prosperity - 12);
-            s.population = Math.max(2, s.population - 1);
+            s.population = Math.max(0, s.population - 1);
             s.food = Math.max(0, s.food - 20);
             if (s.guards > 0 && rand() < 0.6) s.guards--;
             tok.units.length > 2 && rand() < 0.4 && tok.units.pop();
-            events.push(world.day, `${cap(tok.name)} разорили окраины ${s.name} — есть жертвы`, { x: s.x, y: s.y });
+            // добитая деревня: бандиты захватывают, твари оставляют руины
+            if (s.population <= 2 && s.guards === 0) {
+              if (tok.faction === 'bandits') this.game.civ.captureSettlement(s);
+              else this.game.civ.ruinSettlement(s, 'разорена чудовищами');
+            } else {
+              events.push(world.day, `${cap(tok.name)} разорили окраины ${s.name} — есть жертвы`, { x: s.x, y: s.y });
+            }
           } else {
             tok.units.pop();
             if (rand() < 0.25 && s.guards > 1) s.guards--;
@@ -109,16 +138,29 @@ export class AbstractSim {
         faction: kind.faction, units: [...kind.units], x: x * TILE, y: y * TILE, hydrated: null,
       });
     }
-    if (rand() < 0.08 && world.settlements.length >= 2) {
-      const from = pick(rand, world.settlements);
-      let to = pick(rand, world.settlements);
-      if (to !== from) {
-        this.tokens.push({
-          id: 'tok' + this.nextId++, type: 'caravan', name: 'караван',
-          faction: from.faction, units: ['npc', 'guard'],
-          x: from.x * TILE, y: from.y * TILE, target: to.id, hydrated: null,
-        });
-        events.push(world.day, `Караван вышел из ${from.name} в ${to.name}`);
+    // торговля: избыток едет туда, где дефицит
+    if (rand() < 0.25 && world.settlements.length >= 2) {
+      const THRESH = { food: [80, 30], wood: [45, 12], metal: [15, 4], crystal: [8, 1] };
+      const alive = world.settlements.filter(s => !s.ruined && !s.captured);
+      outer: for (const res of ['metal', 'food', 'wood', 'crystal']) {
+        const [hi, lo] = THRESH[res];
+        for (const from of alive) {
+          if ((from[res] || 0) < hi) continue;
+          for (const to of alive) {
+            if (to === from || (to[res] || 0) > lo) continue;
+            const amount = res === 'crystal' ? 3 : res === 'metal' ? 8 : 20;
+            from[res] -= amount;
+            from.prosperity = Math.min(100, from.prosperity + 3);
+            this.tokens.push({
+              id: 'tok' + this.nextId++, type: 'caravan', name: 'караван',
+              faction: from.faction, units: ['npc', 'guard'],
+              x: from.x * TILE, y: from.y * TILE, target: to.id, from: from.id,
+              cargo: { res, amount }, hydrated: null,
+            });
+            events.push(world.day, `Караван с ${RES_NAMES[res]} вышел из ${from.name} в ${to.name}`);
+            break outer;
+          }
+        }
       }
     }
 

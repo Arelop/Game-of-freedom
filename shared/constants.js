@@ -38,14 +38,23 @@ export const T = {
   DUNGEON_FLOOR: 15, DUNGEON_WALL: 16, DOOR: 17, WATER_EDGE: 18,
   CAMPFIRE: 19, STALL: 20, BED: 21, TABLE: 22, WELL: 23, CHEST: 24,
   DUNGEON_DOOR: 25, DUNGEON_EXIT: 26, FIELD: 27, TOWER: 28,
+  MINE: 29, SHRINE: 30,
 };
+
+// Сезоны: 3 игровых дня каждый. Влияют на урожай и агрессию монстров.
+export const SEASONS = ['Весна', 'Лето', 'Осень', 'Зима'];
+export function seasonOf(day) { return Math.floor((day - 1) / 3) % 4; }
+// множитель урожая по сезону
+export const SEASON_HARVEST = [1.0, 1.5, 1.2, 0.3];
 
 // Проходимость: true = блокирует движение
 export const SOLID = new Set([
   T.DEEP_WATER, T.WATER, T.WALL, T.TREE, T.ROCK_SOLID,
   T.DUNGEON_WALL, T.STALL, T.WELL, T.CHEST, T.TABLE, T.BED, T.TOWER,
+  T.MINE, T.SHRINE,
 ]);
 // Блокирует пули (стены — да, вода — нет)
 export const BULLET_SOLID = new Set([
   T.WALL, T.TREE, T.ROCK_SOLID, T.DUNGEON_WALL, T.STALL, T.WELL, T.TOWER,
+  T.MINE,
 ]);

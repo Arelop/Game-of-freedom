@@ -53,6 +53,18 @@ export function buildTower(world, s, site) {
   return { w: 2, h: 2 };
 }
 
+export function buildMine(world, s, site) {
+  for (let y = site.y; y < site.y + 2; y++)
+    for (let x = site.x; x < site.x + 2; x++) set(world, x, y, T.MINE);
+  s.anchors.works.push({ x: site.x, y: site.y + 2 });
+  return { w: 2, h: 2 };
+}
+
+export function buildShrine(world, s, site) {
+  set(world, site.x, site.y, T.SHRINE);
+  return { w: 1, h: 1 };
+}
+
 // Дом размером w x h с дверью снизу; внутри кровать (+стол в больших)
 export function stampHouse(world, x0, y0, w, h, anchors) {
   for (let y = y0; y < y0 + h; y++)

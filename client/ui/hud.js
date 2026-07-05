@@ -1,6 +1,6 @@
 // HUD на низкоразрешённом канвасе: сердца, голод, патроны, монеты,
 // миникарта, квест, день/время, F3-отладка.
-import { VIEW_W, VIEW_H, WORLD_TILES, TILE, PLAYER_MAX_HP } from '../../shared/constants.js';
+import { VIEW_W, VIEW_H, WORLD_TILES, TILE, PLAYER_MAX_HP, SEASONS, seasonOf } from '../../shared/constants.js';
 import { WEAPONS } from '../../shared/weapons.js';
 import { STR } from '../../shared/strings.js';
 
@@ -62,11 +62,11 @@ export class Hud {
     ctx.fillStyle = '#fbf236';
     ctx.fillText(String(you.coins), 18, VIEW_H - 16);
 
-    // время суток
+    // время суток и сезон
     const t = net.worldTime;
     const icon = (t > 0.22 && t < 0.85) ? '☀' : '☾';
     ctx.fillStyle = '#eee';
-    ctx.fillText(`${icon} День ${net.day}`, VIEW_W / 2 - 20, 4);
+    ctx.fillText(`${icon} День ${net.day} · ${SEASONS[seasonOf(net.day)]}`, VIEW_W / 2 - 36, 4);
 
     // квест
     if (you.q) {

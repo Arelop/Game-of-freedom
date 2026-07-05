@@ -535,9 +535,11 @@ function renderBigMap() {
   for (const s of net.mapInfo.settlements) {
     const x = x0 + s.x * TILE * k, y = y0 + s.y * TILE * k;
     const sz = Math.min(7, 3 + Math.floor((s.pop || 6) / 4)); // размер точки = размер деревни
-    ctx.fillStyle = '#99e550';
+    // статус: зелёная — живёт, красная — захвачена, серая — руины
+    ctx.fillStyle = s.st === 2 ? '#696a6a' : s.st === 1 ? '#d9574a' : '#99e550';
     ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
-    ctx.fillText(s.name + (s.pop ? ` (${s.pop})` : ''), x - 18, y - 10);
+    const mark = s.st === 2 ? ' ☠' : s.st === 1 ? ' ⚔' : '';
+    ctx.fillText(s.name + (s.pop ? ` (${s.pop})` : '') + mark, x - 18, y - 10);
   }
   for (const p of net.mapInfo.pois) {
     ctx.fillStyle = p.cleared ? '#696a6a' : p.type === 'dungeon' ? '#d9574a' : '#df7126';

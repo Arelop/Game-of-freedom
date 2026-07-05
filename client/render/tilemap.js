@@ -34,6 +34,8 @@ const TILE_SPRITES = {
   [T.DUNGEON_EXIT]: ['tile_dungeon_floor'], // портал — оверлей
   [T.FIELD]: ['tile_field'],
   [T.TOWER]: ['tile_wall_stone'],
+  [T.MINE]: ['tile_rock_solid'],
+  [T.SHRINE]: ['tile_grass', 'obj_shrine'],
 };
 
 export class TileRenderer {

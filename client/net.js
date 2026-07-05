@@ -65,8 +65,9 @@ export class Net {
     if (m.t === MSG.PONG) {
       this.ping = Math.round(performance.now() - m.t0);
       this.worldTime = m.time; this.day = m.day;
-      // живое население для карты
+      // живое население и статусы для карты
       if (m.pops) m.pops.forEach((n, i) => { if (this.mapInfo.settlements[i]) this.mapInfo.settlements[i].pop = n; });
+      if (m.sts) m.sts.forEach((st, i) => { if (this.mapInfo.settlements[i]) this.mapInfo.settlements[i].st = st; });
       return;
     }
     if (m.t === MSG.CHUNK) {

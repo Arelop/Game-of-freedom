@@ -1,17 +1,20 @@
-// Цивилизации: поселения производят еду и древесину, растут, строят
-// дома/поля/башни, нанимают стражу, голодают, соперничают за угодья.
+// Цивилизации: поселения добывают ресурсы (пшеница, древесина, металл,
+// кристаллы), растут, строят дома/поля/башни/шахты/святилища, нанимают
+// стражу за металл, проводят магические ритуалы, голодают и вымирают.
 // Все значимые исходы идут в журнал событий и тостами игрокам поблизости.
-import { TILE, CHUNK } from '../../shared/constants.js';
-import { findBuildSite, buildHouse, buildField, buildTower } from '../world/structures.js';
+import { TILE, CHUNK, SEASONS, seasonOf, SEASON_HARVEST } from '../../shared/constants.js';
+import { findBuildSite, buildHouse, buildField, buildTower, buildMine, buildShrine } from '../world/structures.js';
 import { RELATIONS, FACTIONS } from './factions.js';
 
 export const CIV_DT = process.env.CIV_FAST ? 2 : 12; // сек на цив-тик (CIV_FAST — отладка)
 
-// Стройки: стоимость древесины и число тиков работы
+// Стройки: стоимость ресурсов и число тиков работы
 const PROJECTS = {
   house: { name: 'дом', wood: 12, ticks: 5, size: [6, 5] },
   field: { name: 'поле', wood: 5, ticks: 3, size: [4, 3] },
-  tower: { name: 'сторожевая башня', wood: 15, ticks: 6, size: [2, 2] },
+  tower: { name: 'сторожевая башня', wood: 12, metal: 4, ticks: 6, size: [2, 2] },
+  mine: { name: 'шахта', wood: 10, ticks: 5, size: [2, 2] },
+  shrine: { name: 'святилище', wood: 10, ticks: 4, size: [1, 1] },
 };
 
 export class CivSim {
@@ -24,6 +27,13 @@ export class CivSim {
     this.timer -= dt;
     if (this.timer > 0) return;
     this.timer = CIV_DT;
+    // смена сезона — общее событие
+    const season = seasonOf(this.game.world.day);
+    if (season !== this.lastSeason) {
+      this.lastSeason = season;
+      this.game.events.push(this.game.world.day, `Наступает ${SEASONS[season].toLowerCase()}`);
+      this.game.toastAll(`— ${SEASONS[season]} —`);
+    }
     for (const s of this.game.world.settlements) this.tickSettlement(s);
     this.tickRivalry();
   }
@@ -37,19 +47,31 @@ export class CivSim {
   tickSettlement(s) {
     const g = this.game;
     const rand = g.rand;
+    if (s.ruined) return;
+    if (s.captured) {
+      // бандиты проедают запасы захваченной деревни
+      s.food = Math.max(0, s.food - 1);
+      s.prosperity = Math.max(0, s.prosperity - 1);
+      return;
+    }
 
-    // --- производство ---
-    const farmers = Math.min(s.population, 2 + s.fields * 2);
-    s.food = Math.min(140, s.food + 1 + s.fields * 2);
+    // --- добыча: урожай зависит от сезона ---
+    const harvest = SEASON_HARVEST[seasonOf(g.world.day)];
+    s.food = Math.min(140, s.food + Math.round((1 + s.fields * 2) * harvest));
     s.wood = Math.min(90, s.wood + s.forestRich);
+    s.metal = Math.min(60, s.metal + s.mines * 2 + (s.rockRich > 0 ? 1 : 0) * 0);
+    if (s.rockRich > 0 && rand() < 0.4) s.metal = Math.min(60, s.metal + 1); // кустарная добыча
+    if (s.crystalRich > 0 && rand() < 0.3) s.crystal = Math.min(20, s.crystal + 1);
+    if (s.shrines > 0 && rand() < 0.25) s.crystal = Math.min(20, s.crystal + 1); // жрецы собирают
 
     // --- потребление и голод/рост ---
     s.food -= Math.ceil(s.population * 0.5);
     if (s.food <= 0) {
       s.food = 0;
       s.prosperity = Math.max(0, s.prosperity - 6);
-      if (rand() < 0.5 && s.population > 2) {
+      if (rand() < 0.5 && s.population > 0) {
         s.population--;
+        if (s.population <= 0) { this.ruinSettlement(s, 'вымерла от голода'); return; }
         this.say(s, `Голод! Жители умирают (${s.population} ост.)`);
       }
     } else if (s.food > 60 && s.population < s.housingCap && rand() < 0.5) {
@@ -59,14 +81,33 @@ export class CivSim {
       this.say(s, `Деревня растёт: уже ${s.population} жителей`);
     }
 
-    // --- наём стражи ---
+    // --- наём стражи: нужен металл на снаряжение ---
     const guardQuota = 2 + s.towers;
     if (s.guards < guardQuota && s.prosperity >= 25 && s.population > 3) {
-      s.guards++;
-      s.prosperity -= 8;
-      this.say(s, 'Нанят новый стражник');
-      this.rehydrate(s);
+      if (s.metal >= 2) {
+        s.metal -= 2;
+        s.guards++;
+        s.prosperity -= 8;
+        this.say(s, 'Нанят новый стражник (−2 металла)');
+        this.rehydrate(s);
+      } else if (rand() < 0.3) {
+        this.say(s, 'Не хватает металла для снаряжения стражи');
+      }
     }
+
+    // --- магические ритуалы за кристаллы ---
+    if (s.shrines > 0 && s.crystal >= 3) {
+      if (s.food < 30) {
+        s.crystal -= 3;
+        s.food = Math.min(140, s.food + 50);
+        this.say(s, '✦ Ритуал урожая: закрома полны!');
+      } else if (s.wardT <= 0 && rand() < 0.25) {
+        s.crystal -= 3;
+        s.wardT = 12;
+        this.say(s, '✦ Обережный ритуал: деревня под защитой духов');
+      }
+    }
+    if (s.wardT > 0) s.wardT--;
 
     // --- строительство ---
     if (s.project) {
@@ -80,18 +121,26 @@ export class CivSim {
     if (s.food > 40 && rand() < 0.3) s.prosperity = Math.min(100, s.prosperity + 1);
   }
 
+  canAfford(s, def) {
+    return s.wood >= (def.wood || 0) && s.metal >= (def.metal || 0) && s.crystal >= (def.crystal || 0);
+  }
+
   chooseProject(s) {
-    // приоритеты: жильё переполнено -> дом; еды мало -> поле; стая рядом/богато -> башня
+    // приоритеты: жильё -> еда -> шахта -> святилище -> башня
     let type = null;
-    if (s.population >= s.housingCap && s.wood >= PROJECTS.house.wood) type = 'house';
-    else if (s.food < 35 && s.wood >= PROJECTS.field.wood) type = 'field';
-    else if (s.towers < 2 && s.prosperity > 50 && s.wood >= PROJECTS.tower.wood) type = 'tower';
+    if (s.population >= s.housingCap && this.canAfford(s, PROJECTS.house)) type = 'house';
+    else if (s.food < 35 && this.canAfford(s, PROJECTS.field)) type = 'field';
+    else if (s.mines < 1 && s.rockRich > 0 && this.canAfford(s, PROJECTS.mine)) type = 'mine';
+    else if (s.shrines < 1 && s.prosperity > 45 && this.canAfford(s, PROJECTS.shrine)) type = 'shrine';
+    else if (s.towers < 2 && s.prosperity > 50 && this.canAfford(s, PROJECTS.tower)) type = 'tower';
     else if (s.wood >= PROJECTS.house.wood + 8 && this.game.rand() < 0.3) type = 'house';
     if (!type) return;
     const def = PROJECTS[type];
     const site = findBuildSite(this.game.world, s, def.size[0], def.size[1], this.game.rand);
     if (!site) return;
-    s.wood -= def.wood;
+    s.wood -= def.wood || 0;
+    s.metal -= def.metal || 0;
+    s.crystal -= def.crystal || 0;
     s.project = { type, progress: 0, ticks: def.ticks, site };
     this.say(s, `Началась стройка: ${def.name}`);
   }
@@ -103,11 +152,51 @@ export class CivSim {
     let rect;
     if (type === 'house') { rect = buildHouse(g.world, s, site, g.rand); s.housingCap += 2; }
     else if (type === 'field') { rect = buildField(g.world, s, site); s.fields++; }
+    else if (type === 'mine') { rect = buildMine(g.world, s, site); s.mines++; }
+    else if (type === 'shrine') { rect = buildShrine(g.world, s, site); s.shrines++; }
     else { rect = buildTower(g.world, s, site); s.towers++; }
     s.project = null;
     this.say(s, `Стройка завершена: ${def.name}!`);
     this.remapArea(site.x - 1, site.y - 1, rect.w + 2, rect.h + 2);
     this.rehydrate(s);
+  }
+
+  // Деревня погибла: руины навсегда, стаи заселяют округу
+  ruinSettlement(s, reason) {
+    const g = this.game;
+    s.ruined = true;
+    s.population = 0; s.guards = 0;
+    this.rehydrate(s);
+    g.events.push(g.world.day, `${s.name} ${reason}. Остались руины…`, { x: s.x, y: s.y });
+    g.toastAll(`☠ ${s.name} ${reason}`);
+  }
+
+  // Бандиты захватили деревню
+  captureSettlement(s) {
+    const g = this.game;
+    s.captured = true;
+    s.faction = 'bandits';
+    s.guards = 0;
+    s.population = Math.max(0, s.population - 2);
+    this.rehydrate(s);
+    g.events.push(g.world.day, `Вольница захватила ${s.name}! Кто освободит жителей?`, { x: s.x, y: s.y });
+    g.toastAll(`⚔ ${s.name} захвачена бандитами!`);
+  }
+
+  // Игроки перебили захватчиков — деревня свободна
+  liberateSettlement(s, liberator) {
+    const g = this.game;
+    s.captured = false;
+    s.faction = s.homeFaction;
+    s.guards = 1;
+    s.population = Math.max(3, s.population);
+    this.rehydrate(s);
+    g.events.push(g.world.day, `${liberator?.name || 'Путники'} освободили ${s.name} от бандитов!`, { x: s.x, y: s.y });
+    g.toastAll(`★ ${s.name} освобождена!`);
+    if (liberator) {
+      liberator.rep[s.homeFaction] = Math.min(100, (liberator.rep[s.homeFaction] || 0) + 25);
+      g.addXp(liberator, 60);
+    }
   }
 
   // Сброс чанков: сервер и клиенты перечитывают тайлы построенного

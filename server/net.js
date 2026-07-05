@@ -70,6 +70,7 @@ export class Net {
         ws.send(JSON.stringify({
           t: MSG.PONG, t0: m.t0, tick: game.tick, time: game.world.time, day: game.world.day,
           pops: game.world.settlements.map(s => s.population),
+          sts: game.world.settlements.map(s => s.ruined ? 2 : s.captured ? 1 : 0),
         }));
         break;
       case MSG.SWITCH_WEAPON: {

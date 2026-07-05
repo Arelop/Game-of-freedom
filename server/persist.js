@@ -16,8 +16,11 @@ export function saveWorld(game) {
       edits: [...w.edits.entries()],
       settlements: w.settlements.map(s => ({
         id: s.id, population: s.population, prosperity: s.prosperity, food: s.food,
-        wood: s.wood, guards: s.guards, towers: s.towers, fields: s.fields,
+        wood: s.wood, metal: s.metal, crystal: s.crystal,
+        guards: s.guards, towers: s.towers, fields: s.fields,
+        mines: s.mines, shrines: s.shrines, wardT: s.wardT,
         housingCap: s.housingCap, project: s.project,
+        captured: s.captured, ruined: s.ruined, faction: s.faction,
       })),
       pois: w.pois.map(o => ({ id: o.id, cleared: o.cleared })),
       tokens: game.abstract.tokens.filter(t => !t.hydrated).map(({ hydrated, ...t }) => t),
