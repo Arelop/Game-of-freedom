@@ -25,6 +25,18 @@ export class Hud {
     ctx.fillStyle = you.hunger < 20 ? '#d9574a' : '#d9a066';
     ctx.fillRect(6, 17, Math.round(40 * you.hunger / 100), 3);
 
+    // уровень и опыт
+    ctx.fillStyle = '#fbf236';
+    ctx.fillText('Ур.' + (you.lvl || 1), 50, 8);
+    ctx.fillStyle = '#222034';
+    ctx.fillRect(5, 22, 42, 3);
+    ctx.fillStyle = '#99e550';
+    ctx.fillRect(5, 22, Math.round(42 * Math.min(1, (you.xp || 0) / (you.xpn || 1))), 3);
+    if ((you.sp || 0) + (you.tp2 || 0) > 0 && Math.floor(performance.now() / 600) % 2 === 0) {
+      ctx.fillStyle = '#fbf236';
+      ctx.fillText('+C', 50, 17);
+    }
+
     // оружие и патроны (справа снизу)
     const w = WEAPONS[you.w];
     if (w) {

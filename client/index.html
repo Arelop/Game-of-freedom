@@ -44,6 +44,30 @@
   #inv .empty { color: #45444f; font-size: 12px; padding: 4px; }
   #deadmsg { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); color: #d9574a; font-size: 22px; text-shadow: 2px 2px 0 #000; z-index: 5; display: none; text-align: center; }
   #help { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; color: rgba(132,126,135,.75); font-size: 11px; pointer-events: none; z-index: 4; }
+  #classPick { display: flex; gap: 10px; }
+  .clscard { width: 170px; background: #1a1826; border: 2px solid #45444f; padding: 10px; cursor: pointer; }
+  .clscard:hover { border-color: #639bff; }
+  .clscard.selected { border-color: #d9a066; background: #241f30; }
+  .clscard .clsname { color: #d9a066; font-size: 16px; margin-bottom: 6px; }
+  .clscard .clsdesc { color: #847e87; font-size: 11px; line-height: 1.4; }
+  #char { position: absolute; left: 12px; top: 60px; width: 300px; max-height: 82vh; overflow-y: auto; background: rgba(20,18,26,.96); border: 2px solid #d9a066; padding: 10px 14px; z-index: 6; display: none; }
+  #char h3 { color: #d9a066; margin: 8px 0 6px; font-size: 14px; }
+  #char .xpbar { height: 8px; background: #222034; border: 1px solid #45444f; margin: 4px 0 8px; }
+  #char .xpfill { height: 100%; background: #99e550; }
+  #char .strow { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; font-size: 13px; }
+  #char .strow .plus { background: #5b6ee1; color: #fff; border: none; width: 20px; height: 20px; cursor: pointer; font-family: inherit; }
+  #char .strow .plus:hover { background: #639bff; }
+  #char .strow .statdesc { color: #696a6a; font-size: 10px; }
+  #char .talent { border: 1px solid #45444f; padding: 6px 8px; margin: 4px 0; font-size: 12px; }
+  #char .talent .tname { color: #eee; }
+  #char .talent .tdesc { color: #847e87; font-size: 11px; }
+  #char .talent.learned { border-color: #99e550; background: #1d2416; }
+  #char .talent.learned .tname { color: #99e550; }
+  #char .talent.avail { border-color: #fbf236; cursor: pointer; }
+  #char .talent.avail:hover { background: #30303f; }
+  #char .talent.locked { opacity: 0.45; }
+  #char .tierlabel { color: #639bff; font-size: 11px; margin-top: 6px; }
+  #char .pts { color: #fbf236; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -52,14 +76,29 @@
 <div id="dialog"></div>
 <div id="inv"></div>
 <div id="deadmsg"></div>
+<div id="char"></div>
 <div id="help"></div>
 <div class="overlay" id="menu">
   <h1>ПОГРАНИЧЬЕ</h1>
   <div class="sub">кооп-шутер в живом открытом мире</div>
   <input id="nameInput" maxlength="16" placeholder="Имя героя" value="">
+  <div id="classPick">
+    <div class="clscard selected" data-cls="warrior">
+      <div class="clsname">⚔ Воин</div>
+      <div class="clsdesc">Меч и упрямство. +1 сердце, силён в ближнем бою.</div>
+    </div>
+    <div class="clscard" data-cls="mage">
+      <div class="clsname">✦ Маг</div>
+      <div class="clsdesc">Посох огня и мана. Хрупок, но испепеляет издалека.</div>
+    </div>
+    <div class="clscard" data-cls="rogue">
+      <div class="clsname">🗡 Вор</div>
+      <div class="clsdesc">Лук и ножи. Быстрый, меткий, удачливый.</div>
+    </div>
+  </div>
   <button id="joinBtn">В игру</button>
   <div class="hint" id="menuHint">WASD — движение · ЛКМ — атака · Пробел/ПКМ — перекат · R — перезарядка ·
-    E — действие · 1-4 — оружие · Tab — инвентарь · M — карта · F3 — отладка<br><br>
+    E — действие · 1-4 — оружие · Tab — инвентарь · C — персонаж · M — карта · F3 — отладка<br><br>
     Для кооп-игры друг открывает этот же адрес в своём браузере.</div>
 </div>
 <script type="module" src="/client/main.js"></script>

@@ -4,6 +4,7 @@ import { MSG, rleEncode } from '../shared/protocol.js';
 import { AOI_RADIUS, CHUNK, MAX_PLAYERS, SNAPSHOT_EVERY, TICK_RATE } from '../shared/constants.js';
 import { ENEMIES } from '../shared/enemies.js';
 import { dist2 } from '../shared/simCore.js';
+import { xpNeed } from '../shared/classes.js';
 
 export class Net {
   constructor(game, httpServer) {
@@ -36,12 +37,13 @@ export class Net {
       if (game.players.size >= MAX_PLAYERS) { ws.send(JSON.stringify({ t: 'full' })); return; }
       const id = this.nextPlayerId++;
       const name = String(m.name || 'Игрок').slice(0, 16) || 'Игрок';
-      const p = game.addPlayer(id, name, ws);
+      const cls = ['warrior', 'mage', 'rogue'].includes(m.cls) ? m.cls : 'warrior';
+      const p = game.addPlayer(id, name, ws, cls);
       ws.playerId = id;
-      console.log(`[net] ${name} вошёл (id=${id})`);
+      console.log(`[net] ${name} (${cls}) вошёл (id=${id})`);
       ws.send(JSON.stringify({
         t: MSG.WELCOME, id, seed: game.world.seed, tick: game.tick,
-        tickRate: TICK_RATE, skin: p.skin,
+        tickRate: TICK_RATE, sprite: p.sprite, cls: p.cls,
         mapInfo: {
           settlements: game.world.settlements.map(s => ({ x: s.x, y: s.y, name: s.name, faction: s.faction })),
           pois: game.world.pois.map(o => ({ x: o.x, y: o.y, name: o.name, type: o.type, cleared: o.cleared })),
@@ -78,6 +80,8 @@ export class Net {
       case MSG.USE_ITEM: game.useItem(p, String(m.item || '')); break;
       case MSG.EQUIP: game.equipItem(p, String(m.item || '')); break;
       case MSG.UNEQUIP: game.unequipItem(p, String(m.slot || '')); break;
+      case MSG.SPEND_STAT: game.spendStat(p, String(m.stat || '')); break;
+      case MSG.LEARN_TALENT: game.learnTalent(p, String(m.id || '')); break;
     }
   }
 
@@ -123,9 +127,9 @@ export class Net {
       if (q.id === p.id || q.mapId !== p.mapId) continue;
       if (dist2(q.x, q.y, p.x, p.y) > AOI_RADIUS ** 2) continue;
       ents.push({
-        i: 'p' + q.id, tp: 'p', k: 'player_' + q.skin, x: r1(q.x), y: r1(q.y),
+        i: 'p' + q.id, tp: 'p', k: q.sprite, x: r1(q.x), y: r1(q.y),
         a: r2(q.aim), h: q.hp, hm: q.maxHp, nm: q.name, dn: q.dead ? 1 : 0,
-        rl: q.rollT > 0 ? 1 : 0, w: game.weapon(q).id,
+        rl: q.rollT > 0 ? 1 : 0, w: game.weapon(q).id, lv: q.level,
       });
     }
     for (const e of game.entities.values()) {
@@ -160,6 +164,8 @@ export class Net {
         rc: r2(p.rollCd), map: p.mapId,
         eq: p.equipment, sm: r2(p.speedMult || 1), rcm: r2(p.rollCdMult || 1),
         bf: Object.fromEntries(Object.entries(p.buffs || {}).map(([k, b]) => [k, Math.ceil(b.t)])),
+        cls: p.cls, lvl: p.level, xp: p.xp, xpn: xpNeed(p.level),
+        sp: p.statPts, tp2: p.talentPts, st: p.stats, tl: p.talents,
         q: p.quest ? { title: p.quest.title, done: p.quest.done, tx: p.quest.tx, ty: p.quest.ty } : null,
         rep: p.rep,
       },

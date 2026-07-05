@@ -21,6 +21,8 @@ import { makeReputation, FACTIONS, priceMultiplier } from './sim/factions.js';
 import { STR, ITEM_NAMES } from '../shared/strings.js';
 import { ITEMS, GEAR_SLOTS, isGear, isPotion, describeItem } from '../shared/items.js';
 import { AMMO_NAMES } from '../shared/weapons.js';
+import { CLASSES, STAT_KEYS, statBonuses, xpNeed, MAX_LEVEL } from '../shared/classes.js';
+import { TALENTS, findTalent, canLearn } from '../shared/talents.js';
 
 const HOT_RADIUS = 600;            // px: враги думают только рядом с игроками
 const SETTLEMENT_HYDRATE_R = 400;  // px
@@ -79,21 +81,24 @@ export class Game {
   fx(ev, mapId, x, y) { this.pendingFx.push({ ev, mapId, x, y }); }
 
   // ---------- игроки ----------
-  addPlayer(id, name, ws) {
+  addPlayer(id, name, ws, cls = 'warrior') {
+    const C = CLASSES[cls] || CLASSES.warrior;
     const s = this.world.settlements[0];
     const px = (s ? s.x : 256) * TILE + 40, py = (s ? s.y : 256) * TILE + 40;
     const p = {
       ...makePlayerState(px, py),
       id, name, ws, mapId: 'over',
-      skin: (id - 1) % 4,
-      hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP,
-      weapons: ['sword', 'bow'], weaponIdx: 0,
-      mags: { sword: 1, bow: WEAPONS.bow.magSize },
-      ammo: { arrow: 60, bolt: 6, mana: 0, knife: 0 },
+      cls: C.id, sprite: C.sprite,
+      hp: PLAYER_MAX_HP + (C.maxHpBonus || 0), maxHp: PLAYER_MAX_HP + (C.maxHpBonus || 0),
+      level: 1, xp: 0, statPts: 0, talentPts: 0,
+      stats: { ...C.baseStats }, talents: [],
+      weapons: [...C.weapons], weaponIdx: 0,
+      mags: Object.fromEntries(C.weapons.map(w => [w, WEAPONS[w].magSize || 1])),
+      ammo: { ...C.ammo },
       inventory: { bread: 2, bandage: 1 },
       equipment: { armor: null, helmet: null, amulet: null, shield: null },
       buffs: {},                 // { speed: { mult, t } }
-      dmgMult: 1,
+      dmgMult: 1, shadowT: 0, prevRollT: 0, manaRegenT: 0,
       coins: 20, hunger: HUNGER_MAX,
       rep: makeReputation(), aggroFactions: new Set(),
       dead: false, downT: 0,
@@ -105,7 +110,11 @@ export class Game {
     if (process.env.DEV_GEAR) { // отладка: стартовый набор экипировки
       Object.assign(p.inventory, { leather_armor: 1, iron_helmet: 1, wolf_amulet: 1, heal_potion: 2, swift_potion: 1 });
     }
+    if (process.env.DEV_LEVEL) { // отладка: сразу N уровней
+      for (let i = 1; i < +process.env.DEV_LEVEL; i++) { p.level++; p.statPts++; p.talentPts++; }
+    }
     this.players.set(id, p);
+    this.recomputeStats(p);
     return p;
   }
 
@@ -113,23 +122,100 @@ export class Game {
 
   weapon(p) { return WEAPONS[p.weapons[p.weaponIdx]]; }
 
-  // ---------- экипировка и статы ----------
+  // ---------- экипировка, характеристики, таланты ----------
+  hasTalent(p, flag) { return p.talents.some(id => findTalent(p.cls, id)?.flag === flag); }
+
   recomputeStats(p) {
-    let maxHp = PLAYER_MAX_HP, speed = 1, dmg = 1, rollCd = 1;
+    const C = CLASSES[p.cls] || CLASSES.warrior;
+    const sb = statBonuses(p.stats);
+    const d = {
+      dmgMelee: 1 + sb.dmgMelee, dmgRanged: 1 + sb.dmgRanged, dmgMagic: 1 + sb.dmgMagic,
+      critChance: sb.critChance, critMult: 2, coinMult: 1 + sb.coinMult,
+      atkSpeed: 1, arcBonus: 0, magicProj: 0, knifeProj: 0,
+    };
+    let maxHp = PLAYER_MAX_HP + (C.maxHpBonus || 0);
+    let speed = 1 + (C.speedBonus || 0);
+    let gearDmg = 1;
+    let rollCd = 1 - sb.rollCd;
+
     for (const slot of GEAR_SLOTS) {
       const it = ITEMS[p.equipment[slot]];
       if (!it?.stats) continue;
       maxHp += it.stats.maxHp || 0;
       speed += it.stats.speed || 0;
-      dmg += it.stats.damage || 0;
+      gearDmg += it.stats.damage || 0;
       rollCd -= it.stats.rollCd || 0;
     }
+    for (const id of p.talents) {
+      const t = findTalent(p.cls, id);
+      if (!t?.effects) continue;
+      const e = t.effects;
+      maxHp += e.maxHp || 0;
+      speed += e.speed || 0;
+      rollCd -= e.rollCd || 0;
+      d.dmgMelee += e.dmgMelee || 0;
+      d.dmgRanged += e.dmgRanged || 0;
+      d.dmgMagic += e.dmgMagic || 0;
+      d.critChance += e.critChance || 0;
+      d.coinMult += e.coinMult || 0;
+      d.atkSpeed += e.atkSpeed || 0;
+      d.arcBonus += e.arcBonus || 0;
+      d.magicProj += e.magicProj || 0;
+      d.knifeProj += e.knifeProj || 0;
+    }
+    if (this.hasTalent(p, 'deadly')) d.critMult = 3;
     if (p.buffs.speed) speed += p.buffs.speed.mult;
+
+    // амулеты с общим уроном (медвежий) усиливают все школы
+    d.dmgMelee *= gearDmg; d.dmgRanged *= gearDmg; d.dmgMagic *= gearDmg;
+
+    p.derived = d;
     p.maxHp = maxHp;
     p.hp = Math.min(p.hp, maxHp);
     p.speedMult = Math.max(0.4, speed);
-    p.dmgMult = dmg;
     p.rollCdMult = Math.max(0.2, rollCd);
+  }
+
+  // Урон атаки с учётом школы, талантов и крита
+  rollAttack(p, w) {
+    const d = p.derived;
+    const schoolMult = w.school === 'melee' ? d.dmgMelee : w.school === 'magic' ? d.dmgMagic : d.dmgRanged;
+    let mult = schoolMult;
+    if (this.hasTalent(p, 'rage') && p.hp <= p.maxHp * 0.3) mult *= 1.4;
+    if (p.shadowT > 0 && this.hasTalent(p, 'shadow')) { mult *= 1.5; p.shadowT = 0; }
+    const crit = this.rand() < d.critChance;
+    if (crit) mult *= d.critMult;
+    return { dmg: Math.round(w.damage * mult * 10) / 10, crit };
+  }
+
+  // ---------- опыт и уровни ----------
+  addXp(p, n) {
+    if (p.level >= MAX_LEVEL || p.dead) return;
+    p.xp += n;
+    while (p.level < MAX_LEVEL && p.xp >= xpNeed(p.level)) {
+      p.xp -= xpNeed(p.level);
+      p.level++;
+      p.statPts++;
+      p.talentPts++;
+      p.hp = Math.min(p.maxHp, p.hp + 2);
+      this.toast(p, `Уровень ${p.level}! Очко характеристики и талант (C)`);
+      this.fx({ t: 'levelup', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+    }
+  }
+
+  spendStat(p, stat) {
+    if (p.statPts <= 0 || !STAT_KEYS.includes(stat)) return;
+    p.statPts--;
+    p.stats[stat] = (p.stats[stat] || 0) + 1;
+    this.recomputeStats(p);
+  }
+
+  learnTalent(p, id) {
+    if (!canLearn(p.cls, id, p.talents, p.talentPts)) return;
+    p.talentPts--;
+    p.talents.push(id);
+    this.recomputeStats(p);
+    this.toast(p, `Талант изучен: ${findTalent(p.cls, id).name}`);
   }
 
   equipItem(p, itemId) {
@@ -194,6 +280,36 @@ export class Game {
     }
     if (buffEnded) this.recomputeStats(p);
 
+    // Медитация: реген маны
+    if (this.hasTalent(p, 'manaRegen')) {
+      p.manaRegenT -= dt;
+      if (p.manaRegenT <= 0) {
+        p.manaRegenT = 4;
+        p.ammo.mana = Math.min(99, (p.ammo.mana || 0) + 1);
+      }
+    }
+    p.shadowT = Math.max(0, p.shadowT - dt);
+
+    // Начало переката: Таран и Барьер
+    if (p.rollT > p.prevRollT) {
+      p.rollHits = new Set();
+      if (this.hasTalent(p, 'barrier')) p.hurtT = Math.max(p.hurtT, 0.75);
+    }
+    // Конец переката: окно Тени
+    if (p.prevRollT > 0 && p.rollT === 0 && this.hasTalent(p, 'shadow')) p.shadowT = 2;
+    // Таран: сбиваем врагов по пути переката
+    if (p.rollT > 0 && this.hasTalent(p, 'ram')) {
+      for (const e of [...this.entities.values()]) {
+        if (e.entType !== 'enemy' || e.mapId !== p.mapId || p.rollHits?.has(e.id)) continue;
+        const def = ENEMIES[e.kind];
+        if (!circlesOverlap(p.x, p.y, PLAYER_RADIUS + 6, e.x, e.y, def.radius)) continue;
+        p.rollHits.add(e.id);
+        this.damageEnemy(e, Math.round(4 * p.derived.dmgMelee * 10) / 10,
+          { vx: p.rollDx, vy: p.rollDy, knockback: 160, owner: p.id, school: 'melee' });
+      }
+    }
+    p.prevRollT = p.rollT;
+
     // голод
     p.hunger = Math.max(0, p.hunger - HUNGER_RATE * dt);
     if (p.hunger <= 0) {
@@ -250,8 +366,10 @@ export class Game {
     if (w.melee) { this.meleeSwing(p, w, aim); return; }
     if (p.reloadT > 0) return;
     if ((p.mags[w.id] || 0) <= 0) { this.startReload(p); return; }
-    p.fireCd = 1 / w.fireRate;
-    p.mags[w.id]--;
+    p.fireCd = 1 / (w.fireRate * (p.derived?.atkSpeed || 1));
+    // Архимаг: шанс не потратить ману
+    if (!(w.ammoType === 'mana' && this.hasTalent(p, 'arcane') && this.rand() < 0.3))
+      p.mags[w.id]--;
     const seed = hash2(this.world.seed, this.tick, p.id);
     this.spawnPlayerBullets(p, w, aim, seed);
     // событие остальным клиентам (стрелявший рисует свои пули сам)
@@ -260,37 +378,53 @@ export class Game {
 
   // Ближний бой: мгновенный удар по дуге перед игроком.
   meleeSwing(p, w, aim) {
-    p.fireCd = 1 / w.fireRate;
-    const half = (w.arcDeg || 100) * Math.PI / 360;
+    p.fireCd = 1 / (w.fireRate * (p.derived?.atkSpeed || 1));
+    let arcDeg = (w.arcDeg || 100) + (p.derived?.arcBonus || 0);
+    if (this.hasTalent(p, 'whirl')) arcDeg = 360;
+    const half = arcDeg * Math.PI / 360;
     const r = w.range || 26;
-    const dmgMult = p.dmgMult || 1;
-    const hitFake = { vx: Math.cos(aim), vy: Math.sin(aim), knockback: w.knockback, owner: p.id };
+    const atk = this.rollAttack(p, w);
+    const hitFake = { vx: Math.cos(aim), vy: Math.sin(aim), knockback: w.knockback, owner: p.id, school: 'melee', crit: atk.crit };
     for (const e of [...this.entities.values()]) {
       if (e.entType === 'enemy' && e.mapId === p.mapId) {
         const def = ENEMIES[e.kind];
         if (dist2(p.x, p.y, e.x, e.y) > (r + def.radius) ** 2) continue;
         let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
         da = Math.atan2(Math.sin(da), Math.cos(da));
-        if (Math.abs(da) <= half) this.damageEnemy(e, Math.round(w.damage * dmgMult * 10) / 10, hitFake);
+        if (arcDeg >= 360 || Math.abs(da) <= half) this.damageEnemy(e, atk.dmg, hitFake);
       } else if (e.entType === 'npc' && e.mapId === p.mapId) {
         if (dist2(p.x, p.y, e.x, e.y) > (r + 5) ** 2) continue;
         let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
         da = Math.atan2(Math.sin(da), Math.cos(da));
-        if (Math.abs(da) <= half) this.damageNpc(e, w.damage, p);
+        if (arcDeg >= 360 || Math.abs(da) <= half) this.damageNpc(e, w.damage, p);
       }
     }
-    this.fx({ t: 'swing', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, range: r, arc: w.arcDeg || 100 }, p.mapId, p.x, p.y);
+    this.fx({ t: 'swing', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, range: r, arc: arcDeg }, p.mapId, p.x, p.y);
+  }
+
+  // Сколько снарядов даёт оружие этому игроку (таланты магов/воров)
+  projCount(p, w) {
+    let n = w.projectilesPerShot || 1;
+    if (w.school === 'magic') n += p.derived?.magicProj || 0;
+    if (w.id === 'knives') n += p.derived?.knifeProj || 0;
+    return n;
   }
 
   spawnPlayerBullets(p, w, aim, seed) {
     const rand = mulberry32(seed);
-    const dmg = Math.round(w.damage * (p.dmgMult || 1) * 10) / 10;
-    for (let i = 0; i < w.projectilesPerShot; i++) {
-      const spread = (rand() - 0.5) * w.spreadDeg * Math.PI / 180;
+    const atk = this.rollAttack(p, w);
+    const count = this.projCount(p, w);
+    // замедление льдом; талант мага усиливает
+    let slow = w.slow;
+    if (slow && this.hasTalent(p, 'frostMaster')) slow = { mult: 0.45, time: 2.5 };
+    for (let i = 0; i < count; i++) {
+      const extraSpread = count > (w.projectilesPerShot || 1) ? Math.max(w.spreadDeg, 10) : w.spreadDeg;
+      const spread = (rand() - 0.5) * extraSpread * Math.PI / 180;
       const a = aim + spread;
       this.projectiles.push({
         x: p.x, y: p.y - 4, vx: Math.cos(a) * w.projectileSpeed, vy: Math.sin(a) * w.projectileSpeed,
-        life: w.projLife, radius: w.projRadius, dmg, knockback: w.knockback,
+        life: w.projLife, radius: w.projRadius, dmg: atk.dmg, crit: atk.crit,
+        knockback: w.knockback, slow, school: w.school,
         owner: p.id, friendly: true, mapId: p.mapId,
       });
     }
@@ -527,18 +661,30 @@ export class Game {
       const dx = Math.cos(a) * kb, dy = Math.sin(a) * kb;
       if (!map.isSolid(Math.floor((e.x + dx) / TILE), Math.floor((e.y + dy) / TILE))) { e.x += dx; e.y += dy; }
     }
-    this.fx({ t: 'hurt', id: e.id, x: e.x, y: e.y }, e.mapId, e.x, e.y);
+    // замедление льдом
+    if (pr && pr.slow) { e.slowT = Math.max(e.slowT || 0, pr.slow.time); e.slowMult = pr.slow.mult; }
+    this.fx({ t: 'hurt', id: e.id, x: e.x, y: e.y, dmg: Math.round(dmg * 10) / 10, crit: pr?.crit ? 1 : 0 }, e.mapId, e.x, e.y);
     if (e.hp <= 0) this.killEnemy(e, pr);
   }
 
   killEnemy(e, pr) {
     const def = ENEMIES[e.kind];
+    const killer = pr && this.players.get(pr.owner);
     this.entities.delete(e.id);
     this.fx({ t: 'die', id: e.id, kind: def.sprite, x: e.x, y: e.y }, e.mapId, e.x, e.y);
+    // опыт — всем игрокам рядом (кооп-дружелюбно), иначе убийце
+    const nearby = [...this.players.values()].filter(q =>
+      !q.dead && q.mapId === e.mapId && dist2(q.x, q.y, e.x, e.y) < 350 ** 2);
+    const gainers = nearby.length ? nearby : (killer ? [killer] : []);
+    for (const q of gainers) this.addXp(q, def.xp);
+    // Кровожадность: лечение за убийство в ближнем бою
+    if (killer && pr.school === 'melee' && this.hasTalent(killer, 'bloodlust'))
+      killer.hp = Math.min(killer.maxHp, killer.hp + 1);
     // дроп
     for (const [item, range] of Object.entries(def.drops || {})) {
       if (item === 'weapon') { this.dropRandomWeapon(e.mapId, e.x, e.y); continue; }
-      const n = Array.isArray(range) ? randInt(this.rand, range[0], range[1]) : range;
+      let n = Array.isArray(range) ? randInt(this.rand, range[0], range[1]) : range;
+      if (item === 'coin' && killer) n = Math.round(n * (killer.derived?.coinMult || 1));
       if (n > 0) this.spawnDrop(item, n, e.mapId, e.x + (this.rand() - 0.5) * 14, e.y + (this.rand() - 0.5) * 14);
     }
     if (this.rand() < 0.15) this.spawnDrop('herb', 1, e.mapId, e.x, e.y);
@@ -552,7 +698,6 @@ export class Game {
       this.events.push(this.world.day, `Пал грозный ${def.name}!`);
     }
     // квест «убить стаю» проверяется в onTokenUnitKilled через журнал
-    const killer = pr && this.players.get(pr.owner);
     if (killer && killer.quest && killer.quest.type === 'kill' && e.token === killer.quest.token) {
       const tokenGone = !this.abstract.tokens.some(t => t.id === e.token);
       if (tokenGone) this.completeQuestObjective(killer);
@@ -885,7 +1030,7 @@ export class Game {
       if (poi) quest = {
         type: 'clear', poi: poi.id, giver: s.id, done: false,
         title: `Зачистить: ${poi.name}`, tx: poi.x, ty: poi.y,
-        reward: { coins: 40 + poi.difficulty * 25, rep: 15 },
+        reward: { coins: 40 + poi.difficulty * 25, rep: 15, xp: 40 + poi.difficulty * 20 },
       };
     } else if (roll < 0.75) {
       const tok = this.abstract.tokens
@@ -894,7 +1039,7 @@ export class Game {
       if (tok) quest = {
         type: 'kill', token: tok.id, giver: s.id, done: false,
         title: `Истребить: ${tok.name}`, tx: Math.round(tok.x / TILE), ty: Math.round(tok.y / TILE),
-        reward: { coins: 35, rep: 12 },
+        reward: { coins: 35, rep: 12, xp: 45 },
       };
     }
     if (!quest) {
@@ -902,7 +1047,7 @@ export class Game {
       if (to) quest = {
         type: 'deliver', to: to.id, giver: s.id, done: false,
         title: `Доставить письмо в ${to.name}`, tx: to.x, ty: to.y,
-        reward: { coins: 25, rep: 10 },
+        reward: { coins: 25, rep: 10, xp: 30 },
       };
     }
     if (!quest) return;

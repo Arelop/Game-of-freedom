@@ -12,6 +12,8 @@ export const MSG = {
   USE_ITEM: 'useItem',    // { item }
   EQUIP: 'equip',         // { item } надеть из инвентаря
   UNEQUIP: 'unequip',     // { slot } снять в инвентарь
+  SPEND_STAT: 'spendStat',     // { stat } потратить очко характеристики
+  LEARN_TALENT: 'learnTalent', // { id } изучить талант
 
   // сервер -> клиент
   WELCOME: 'welcome',     // { id, worldSeed, worldMeta, tick }

@@ -35,10 +35,10 @@ export class Net {
     this.handlers = {};                   // события для main: onFx, onToast, onDialog, onMapChange, onChunk
   }
 
-  connect(name) {
+  connect(name, cls = 'warrior') {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     this.ws = new WebSocket(proto + '//' + location.host);
-    this.ws.onopen = () => this.ws.send(JSON.stringify({ t: MSG.JOIN, name }));
+    this.ws.onopen = () => this.ws.send(JSON.stringify({ t: MSG.JOIN, name, cls }));
     this.ws.onmessage = e => this.onMessage(JSON.parse(e.data));
     this.ws.onclose = () => { this.connected = false; this.handlers.onDisconnect?.(); };
     setInterval(() => {
@@ -53,7 +53,9 @@ export class Net {
 
   onMessage(m) {
     if (m.t === MSG.WELCOME) {
-      this.myId = m.id; this.skin = m.skin;
+      this.myId = m.id;
+      this.sprite = m.sprite || 'player_0';
+      this.cls = m.cls || 'warrior';
       this.mapInfo = m.mapInfo;
       this.connected = true;
       this.handlers.onWelcome?.(m);

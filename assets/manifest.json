@@ -50,6 +50,9 @@
     "player_1": { "pack": "d", "tx": 3, "ty": 8 },
     "player_2": { "pack": "d", "tx": 4, "ty": 8 },
     "player_3": { "pack": "d", "tx": 2, "ty": 8 },
+    "player_warrior": { "pack": "d", "tx": 1, "ty": 8 },
+    "player_mage":    { "pack": "d", "tx": 0, "ty": 7 },
+    "player_rogue":   { "pack": "d", "tx": 3, "ty": 9 },
 
     "npc_wizard":   { "pack": "d", "tx": 0, "ty": 7 },
     "npc_villager": { "pack": "d", "tx": 1, "ty": 7 },

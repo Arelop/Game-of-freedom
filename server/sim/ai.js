@@ -10,6 +10,11 @@ export function updateEnemy(e, dt, map, players, rand) {
   const def = ENEMIES[e.kind];
   const shots = [];
 
+  // замедление (лёд): множитель скорости, пока действует slowT
+  let slowF = 1;
+  if (e.slowT > 0) { e.slowT -= dt; slowF = e.slowMult || 0.65; }
+  e.slowF = slowF;
+
   // цель — ближайший живой игрок
   let target = null, bestD = Infinity;
   for (const p of players) {
@@ -32,12 +37,12 @@ export function updateEnemy(e, dt, map, players, rand) {
         if (e.stateT <= 0) { e.state = 'lunge'; e.stateT = 0.35; e.lungeA = ang; }
       } else if (e.state === 'lunge') {
         e.stateT -= dt;
-        moveWithCollision(e, Math.cos(e.lungeA) * def.lungeSpeed * dt, Math.sin(e.lungeA) * def.lungeSpeed * dt, def.radius, map);
+        moveWithCollision(e, Math.cos(e.lungeA) * def.lungeSpeed * slowF * dt, Math.sin(e.lungeA) * def.lungeSpeed * slowF * dt, def.radius, map);
         if (e.stateT <= 0) { e.state = 'chase'; e.cd = 0.8; }
       } else {
         e.cd = Math.max(0, (e.cd || 0) - dt);
         if (dist < def.lungeRange && e.cd <= 0) { e.state = 'windup'; e.stateT = def.lungeWindup; }
-        else moveWithCollision(e, Math.cos(ang) * def.speed * dt, Math.sin(ang) * def.speed * dt, def.radius, map);
+        else moveWithCollision(e, Math.cos(ang) * def.speed * slowF * dt, Math.sin(ang) * def.speed * slowF * dt, def.radius, map);
       }
       break;
     }
@@ -51,7 +56,7 @@ export function updateEnemy(e, dt, map, players, rand) {
         mx = -Math.sin(ang) * s; my = Math.cos(ang) * s;
         if (rand() < 0.01) e.strafeDir = -s;
       }
-      moveWithCollision(e, mx * def.speed * dt, my * def.speed * dt, def.radius, map);
+      moveWithCollision(e, mx * def.speed * slowF * dt, my * def.speed * slowF * dt, def.radius, map);
       e.fireT = (e.fireT ?? def.fireInterval * rand()) - dt;
       if (e.fireT <= 0 && dist < 240) {
         e.fireT = def.fireInterval;
@@ -74,11 +79,11 @@ export function updateEnemy(e, dt, map, players, rand) {
         if (e.stateT <= 0) { e.state = 'dash'; e.stateT = def.dashTime; }
       } else if (e.state === 'dash') {
         e.stateT -= dt;
-        moveWithCollision(e, Math.cos(e.lungeA) * def.dashSpeed * dt, Math.sin(e.lungeA) * def.dashSpeed * dt, def.radius, map);
+        moveWithCollision(e, Math.cos(e.lungeA) * def.dashSpeed * slowF * dt, Math.sin(e.lungeA) * def.dashSpeed * slowF * dt, def.radius, map);
         if (e.stateT <= 0) { e.state = 'idle'; e.cd = 1.2; }
       } else {
         e.cd = Math.max(0, (e.cd || 0) - dt);
-        moveWithCollision(e, Math.cos(ang + 0.5) * def.speed * dt, Math.sin(ang + 0.5) * def.speed * dt, def.radius, map);
+        moveWithCollision(e, Math.cos(ang + 0.5) * def.speed * slowF * dt, Math.sin(ang + 0.5) * def.speed * slowF * dt, def.radius, map);
         if (e.cd <= 0 && dist < 180) { e.state = 'windup'; e.stateT = def.dashWindup; e.lungeA = ang; }
       }
       break;
@@ -98,7 +103,7 @@ export function updateEnemy(e, dt, map, players, rand) {
         ? { x: -Math.sin(ang), y: Math.cos(ang) }
         : { x: Math.cos(ang), y: Math.sin(ang) };
       if (dist > 40 || step.move === 'strafe')
-        moveWithCollision(e, mv.x * def.speed * dt, mv.y * def.speed * dt, def.radius, map);
+        moveWithCollision(e, mv.x * def.speed * slowF * dt, mv.y * def.speed * slowF * dt, def.radius, map);
       break;
     }
   }

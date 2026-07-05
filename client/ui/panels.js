@@ -3,6 +3,8 @@ import { STR, ITEM_NAMES } from '../../shared/strings.js';
 import { MSG } from '../../shared/protocol.js';
 import { ITEMS, GEAR_SLOTS, SLOT_NAMES, isGear, isPotion, describeItem } from '../../shared/items.js';
 import { AMMO_NAMES } from '../../shared/weapons.js';
+import { CLASSES, STAT_KEYS, STAT_NAMES, STAT_DESC, xpNeed, MAX_LEVEL } from '../../shared/classes.js';
+import { TALENTS, TIER_REQ } from '../../shared/talents.js';
 import { SFX } from '../sfx.js';
 
 const USABLE_FOOD = new Set(['bread', 'meat', 'cooked_meat', 'bandage']);
@@ -14,9 +16,11 @@ export class Panels {
     this.toastsEl = document.getElementById('toasts');
     this.dialogEl = document.getElementById('dialog');
     this.invEl = document.getElementById('inv');
+    this.charEl = document.getElementById('char');
     this.deadEl = document.getElementById('deadmsg');
     this.helpEl = document.getElementById('help');
     this.invOpen = false;
+    this.charOpen = false;
     this.iconCache = new Map();
     this.helpEl.textContent = STR.controls;
     setTimeout(() => { this.helpEl.style.display = 'none'; }, 20000);
@@ -187,6 +191,90 @@ export class Panels {
   setDead(dead, downT) {
     this.deadEl.style.display = dead ? 'block' : 'none';
     if (dead) this.deadEl.innerHTML = STR.dead + '<br>' + STR.respawnIn(Math.ceil(downT));
+  }
+
+  // ---------- лист персонажа (C) ----------
+  toggleChar() {
+    this.charOpen = !this.charOpen;
+    this.charEl.style.display = this.charOpen ? 'block' : 'none';
+    if (this.charOpen) this.renderChar();
+  }
+
+  renderChar() {
+    if (!this.charOpen || !this.net.you) return;
+    const you = this.net.you;
+    const el = this.charEl;
+    const C = CLASSES[you.cls] || CLASSES.warrior;
+    el.innerHTML = '';
+
+    const h = document.createElement('h3');
+    h.textContent = `${C.name} — уровень ${you.lvl}`;
+    el.appendChild(h);
+
+    // полоса опыта
+    const bar = document.createElement('div');
+    bar.className = 'xpbar';
+    bar.title = `Опыт: ${you.xp} / ${you.xpn}`;
+    const fill = document.createElement('div');
+    fill.className = 'xpfill';
+    fill.style.width = you.lvl >= MAX_LEVEL ? '100%' : Math.round(100 * you.xp / you.xpn) + '%';
+    bar.appendChild(fill);
+    el.appendChild(bar);
+
+    // характеристики
+    const sh = document.createElement('h3');
+    sh.innerHTML = 'Характеристики' + (you.sp > 0 ? ` <span class="pts">(+${you.sp} очк.)</span>` : '');
+    el.appendChild(sh);
+    for (const key of STAT_KEYS) {
+      const row = document.createElement('div');
+      row.className = 'strow';
+      row.title = STAT_DESC[key];
+      const label = document.createElement('span');
+      label.innerHTML = `${STAT_NAMES[key]}: <b>${you.st?.[key] ?? 0}</b><br><span class="statdesc">${STAT_DESC[key]}</span>`;
+      row.appendChild(label);
+      if (you.sp > 0) {
+        const plus = document.createElement('button');
+        plus.className = 'plus';
+        plus.textContent = '+';
+        plus.onclick = () => {
+          SFX.ui();
+          this.net.send({ t: MSG.SPEND_STAT, stat: key });
+          setTimeout(() => this.renderChar(), 150);
+        };
+        row.appendChild(plus);
+      }
+      el.appendChild(row);
+    }
+
+    // таланты
+    const th = document.createElement('h3');
+    th.innerHTML = 'Таланты' + (you.tp2 > 0 ? ` <span class="pts">(+${you.tp2} очк.)</span>` : '');
+    el.appendChild(th);
+    const learned = you.tl || [];
+    let lastTier = 0;
+    for (const t of TALENTS[you.cls] || []) {
+      if (t.tier !== lastTier) {
+        lastTier = t.tier;
+        const tl = document.createElement('div');
+        tl.className = 'tierlabel';
+        tl.textContent = `— Ярус ${t.tier}` + (TIER_REQ[t.tier] ? ` (нужно ${TIER_REQ[t.tier]} изученных)` : '');
+        el.appendChild(tl);
+      }
+      const box = document.createElement('div');
+      const isLearned = learned.includes(t.id);
+      const tierOpen = learned.length >= TIER_REQ[t.tier];
+      const avail = !isLearned && tierOpen && you.tp2 > 0;
+      box.className = 'talent ' + (isLearned ? 'learned' : avail ? 'avail' : 'locked');
+      box.innerHTML = `<div class="tname">${isLearned ? '✓ ' : ''}${t.name}</div><div class="tdesc">${t.desc}</div>`;
+      if (avail) {
+        box.onclick = () => {
+          SFX.quest();
+          this.net.send({ t: MSG.LEARN_TALENT, id: t.id });
+          setTimeout(() => this.renderChar(), 150);
+        };
+      }
+      el.appendChild(box);
+    }
   }
 }
 

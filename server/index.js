@@ -35,8 +35,8 @@ const http = createServer(async (req, res) => {
 const game = new Game(SEED);
 loadWorld(game);
 const _addPlayer = game.addPlayer.bind(game);
-game.addPlayer = (id, name, ws) => {
-  const p = _addPlayer(id, name, ws);
+game.addPlayer = (...args) => {
+  const p = _addPlayer(...args);
   applySavedPlayer(game, p);
   return p;
 };

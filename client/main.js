@@ -54,6 +54,12 @@ let localMag = 0, localWeapon = '';
 let invRefresh = 0;
 let swingAnim = 0;       // анимация замаха своего игрока
 const swings = [];       // {x,y,aim,range,arc,t,maxT,color}
+const floatTexts = [];   // летящие цифры урона {x,y,text,color,t,big}
+
+function addFloatText(x, y, text, color, big = false) {
+  floatTexts.push({ x: x + (Math.random() - 0.5) * 8, y: y - 10, text, color, t: 0.9, big });
+  if (floatTexts.length > 40) floatTexts.shift();
+}
 
 function spawnSwing(x, y, aim, range, arc, w) {
   swings.push({ x, y, aim, range: range || 28, arc: (arc || 100) * Math.PI / 180, t: 0.18, maxT: 0.18, color: w?.swingColor || '#eee' });
@@ -73,11 +79,26 @@ nameInput.value = localStorage.getItem('heroName') || '';
 document.getElementById('joinBtn').onclick = join;
 nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
 
+// выбор класса
+let pickedClass = localStorage.getItem('heroClass') || 'warrior';
+for (const card of document.querySelectorAll('.clscard')) {
+  if (card.dataset.cls === pickedClass) {
+    document.querySelector('.clscard.selected')?.classList.remove('selected');
+    card.classList.add('selected');
+  }
+  card.onclick = () => {
+    document.querySelector('.clscard.selected')?.classList.remove('selected');
+    card.classList.add('selected');
+    pickedClass = card.dataset.cls;
+    localStorage.setItem('heroClass', pickedClass);
+  };
+}
+
 function join() {
   const name = nameInput.value.trim() || 'Безымянный';
   localStorage.setItem('heroName', name);
   document.getElementById('menuHint').textContent = STR.connecting;
-  net.connect(name);
+  net.connect(name, pickedClass);
 }
 
 net.handlers.onWelcome = () => { menu.style.display = 'none'; SFX.quest(); };
@@ -107,7 +128,13 @@ net.handlers.onFx = (kind, m) => {
     case 'hurt':
       flashes.set(m.id, performance.now() + 80);
       particles.blood(m.x, m.y, 5);
+      if (m.dmg) addFloatText(m.x, m.y, (m.crit ? '💥' : '') + m.dmg, m.crit ? '#fbf236' : '#eeeeee', !!m.crit);
       SFX.hit();
+      break;
+    case 'levelup':
+      particles.sparkle(m.x, m.y);
+      particles.heal(m.x, m.y);
+      if (m.pid === net.myId) { SFX.quest(); addFloatText(m.x, m.y - 8, 'УРОВЕНЬ!', '#fbf236', true); }
       break;
     case 'phurt':
       if (m.id === net.myId) { vignette = 0.6; cam.addTrauma(0.5); SFX.hurt(); }
@@ -135,6 +162,7 @@ input.onKey = k => {
   if (k === 'KeyE') { net.send({ t: MSG.INTERACT }); SFX.ui(); }
   if (k === 'KeyR') net.send({ t: MSG.RELOAD });
   if (k === 'Tab') panels.toggleInventory();
+  if (k === 'KeyC') panels.toggleChar();
   if (k === 'KeyM') bigMap = !bigMap;
   if (k === 'F3') hud.debug = !hud.debug;
   if (k === 'Escape') panels.hideDialog();
@@ -198,10 +226,12 @@ function simStep() {
     }
   }
 
-  // затухание свингов
+  // затухание свингов и цифр урона
   swingAnim = Math.max(0, swingAnim - SIM_DT);
   for (const s of swings) s.t -= SIM_DT;
   for (let i = swings.length - 1; i >= 0; i--) if (swings[i].t <= 0) swings.splice(i, 1);
+  for (const f of floatTexts) { f.t -= SIM_DT; f.y -= 18 * SIM_DT; }
+  for (let i = floatTexts.length - 1; i >= 0; i--) if (floatTexts[i].t <= 0) floatTexts.splice(i, 1);
 
   // перекат: эффекты на старте
   if (net.pred.rollT > 0 && !wasRolling) { particles.dust(net.pred.x, net.pred.y); SFX.roll(); }
@@ -230,7 +260,11 @@ function simStep() {
   // мёртв?
   if (you) panels.setDead(!!you.dead, you.dt || 0);
   invRefresh -= SIM_DT;
-  if (panels.invOpen && invRefresh <= 0) { panels.renderInventory(); invRefresh = 0.5; }
+  if (invRefresh <= 0) {
+    if (panels.invOpen) panels.renderInventory();
+    if (panels.charOpen) panels.renderChar();
+    invRefresh = 0.5;
+  }
 }
 
 // ---------- рендер ----------
@@ -289,6 +323,20 @@ function render(timeSec) {
     ctx.globalAlpha = 1;
   }
 
+  // летящие цифры урона
+  ctx.textAlign = 'center';
+  for (const f of floatTexts) {
+    const s = cam.toScreen(f.x, f.y);
+    ctx.font = f.big ? 'bold 10px monospace' : '8px monospace';
+    ctx.globalAlpha = Math.min(1, f.t / 0.4);
+    ctx.fillStyle = '#000';
+    ctx.fillText(f.text, s.x + 1, s.y + 1);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, s.x, s.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+
   particles.render(ctx, cam);
   renderLight(timeSec);
 
@@ -313,7 +361,7 @@ function drawMe(timeSec) {
   if (!you) return;
   const p = net.pred;
   const s = cam.toScreen(p.x, p.y);
-  const sprite = 'player_' + net.skin;
+  const sprite = net.sprite || 'player_0';
   atlas.draw(ctx, 'fx_shadow', s.x, s.y + 6);
   if (you.dead) {
     atlas.draw(ctx, sprite, s.x, s.y, { rot: Math.PI / 2, alpha: 0.7 });

@@ -2,6 +2,7 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CLASSES } from '../shared/classes.js';
 
 const SAVES = join(dirname(fileURLToPath(import.meta.url)), '..', 'saves');
 const FILE = join(SAVES, 'world.json');
@@ -22,6 +23,8 @@ export function saveWorld(game) {
         hp: p.hp, hunger: p.hunger, coins: p.coins,
         weapons: p.weapons, ammo: p.ammo, inventory: p.inventory, rep: p.rep,
         equipment: p.equipment,
+        cls: p.cls, level: p.level, xp: p.xp,
+        statPts: p.statPts, talentPts: p.talentPts, stats: p.stats, talents: p.talents,
       })),
     };
     writeFileSync(FILE, JSON.stringify(data));
@@ -62,6 +65,14 @@ export function applySavedPlayer(game, p) {
     weapons: rec.weapons, ammo: rec.ammo, inventory: rec.inventory, rep: rec.rep,
   });
   if (rec.equipment) p.equipment = { armor: null, helmet: null, amulet: null, shield: null, ...rec.equipment };
+  if (rec.cls) { // сохранённый персонаж: класс и прокачка из сейва
+    p.cls = rec.cls;
+    p.sprite = CLASSES[rec.cls]?.sprite || p.sprite;
+    p.level = rec.level ?? 1; p.xp = rec.xp ?? 0;
+    p.statPts = rec.statPts ?? 0; p.talentPts = rec.talentPts ?? 0;
+    if (rec.stats) p.stats = rec.stats;
+    if (rec.talents) p.talents = rec.talents;
+  }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);
 }
