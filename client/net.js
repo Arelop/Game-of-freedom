@@ -130,6 +130,9 @@ export class Net {
   onSnapshot(snap) {
     this.you = snap.you;
     this.worldTime = snap.time; this.day = snap.day;
+    // статы от экипировки/бафов — в предсказание
+    this.pred.speedMult = snap.you.sm || 1;
+    this.pred.rollCdMult = snap.you.rcm || 1;
     if (snap.you.map !== this.mapId) {
       this.mapId = snap.you.map;
       this.remotes.clear(); this.bullets.length = 0;

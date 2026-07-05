@@ -21,6 +21,7 @@ export function saveWorld(game) {
         name: p.name, x: p.x, y: p.y, mapId: 'over',
         hp: p.hp, hunger: p.hunger, coins: p.coins,
         weapons: p.weapons, ammo: p.ammo, inventory: p.inventory, rep: p.rep,
+        equipment: p.equipment,
       })),
     };
     writeFileSync(FILE, JSON.stringify(data));
@@ -60,5 +61,7 @@ export function applySavedPlayer(game, p) {
     x: rec.x, y: rec.y, hp: Math.max(1, rec.hp), hunger: rec.hunger, coins: rec.coins,
     weapons: rec.weapons, ammo: rec.ammo, inventory: rec.inventory, rep: rec.rep,
   });
+  if (rec.equipment) p.equipment = { armor: null, helmet: null, amulet: null, shield: null, ...rec.equipment };
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
+  game.recomputeStats(p);
 }

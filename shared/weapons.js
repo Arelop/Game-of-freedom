@@ -13,10 +13,10 @@ export const WEAPONS = {
   },
   bow: {
     id: 'bow', name: 'Лук', damage: 3, projectilesPerShot: 1,
-    spreadDeg: 3, projectileSpeed: 360, fireRate: 3, magSize: 999,
-    reloadTime: 0.4, knockback: 25, recoilShake: 0.12,
+    spreadDeg: 3, projectileSpeed: 360, fireRate: 3, magSize: 12,
+    reloadTime: 0.8, knockback: 25, recoilShake: 0.12,
     sprite: 'wpn_bow', projSprite: 'proj_arrow', sound: 'shot_bow',
-    projRadius: 2, projLife: 1.4, ammoType: 'arrow', infiniteAmmo: true,
+    projRadius: 2, projLife: 1.4, ammoType: 'arrow',
   },
   huntbow: {
     id: 'huntbow', name: 'Охотничий лук', damage: 6, projectilesPerShot: 1,

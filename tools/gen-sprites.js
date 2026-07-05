@@ -211,6 +211,55 @@ const GEN = {
     px(s, 0, 0, C.tan); px(s, 0, 2, C.tan);
     return s;
   },
+  armorIcon({ tier = 'leather' } = {}) {
+    const s = make(12, 12);
+    const main = tier === 'leather' ? C.lbrown : tier === 'chain' ? C.gray : C.steel;
+    const dark = tier === 'leather' ? C.brown : C.dgray;
+    // торс с плечами
+    rect(s, 3, 2, 6, 8, main);
+    rect(s, 1, 2, 2, 3, main); rect(s, 9, 2, 2, 3, main);
+    frame(s, 3, 2, 6, 8, dark);
+    px(s, 5, 1, dark); px(s, 6, 1, dark);              // ворот
+    if (tier === 'chain') { for (let y = 3; y < 9; y += 2) for (let x = 4; x < 9; x += 2) px(s, x, y, C.lgray); }
+    if (tier === 'plate') { rect(s, 4, 4, 4, 1, C.white); px(s, 5, 6, C.lgray); px(s, 6, 6, C.lgray); }
+    if (tier === 'leather') { rect(s, 4, 6, 4, 1, C.dbrown); }
+    return s;
+  },
+  hoodIcon() {
+    const s = make(12, 11);
+    disc(s, 6, 5, 4, C.dgreen);
+    rect(s, 2, 5, 8, 4, C.dgreen);
+    rect(s, 4, 5, 4, 3, C.dblue);                       // тень лица
+    px(s, 6, 1, C.swamp); px(s, 7, 2, C.swamp);         // кончик капюшона
+    frame(s, 2, 5, 8, 4, C.swamp);
+    return s;
+  },
+  helmetIcon() {
+    const s = make(12, 11);
+    disc(s, 6, 5, 4, C.steel);
+    rect(s, 2, 5, 8, 4, C.steel);
+    rect(s, 3, 6, 6, 1, C.dgray);                       // смотровая щель
+    px(s, 6, 1, C.lgray); rect(s, 5, 0, 2, 2, C.red);   // плюмаж
+    frame(s, 2, 4, 8, 5, C.dgray);
+    return s;
+  },
+  amuletIcon({ kind = 'wolf' } = {}) {
+    const s = make(11, 12);
+    // шнурок
+    for (let i = 0; i < 4; i++) { px(s, 3 - i + 2, 1 + i, C.brown); px(s, 7 + i - 2, 1 + i, C.brown); }
+    px(s, 5, 0, C.brown);
+    const gem = kind === 'bear' ? C.red : C.cyan;
+    const gemD = kind === 'bear' ? C.dred : C.blue;
+    disc(s, 5, 7, 3, gemD); disc(s, 5, 7, 2, gem); px(s, 4, 6, C.white);
+    if (kind === 'wolf') { px(s, 3, 10, C.lgray); px(s, 7, 10, C.lgray); } // клыки
+    return s;
+  },
+  ringIcon() {
+    const s = make(10, 10);
+    ring(s, 5, 5, 3, C.yellow); ring(s, 5, 6, 3, C.orange);
+    disc(s, 5, 2, 1, C.lgreen); px(s, 5, 1, C.white);   // камень
+    return s;
+  },
   coin() {
     const s = make(8, 8);
     disc(s, 4, 4, 3, C.orange); disc(s, 4, 4, 2, C.yellow); px(s, 3, 3, C.white);

@@ -1,6 +1,7 @@
 // Точка входа клиента: цикл с фиксированным шагом, рендер, эффекты.
 import { VIEW_W, VIEW_H, SIM_DT, TILE, PLAYER_RADIUS } from '../shared/constants.js';
 import { WEAPONS } from '../shared/weapons.js';
+import { ITEMS } from '../shared/items.js';
 import { STR } from '../shared/strings.js';
 import { MSG } from '../shared/protocol.js';
 import { Net } from './net.js';
@@ -40,7 +41,7 @@ const cam = new Camera();
 const particles = new Particles();
 const hud = new Hud(atlas);
 const tiles = new TileRenderer(atlas, net);
-const panels = new Panels(net);
+const panels = new Panels(net, atlas);
 
 // локальное косметическое состояние
 let fireCd = 0;
@@ -357,7 +358,8 @@ function drawEntity(id, r, p, nowMs, timeSec) {
 
   if (e.tp === 'd') {
     const bob = Math.sin(timeSec * 4 + p.x) * 1.5;
-    const spriteName = e.k.startsWith('weapon:') ? WEAPONS[e.k.slice(7)]?.sprite : 'item_' + e.k;
+    const spriteName = e.k.startsWith('weapon:') ? WEAPONS[e.k.slice(7)]?.sprite
+      : (ITEMS[e.k]?.icon || 'item_' + e.k);
     atlas.draw(ctx, 'fx_shadow', s.x, s.y + 4, { alpha: 0.6 });
     atlas.draw(ctx, spriteName || 'item_coin', s.x, s.y - 3 + bob);
     return;

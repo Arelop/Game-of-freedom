@@ -76,6 +76,8 @@ export class Net {
       case MSG.INTERACT: game.interact(p); break;
       case MSG.DIALOG_CHOICE: game.dialogChoice(p, String(m.id || ''), String(m.choice || '')); break;
       case MSG.USE_ITEM: game.useItem(p, String(m.item || '')); break;
+      case MSG.EQUIP: game.equipItem(p, String(m.item || '')); break;
+      case MSG.UNEQUIP: game.unequipItem(p, String(m.slot || '')); break;
     }
   }
 
@@ -156,6 +158,8 @@ export class Net {
         ammo: p.ammo, inv: p.inventory,
         rt: r2(p.reloadT), dead: p.dead ? 1 : 0, dt: r1(p.downT),
         rc: r2(p.rollCd), map: p.mapId,
+        eq: p.equipment, sm: r2(p.speedMult || 1), rcm: r2(p.rollCdMult || 1),
+        bf: Object.fromEntries(Object.entries(p.buffs || {}).map(([k, b]) => [k, Math.ceil(b.t)])),
         q: p.quest ? { title: p.quest.title, done: p.quest.done, tx: p.quest.tx, ty: p.quest.ty } : null,
         rep: p.rep,
       },

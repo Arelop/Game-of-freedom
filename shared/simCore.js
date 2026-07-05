@@ -16,6 +16,8 @@ export function makePlayerState(x, y) {
     rollDx: 0, rollDy: 0,
     hp: 6, hurtT: 0,   // время неуязвимости после урона
     fireCd: 0, reloadT: 0, mag: 0,
+    speedMult: 1,      // экипировка/бафы (сервер шлёт в снапшоте)
+    rollCdMult: 1,
   };
 }
 
@@ -32,27 +34,28 @@ export function stepPlayer(p, input, dt, map) {
   if (p.reloadT > 0) p.reloadT = Math.max(0, p.reloadT - dt);
   p.aim = input.aim;
 
+  const spd = PLAYER_SPEED * (p.speedMult || 1);
   let dx = 0, dy = 0;
   if (p.rollT > 0) {
     p.rollT = Math.max(0, p.rollT - dt);
-    dx = p.rollDx * PLAYER_SPEED * ROLL_SPEED_MULT * dt;
-    dy = p.rollDy * PLAYER_SPEED * ROLL_SPEED_MULT * dt;
+    dx = p.rollDx * spd * ROLL_SPEED_MULT * dt;
+    dy = p.rollDy * spd * ROLL_SPEED_MULT * dt;
   } else {
     let mx = input.mx, my = input.my;
     const len = Math.hypot(mx, my);
     if (len > 1e-6) { mx /= Math.max(1, len); my /= Math.max(1, len); }
     if (input.roll && p.rollCd <= 0 && len > 1e-6) {
       p.rollT = ROLL_TIME;
-      p.rollCd = ROLL_TIME + ROLL_COOLDOWN;
+      p.rollCd = ROLL_TIME + ROLL_COOLDOWN * (p.rollCdMult || 1);
       p.rollDx = mx / len * Math.min(1, len) || mx;
       p.rollDy = my / len * Math.min(1, len) || my;
       const n = Math.hypot(p.rollDx, p.rollDy) || 1;
       p.rollDx /= n; p.rollDy /= n;
-      dx = p.rollDx * PLAYER_SPEED * ROLL_SPEED_MULT * dt;
-      dy = p.rollDy * PLAYER_SPEED * ROLL_SPEED_MULT * dt;
+      dx = p.rollDx * spd * ROLL_SPEED_MULT * dt;
+      dy = p.rollDy * spd * ROLL_SPEED_MULT * dt;
     } else {
-      dx = mx * PLAYER_SPEED * dt;
-      dy = my * PLAYER_SPEED * dt;
+      dx = mx * spd * dt;
+      dy = my * spd * dt;
     }
   }
   moveWithCollision(p, dx, dy, PLAYER_RADIUS, map);

@@ -10,6 +10,8 @@ export const MSG = {
   INTERACT: 'interact',   // контекстное действие (E)
   DIALOG_CHOICE: 'dialogChoice', // { id, choice }
   USE_ITEM: 'useItem',    // { item }
+  EQUIP: 'equip',         // { item } надеть из инвентаря
+  UNEQUIP: 'unequip',     // { slot } снять в инвентарь
 
   // сервер -> клиент
   WELCOME: 'welcome',     // { id, worldSeed, worldMeta, tick }
