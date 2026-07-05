@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Пограничье — кооп-шутер</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #14121a; overflow: hidden; }
+  body { font-family: 'Courier New', monospace; color: #eee; }
+  #game { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  canvas#screen { image-rendering: pixelated; image-rendering: crisp-edges; cursor: none; }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; background: rgba(10,8,16,.88); z-index: 10; }
+  .overlay h1 { font-size: 42px; letter-spacing: 8px; color: #d9a066; text-shadow: 3px 3px 0 #3f2827; }
+  .overlay .sub { color: #847e87; margin-bottom: 12px; }
+  .overlay input { background: #222034; color: #eee; border: 2px solid #5b6ee1; padding: 10px 14px; font-family: inherit; font-size: 18px; text-align: center; outline: none; }
+  .overlay button { background: #5b6ee1; color: #fff; border: none; padding: 10px 28px; font-family: inherit; font-size: 18px; cursor: pointer; }
+  .overlay button:hover { background: #639bff; }
+  .overlay .hint { color: #696a6a; font-size: 12px; max-width: 480px; text-align: center; line-height: 1.6; }
+  #toasts { position: absolute; top: 14%; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; z-index: 5; }
+  .toast { background: rgba(34,32,52,.92); border: 1px solid #5b6ee1; padding: 5px 14px; font-size: 14px; animation: fadeout 4s forwards; }
+  @keyframes fadeout { 0%{opacity:0; transform:translateY(-6px)} 8%{opacity:1; transform:none} 80%{opacity:1} 100%{opacity:0} }
+  #dialog { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); min-width: 340px; max-width: 560px; background: rgba(20,18,26,.95); border: 2px solid #d9a066; padding: 12px 16px; z-index: 6; display: none; }
+  #dialog .dname { color: #d9a066; font-weight: bold; margin-bottom: 6px; }
+  #dialog .dline { margin: 3px 0; font-size: 14px; line-height: 1.45; }
+  #dialog .dchoice { display: block; width: 100%; text-align: left; background: #222034; color: #99e550; border: 1px solid #45444f; margin-top: 6px; padding: 6px 10px; font-family: inherit; font-size: 14px; cursor: pointer; }
+  #dialog .dchoice:hover { background: #30303f; }
+  #inv { position: absolute; right: 12px; top: 60px; width: 240px; background: rgba(20,18,26,.95); border: 2px solid #5b6ee1; padding: 10px 14px; z-index: 6; display: none; }
+  #inv h3 { color: #639bff; margin-bottom: 8px; font-size: 15px; }
+  #inv .item { display: flex; justify-content: space-between; padding: 3px 4px; font-size: 14px; cursor: pointer; }
+  #inv .item:hover { background: #30303f; }
+  #inv .item .use { color: #99e550; font-size: 11px; }
+  #deadmsg { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); color: #d9574a; font-size: 22px; text-shadow: 2px 2px 0 #000; z-index: 5; display: none; text-align: center; }
+  #help { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; color: rgba(132,126,135,.75); font-size: 11px; pointer-events: none; z-index: 4; }
+</style>
+</head>
+<body>
+<div id="game"><canvas id="screen"></canvas></div>
+<div id="toasts"></div>
+<div id="dialog"></div>
+<div id="inv"></div>
+<div id="deadmsg"></div>
+<div id="help"></div>
+<div class="overlay" id="menu">
+  <h1>ПОГРАНИЧЬЕ</h1>
+  <div class="sub">кооп-шутер в живом открытом мире</div>
+  <input id="nameInput" maxlength="16" placeholder="Имя героя" value="">
+  <button id="joinBtn">В игру</button>
+  <div class="hint" id="menuHint">WASD — движение · ЛКМ — огонь · Пробел/ПКМ — перекат · R — перезарядка ·
+    E — действие · 1-4 — оружие · Tab — инвентарь · M — карта · F3 — отладка<br><br>
+    Для кооп-игры друг открывает этот же адрес в своём браузере.</div>
+</div>
+<script type="module" src="/client/main.js"></script>
+</body>
+</html>

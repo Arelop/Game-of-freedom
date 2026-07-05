@@ -1,0 +1,169 @@
+// Сетевой слой: подключения, роутинг сообщений, снапшоты 15 Гц с AOI.
+import { WebSocketServer } from 'ws';
+import { MSG, rleEncode } from '../shared/protocol.js';
+import { AOI_RADIUS, CHUNK, MAX_PLAYERS, SNAPSHOT_EVERY, TICK_RATE } from '../shared/constants.js';
+import { ENEMIES } from '../shared/enemies.js';
+import { dist2 } from '../shared/simCore.js';
+
+export class Net {
+  constructor(game, httpServer) {
+    this.game = game;
+    this.nextPlayerId = 1;
+    this.wss = new WebSocketServer({ server: httpServer });
+    this.wss.on('connection', ws => this.onConnection(ws));
+  }
+
+  onConnection(ws) {
+    ws.on('message', raw => {
+      let msg;
+      try { msg = JSON.parse(raw); } catch { return; }
+      this.onMessage(ws, msg);
+    });
+    ws.on('close', () => {
+      if (ws.playerId) {
+        const p = this.game.players.get(ws.playerId);
+        if (p) console.log(`[net] ${p.name} отключился`);
+        this.game.removePlayer(ws.playerId);
+      }
+    });
+    ws.on('error', () => {});
+  }
+
+  onMessage(ws, m) {
+    const game = this.game;
+    if (m.t === MSG.JOIN) {
+      if (ws.playerId) return;
+      if (game.players.size >= MAX_PLAYERS) { ws.send(JSON.stringify({ t: 'full' })); return; }
+      const id = this.nextPlayerId++;
+      const name = String(m.name || 'Игрок').slice(0, 16) || 'Игрок';
+      const p = game.addPlayer(id, name, ws);
+      ws.playerId = id;
+      console.log(`[net] ${name} вошёл (id=${id})`);
+      ws.send(JSON.stringify({
+        t: MSG.WELCOME, id, seed: game.world.seed, tick: game.tick,
+        tickRate: TICK_RATE, skin: p.skin,
+        mapInfo: {
+          settlements: game.world.settlements.map(s => ({ x: s.x, y: s.y, name: s.name, faction: s.faction })),
+          pois: game.world.pois.map(o => ({ x: o.x, y: o.y, name: o.name, type: o.type, cleared: o.cleared })),
+        },
+      }));
+      return;
+    }
+    const p = ws.playerId && game.players.get(ws.playerId);
+    if (!p) return;
+    switch (m.t) {
+      case MSG.INPUT: {
+        // защита от мусора
+        const dt = Math.min(0.05, Math.max(0.001, +m.dt || 0.016));
+        p.inputs.push({
+          seq: m.seq | 0, dt,
+          mx: clamp(+m.mx || 0), my: clamp(+m.my || 0),
+          aim: +m.aim || 0, fire: !!m.fire, roll: !!m.roll,
+        });
+        if (p.inputs.length > 30) p.inputs.splice(0, p.inputs.length - 30);
+        break;
+      }
+      case MSG.CHUNK_REQ: this.sendChunk(ws, p, m.cx | 0, m.cy | 0); break;
+      case MSG.PING:
+        ws.send(JSON.stringify({ t: MSG.PONG, t0: m.t0, tick: game.tick, time: game.world.time, day: game.world.day }));
+        break;
+      case MSG.SWITCH_WEAPON: {
+        const idx = m.slot | 0;
+        if (idx >= 0 && idx < p.weapons.length) { p.weaponIdx = idx; p.reloadT = 0; p.reloadPending = false; }
+        break;
+      }
+      case MSG.RELOAD: game.startReload(p); break;
+      case MSG.INTERACT: game.interact(p); break;
+      case MSG.DIALOG_CHOICE: game.dialogChoice(p, String(m.id || ''), String(m.choice || '')); break;
+      case MSG.USE_ITEM: game.useItem(p, String(m.item || '')); break;
+    }
+  }
+
+  sendChunk(ws, p, cx, cy) {
+    const tiles = this.game.chunks.getChunk(p.mapId, cx, cy);
+    if (!tiles) return;
+    ws.send(JSON.stringify({ t: MSG.CHUNK, mapId: p.mapId, cx, cy, rle: rleEncode(Array.from(tiles)) }));
+  }
+
+  // Рассылка после каждого тика: события всегда, снапшоты каждые SNAPSHOT_EVERY тиков
+  broadcast() {
+    const game = this.game;
+    const sendSnap = game.tick % SNAPSHOT_EVERY === 0;
+
+    for (const p of game.players.values()) {
+      if (!p.ws || p.ws.readyState !== 1) continue;
+      const msgs = [];
+
+      for (const { ev, mapId, x, y } of game.pendingFx) {
+        if (ev.pid !== undefined && (ev.t === 'dialog' || ev.t === 'toast' || ev.t === 'marker' || ev.t === 'mapChange')) {
+          if (ev.pid !== p.id && ev.t !== 'mapChange') continue;
+          if (ev.t === 'mapChange' && ev.pid !== p.id) { /* другим — как обычное событие */ }
+          else { msgs.push(ev); continue; }
+        }
+        if (ev.t === 'toast' && ev.pid === undefined) {
+          if (!ev.mapId || ev.mapId === p.mapId) msgs.push(ev);
+          continue;
+        }
+        if (mapId && mapId !== p.mapId) continue;
+        if (x !== undefined && dist2(x, y, p.x, p.y) > (AOI_RADIUS * 1.6) ** 2) continue;
+        msgs.push(ev);
+      }
+
+      if (sendSnap) msgs.push(this.buildSnapshot(p));
+      if (msgs.length) p.ws.send(JSON.stringify({ t: 'batch', tick: game.tick, msgs }));
+    }
+  }
+
+  buildSnapshot(p) {
+    const game = this.game;
+    const ents = [];
+    for (const q of game.players.values()) {
+      if (q.id === p.id || q.mapId !== p.mapId) continue;
+      if (dist2(q.x, q.y, p.x, p.y) > AOI_RADIUS ** 2) continue;
+      ents.push({
+        i: 'p' + q.id, tp: 'p', k: 'player_' + q.skin, x: r1(q.x), y: r1(q.y),
+        a: r2(q.aim), h: q.hp, hm: q.maxHp, nm: q.name, dn: q.dead ? 1 : 0,
+        rl: q.rollT > 0 ? 1 : 0, w: game.weapon(q).id,
+      });
+    }
+    for (const e of game.entities.values()) {
+      if (e.mapId !== p.mapId) continue;
+      if (dist2(e.x, e.y, p.x, p.y) > AOI_RADIUS ** 2) continue;
+      if (e.entType === 'drop') {
+        ents.push({ i: e.id, tp: 'd', k: e.item, x: r1(e.x), y: r1(e.y), c: e.count });
+      } else if (e.entType === 'enemy') {
+        const def = ENEMIES[e.kind];
+        ents.push({
+          i: e.id, tp: 'e', k: def.sprite, x: r1(e.x), y: r1(e.y), a: r2(e.aim || 0),
+          h: e.hp, hm: def.hp, st: e.state === 'windup' || e.state === 'dash' ? e.state : undefined,
+        });
+      } else {
+        ents.push({
+          i: e.id, tp: 'n', k: e.kind, x: r1(e.x), y: r1(e.y), a: r2(e.aim || 0),
+          h: e.hp, hm: e.maxHp, rо: undefined, ro: e.role,
+        });
+      }
+    }
+    const w = game.weapon(p);
+    return {
+      t: MSG.SNAPSHOT, tick: game.tick, lastSeq: p.lastSeq,
+      time: r2(game.world.time), day: game.world.day,
+      you: {
+        x: r1(p.x), y: r1(p.y), hp: p.hp, hm: p.maxHp,
+        hunger: Math.round(p.hunger), coins: p.coins,
+        w: w.id, wi: p.weaponIdx, ws: p.weapons,
+        mag: p.mags[w.id] || 0, magMax: w.magSize,
+        ammo: p.ammo, inv: p.inventory,
+        rt: r2(p.reloadT), dead: p.dead ? 1 : 0, dt: r1(p.downT),
+        rc: r2(p.rollCd), map: p.mapId,
+        q: p.quest ? { title: p.quest.title, done: p.quest.done, tx: p.quest.tx, ty: p.quest.ty } : null,
+        rep: p.rep,
+      },
+      ents,
+    };
+  }
+}
+
+function clamp(v) { return Math.max(-1, Math.min(1, v)); }
+function r1(v) { return Math.round(v * 10) / 10; }
+function r2(v) { return Math.round(v * 100) / 100; }

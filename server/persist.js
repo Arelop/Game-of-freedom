@@ -1,0 +1,64 @@
+// Сохранение/загрузка мира в saves/world.json (раз в 60 с и при выключении).
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SAVES = join(dirname(fileURLToPath(import.meta.url)), '..', 'saves');
+const FILE = join(SAVES, 'world.json');
+
+export function saveWorld(game) {
+  try {
+    mkdirSync(SAVES, { recursive: true });
+    const w = game.world;
+    const data = {
+      seed: w.seed, time: w.time, day: w.day,
+      edits: [...w.edits.entries()],
+      settlements: w.settlements.map(s => ({ id: s.id, population: s.population, prosperity: s.prosperity, food: s.food })),
+      pois: w.pois.map(o => ({ id: o.id, cleared: o.cleared })),
+      tokens: game.abstract.tokens.filter(t => !t.hydrated).map(({ hydrated, ...t }) => t),
+      events: game.events.entries,
+      players: [...game.players.values()].map(p => ({
+        name: p.name, x: p.x, y: p.y, mapId: 'over',
+        hp: p.hp, hunger: p.hunger, coins: p.coins,
+        weapons: p.weapons, ammo: p.ammo, inventory: p.inventory, rep: p.rep,
+      })),
+    };
+    writeFileSync(FILE, JSON.stringify(data));
+  } catch (e) { console.warn('[save] не удалось сохранить:', e.message); }
+}
+
+export function loadWorld(game) {
+  if (!existsSync(FILE)) return false;
+  try {
+    const data = JSON.parse(readFileSync(FILE, 'utf8'));
+    if (data.seed !== game.world.seed) return false;
+    const w = game.world;
+    w.time = data.time; w.day = data.day;
+    for (const [k, v] of data.edits) w.edits.set(k, v);
+    for (const rec of data.settlements) {
+      const s = w.settlements.find(x => x.id === rec.id);
+      if (s) Object.assign(s, rec);
+    }
+    for (const rec of data.pois) {
+      const o = w.pois.find(x => x.id === rec.id);
+      if (o) o.cleared = rec.cleared;
+    }
+    if (data.tokens) { game.abstract.tokens = data.tokens.map(t => ({ ...t, hydrated: null })); }
+    if (data.events) game.events.entries = data.events;
+    game.savedPlayers = new Map((data.players || []).map(p => [p.name, p]));
+    game.chunks.cache.clear();
+    console.log(`[save] мир загружен (день ${w.day})`);
+    return true;
+  } catch (e) { console.warn('[save] не удалось загрузить:', e.message); return false; }
+}
+
+// применить сохранённый профиль при входе игрока с тем же именем
+export function applySavedPlayer(game, p) {
+  const rec = game.savedPlayers?.get(p.name);
+  if (!rec) return;
+  Object.assign(p, {
+    x: rec.x, y: rec.y, hp: Math.max(1, rec.hp), hunger: rec.hunger, coins: rec.coins,
+    weapons: rec.weapons, ammo: rec.ammo, inventory: rec.inventory, rep: rec.rep,
+  });
+  for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
+}

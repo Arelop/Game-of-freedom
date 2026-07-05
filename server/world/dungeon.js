@@ -1,0 +1,103 @@
+// Данжи в стиле Gungeon: отдельный инстанс 64x64, комнаты + коридоры,
+// боевые комнаты запечатываются до зачистки, сокровищница, комната босса.
+import { T } from '../../shared/constants.js';
+import { mulberry32, randInt, pick } from '../../shared/rng.js';
+
+const SIZE = 64;
+
+export function generateDungeon(seed, difficulty, withBoss) {
+  const rand = mulberry32(seed);
+  const g = new Uint8Array(SIZE * SIZE).fill(T.DUNGEON_WALL);
+  const rooms = [];
+
+  // цепочка комнат: вход -> 3-5 боевых -> (сокровищница) -> (босс)
+  const count = randInt(rand, 3, 5) + (withBoss ? 1 : 0);
+  let px = 8, py = SIZE - 10;
+  const entrance = { x: px, y: py };
+  carveRoom(g, px, py, 4, 4);
+  let prev = { x: px, y: py };
+
+  for (let i = 0; i < count; i++) {
+    const isBoss = withBoss && i === count - 1;
+    const rw = isBoss ? randInt(rand, 8, 10) : randInt(rand, 5, 8);
+    const rh = isBoss ? randInt(rand, 8, 10) : randInt(rand, 5, 8);
+    // следующая комната — смещение вверх/вбок
+    let nx = 0, ny = 0, tries = 0;
+    do {
+      nx = prev.x + randInt(rand, -14, 14);
+      ny = prev.y - randInt(rand, 8, 14);
+      tries++;
+    } while ((nx < rw + 3 || nx > SIZE - rw - 3 || ny < rh + 3) && tries < 30);
+    if (ny < rh + 3) ny = rh + 3;
+    nx = Math.max(rw + 2, Math.min(SIZE - rw - 2, nx));
+
+    carveRoom(g, nx, ny, rw, rh);
+    const doors = carveCorridor(g, prev.x, prev.y, nx, ny);
+
+    const room = {
+      id: 'r' + i, x: nx, y: ny, w: rw, h: rh,
+      doors,          // тайлы-двери коридора (для запечатывания)
+      cleared: false, sealed: false,
+      isBoss,
+      isTreasure: false,
+      spawns: [],
+    };
+    const n = isBoss ? 1 : randInt(rand, 3, 4 + difficulty);
+    const kinds = isBoss ? ['bossOgre']
+      : difficulty >= 2 ? ['skeleton', 'slime', 'dasher', 'turret', 'spiralTurret', 'banditHeavy']
+      : ['slime', 'skeleton', 'bandit', 'turret'];
+    for (let k = 0; k < n; k++) {
+      room.spawns.push({
+        kind: isBoss ? 'bossOgre' : pick(rand, kinds),
+        x: nx + randInt(rand, -Math.floor(rw / 2) + 1, Math.floor(rw / 2) - 1),
+        y: ny + randInt(rand, -Math.floor(rh / 2) + 1, Math.floor(rh / 2) - 1),
+      });
+    }
+    rooms.push(room);
+    prev = { x: nx, y: ny };
+  }
+
+  // сокровищница: сундук в последней небоссовой комнате
+  const treasureRoom = rooms[withBoss ? rooms.length - 2 : rooms.length - 1];
+  if (treasureRoom) {
+    treasureRoom.isTreasure = true;
+    g[(treasureRoom.y) * SIZE + treasureRoom.x] = T.CHEST;
+    treasureRoom.chest = { x: treasureRoom.x, y: treasureRoom.y, opened: false };
+  }
+
+  // выход = вход (портал наружу)
+  g[entrance.y * SIZE + entrance.x] = T.DUNGEON_EXIT;
+
+  return { size: SIZE, grid: g, rooms, entrance, seed, difficulty };
+}
+
+function carveRoom(g, cx, cy, rw, rh) {
+  for (let y = cy - rh; y <= cy + rh; y++)
+    for (let x = cx - rw; x <= cx + rw; x++)
+      if (x > 0 && y > 0 && x < SIZE - 1 && y < SIZE - 1)
+        g[y * SIZE + x] = T.DUNGEON_FLOOR;
+}
+
+// Г-образный коридор шириной 2; возвращает тайлы в местах входа в комнаты
+function carveCorridor(g, x0, y0, x1, y1) {
+  const doors = [];
+  let x = x0, y = y0;
+  const carve = (x, y) => {
+    for (let dy = 0; dy <= 1; dy++) for (let dx = 0; dx <= 1; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if (xx > 0 && yy > 0 && xx < SIZE - 1 && yy < SIZE - 1 && g[yy * SIZE + xx] === T.DUNGEON_WALL)
+        g[yy * SIZE + xx] = T.DUNGEON_FLOOR;
+    }
+  };
+  while (x !== x1) { x += Math.sign(x1 - x); carve(x, y); }
+  while (y !== y1) { y += Math.sign(y1 - y); carve(x, y); }
+  // дверные точки — середина коридора
+  doors.push({ x: x1, y: Math.round((y0 + y1) / 2) });
+  doors.push({ x: Math.round((x0 + x1) / 2), y: y0 });
+  return doors;
+}
+
+export function roomAt(dungeon, tx, ty) {
+  return dungeon.rooms.find(r =>
+    tx >= r.x - r.w && tx <= r.x + r.w && ty >= r.y - r.h && ty <= r.y + r.h);
+}

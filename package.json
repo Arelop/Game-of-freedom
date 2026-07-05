@@ -1,0 +1,19 @@
+{
+  "name": "koop-shooter",
+  "version": "0.1.0",
+  "description": "Кооп топ-даун шутер в живом открытом мире",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "assets": "node tools/fetch-assets.js && node tools/build-atlas.js",
+    "test": "node --test tests/core.test.js && node tools/smoke-test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "adm-zip": "^0.5.16",
+    "pngjs": "^7.0.0"
+  }
+}
