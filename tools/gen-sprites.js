@@ -141,44 +141,74 @@ const GEN = {
     disc(s, 8, 8, 2, C.white);
     return s;
   },
-  gun({ kind = 'pistol' } = {}) {
-    const s = make(16, 8);
-    const K = {
-      pistol: () => { rect(s, 4, 2, 8, 2, C.dgray); rect(s, 4, 4, 2, 3, C.brown); px(s, 11, 1, C.lgray); },
-      smg: () => { rect(s, 3, 2, 10, 3, C.dgray); rect(s, 4, 5, 2, 2, C.brown); rect(s, 8, 5, 2, 3, C.dgray); px(s, 12, 1, C.lgray); },
-      shotgun: () => { rect(s, 2, 3, 12, 2, C.brown); rect(s, 6, 2, 8, 2, C.dgray); rect(s, 2, 5, 3, 2, C.lbrown); },
-      rifle: () => { rect(s, 1, 3, 14, 2, C.dgray); rect(s, 1, 5, 4, 2, C.brown); rect(s, 8, 1, 3, 2, C.gray); px(s, 15, 3, C.lgray); },
-      crossbow: () => { rect(s, 3, 3, 10, 2, C.brown); px(s, 12, 1, C.lbrown); px(s, 12, 6, C.lbrown); px(s, 13, 2, C.lbrown); px(s, 13, 5, C.lbrown); rect(s, 13, 3, 1, 2, C.lgray); rect(s, 5, 2, 1, 4, C.tan); },
-      laser: () => { rect(s, 3, 2, 10, 3, C.navy); rect(s, 4, 5, 2, 2, C.dgray); rect(s, 12, 3, 3, 1, C.cyan); px(s, 6, 3, C.cyan); px(s, 8, 3, C.cyan); },
-    };
-    (K[kind] || K.pistol)();
+  bow({ kind = 'short' } = {}) {
+    const s = make(14, 14);
+    const wood = kind === 'hunt' ? C.dbrown : C.lbrown;
+    // дуга лука
+    for (let y = 1; y <= 12; y++) {
+      const dx = Math.round(Math.sin((y - 1) / 11 * Math.PI) * 4);
+      px(s, 3 + dx, y, wood);
+      if (kind === 'hunt') px(s, 3 + dx + 1, y, C.brown);
+    }
+    // тетива
+    for (let y = 1; y <= 12; y++) px(s, 3, y, C.lgray, 200);
+    // стрела наготове
+    rect(s, 3, 6, 9, 1, C.tan); px(s, 12, 6, C.lgray); px(s, 2, 5, C.white); px(s, 2, 7, C.white);
     return s;
   },
-  orb() {
+  crossbow() {
+    const s = make(14, 12);
+    rect(s, 5, 5, 8, 2, C.brown);          // ложе
+    rect(s, 4, 4, 2, 4, C.dbrown);         // приклад
+    // дуга
+    for (let y = 2; y <= 9; y++) { px(s, 8, y, C.gray); px(s, 9, y, C.dgray); }
+    rect(s, 8, 5, 4, 1, C.lgray);          // болт
+    px(s, 12, 5, C.white);
+    return s;
+  },
+  staff({ gem = 'fire' } = {}) {
+    const s = make(10, 16);
+    for (let y = 4; y < 15; y++) { px(s, 5, y, C.brown); px(s, 4, y, C.dbrown); } // древко
+    const g = gem === 'frost' ? C.cyan : gem === 'arcane' ? C.purple : C.orange;
+    const gd = gem === 'frost' ? C.blue : gem === 'arcane' ? C.navy : C.red;
+    disc(s, 5, 3, 2, gd); disc(s, 5, 3, 1, g); px(s, 4, 2, C.white);
+    return s;
+  },
+  orb({ color = 'purple' } = {}) {
     const s = make(7, 7);
-    disc(s, 3, 3, 3, C.dred); disc(s, 3, 3, 2, C.red); px(s, 2, 2, C.pink); px(s, 3, 2, C.white);
+    const map = { red: [C.dred, C.red, C.pink], purple: [C.navy, C.purple, C.pink] };
+    const [d, m, h] = map[color] || map.purple;
+    disc(s, 3, 3, 3, d); disc(s, 3, 3, 2, m); px(s, 2, 2, h); px(s, 3, 2, C.white);
     return s;
   },
-  pellet() {
-    const s = make(4, 4);
-    rect(s, 0, 0, 4, 4, C.orange); px(s, 1, 1, C.yellow);
-    px(s, 0, 0, C.dred); px(s, 3, 3, C.dred);
+  magicOrb({ color = 'fire' } = {}) {
+    const s = make(8, 8);
+    const t = color === 'frost'
+      ? { outer: C.blue, inner: C.cyan, core: C.white }
+      : { outer: C.red, inner: C.orange, core: C.yellow };
+    disc(s, 4, 4, 3, t.outer); disc(s, 4, 4, 2, t.inner); px(s, 3, 3, t.core); px(s, 4, 3, t.core);
+    // хвостики пламени/инея
+    px(s, 0, 4, t.inner); px(s, 7, 2, t.inner);
     return s;
   },
-  projLong() {
-    const s = make(9, 3);
-    rect(s, 0, 0, 9, 3, C.yellow); rect(s, 0, 1, 3, 1, C.orange); px(s, 8, 1, C.white);
+  arrow() {
+    const s = make(11, 3);
+    rect(s, 0, 1, 9, 1, C.brown);          // древко
+    px(s, 9, 0, C.lgray); px(s, 10, 1, C.lgray); px(s, 9, 2, C.lgray); // наконечник
+    px(s, 0, 0, C.tan); px(s, 0, 2, C.tan); px(s, 1, 0, C.tan); px(s, 1, 2, C.tan); // оперение
+    return s;
+  },
+  knife() {
+    const s = make(9, 5);
+    rect(s, 0, 2, 3, 1, C.brown);          // рукоять
+    rect(s, 3, 2, 5, 1, C.lgray);          // клинок
+    px(s, 8, 2, C.white); px(s, 3, 1, C.dgray); px(s, 3, 3, C.dgray);
     return s;
   },
   bolt() {
     const s = make(9, 3);
     rect(s, 0, 1, 7, 1, C.brown); px(s, 7, 1, C.lgray); px(s, 8, 1, C.white);
     px(s, 0, 0, C.tan); px(s, 0, 2, C.tan);
-    return s;
-  },
-  laserBeam() {
-    const s = make(9, 3);
-    rect(s, 0, 1, 9, 1, C.cyan); rect(s, 2, 0, 5, 3, C.cyan, 140); rect(s, 3, 1, 4, 1, C.white);
     return s;
   },
   coin() {

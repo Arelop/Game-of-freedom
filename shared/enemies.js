@@ -14,13 +14,13 @@ export const ENEMIES = {
     id: 'bandit', name: 'Бандит', archetype: 'shooter', hp: 8, speed: 55,
     radius: 5, touchDamage: 1, preferRange: [90, 150], fireInterval: 1.6,
     pattern: 'aimedSingle', sprite: 'enemy_bandit', xp: 3,
-    drops: { coin: [2, 5], ammo_light: [0, 1] },
+    drops: { coin: [2, 5], ammo_arrow: [0, 1] },
   },
   banditHeavy: {
     id: 'banditHeavy', name: 'Громила', archetype: 'shooter', hp: 16, speed: 40,
     radius: 6, touchDamage: 2, preferRange: [70, 120], fireInterval: 2.2,
     pattern: 'fan5', sprite: 'enemy_bandit_heavy', xp: 6,
-    drops: { coin: [4, 8], ammo_shell: [0, 2] },
+    drops: { coin: [4, 8], ammo_bolt: [0, 2] },
   },
   skeleton: {
     id: 'skeleton', name: 'Скелет', archetype: 'shooter', hp: 6, speed: 48,

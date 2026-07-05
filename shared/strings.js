@@ -42,12 +42,12 @@ export const STR = {
   questAccept: 'Взять квест',
   questTurnIn: 'Сдать квест',
   rumor: 'Что слышно?',
-  controls: 'WASD — движение, ЛКМ — огонь, Пробел/ПКМ — перекат, R — перезарядка, E — действие, 1-4 — оружие, Tab — инвентарь, M — карта',
+  controls: 'WASD — движение, ЛКМ — атака, Пробел/ПКМ — перекат, R — перезарядка, E — действие, 1-4 — оружие, Tab — инвентарь, M — карта',
 };
 
 export const ITEM_NAMES = {
   coin: 'Монета', meat: 'Сырое мясо', cooked_meat: 'Жареное мясо',
-  bread: 'Хлеб', bandage: 'Бинт', ammo_light: 'Лёгкие патроны',
-  ammo_shell: 'Дробь', ammo_heavy: 'Тяжёлые патроны', ammo_cell: 'Батареи',
+  bread: 'Хлеб', bandage: 'Бинт', ammo_arrow: 'Стрелы',
+  ammo_bolt: 'Болты', ammo_mana: 'Кристаллы маны', ammo_knife: 'Метательные ножи',
   wood: 'Древесина', hide: 'Шкура', herb: 'Травы',
 };

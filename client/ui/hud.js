@@ -32,10 +32,12 @@ export class Hud {
       this.atlas.draw(ctx, w.sprite, gx, gy + 6);
       ctx.fillStyle = '#eee';
       ctx.fillText(w.name, gx + 12, gy);
-      const ammoTxt = w.infiniteAmmo ? `${you.mag}/${STR.ammoInf}`
-        : `${you.mag}/${you.ammo[w.ammoType] ?? 0}`;
-      ctx.fillStyle = you.mag === 0 ? '#d9574a' : '#99e550';
-      ctx.fillText(you.rt > 0 ? STR.reloading : ammoTxt, gx + 12, gy + 9);
+      let ammoTxt, col;
+      if (w.melee) { ammoTxt = 'ближний бой'; col = '#99e550'; }
+      else if (w.infiniteAmmo) { ammoTxt = STR.ammoInf; col = '#99e550'; }
+      else { ammoTxt = `${you.mag}/${you.ammo[w.ammoType] ?? 0}`; col = you.mag === 0 ? '#d9574a' : '#99e550'; }
+      ctx.fillStyle = col;
+      ctx.fillText(you.rt > 0 && !w.melee ? STR.reloading : ammoTxt, gx + 12, gy + 9);
       // слоты оружия
       for (let i = 0; i < you.ws.length; i++) {
         ctx.fillStyle = i === you.wi ? '#fbf236' : '#696a6a';

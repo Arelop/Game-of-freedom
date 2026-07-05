@@ -1,51 +1,62 @@
-// Оружие — чистые данные. Новое оружие = новая запись.
+// Оружие — чистые данные. Фэнтези-арсенал: ближний бой + луки/посохи/метательное.
+// melee:true — удар по дуге (без патронов/перезарядки). Остальное — снаряды.
 export const WEAPONS = {
-  pistol: {
-    id: 'pistol', name: 'Пистолет', damage: 2, projectilesPerShot: 1,
-    spreadDeg: 3, projectileSpeed: 300, fireRate: 4, magSize: 12,
-    reloadTime: 1.0, knockback: 20, recoilShake: 0.15, infiniteAmmo: true,
-    sprite: 'gun_pistol', projSprite: 'proj_small', sound: 'shot_light',
-    projRadius: 2, projLife: 1.2,
+  sword: {
+    id: 'sword', name: 'Меч', melee: true, damage: 4, fireRate: 2.4,
+    range: 30, arcDeg: 110, knockback: 90, recoilShake: 0.2, infiniteAmmo: true,
+    sprite: 'wpn_sword', sound: 'swing', swingColor: '#eeeeee',
   },
-  smg: {
-    id: 'smg', name: 'ПП «Оса»', damage: 1, projectilesPerShot: 1,
-    spreadDeg: 9, projectileSpeed: 340, fireRate: 11, magSize: 30,
-    reloadTime: 1.4, knockback: 10, recoilShake: 0.1,
-    sprite: 'gun_smg', projSprite: 'proj_small', sound: 'shot_light',
-    projRadius: 2, projLife: 0.9, ammoType: 'light',
+  axe: {
+    id: 'axe', name: 'Секира', melee: true, damage: 8, fireRate: 1.3,
+    range: 32, arcDeg: 130, knockback: 140, recoilShake: 0.4, infiniteAmmo: true,
+    sprite: 'wpn_axe', sound: 'swing_heavy', swingColor: '#d9a066',
   },
-  shotgun: {
-    id: 'shotgun', name: 'Обрез', damage: 2, projectilesPerShot: 6,
-    spreadDeg: 24, projectileSpeed: 260, fireRate: 1.4, magSize: 2,
-    reloadTime: 1.6, knockback: 60, recoilShake: 0.45,
-    sprite: 'gun_shotgun', projSprite: 'proj_pellet', sound: 'shot_heavy',
-    projRadius: 2, projLife: 0.45, ammoType: 'shell',
+  bow: {
+    id: 'bow', name: 'Лук', damage: 3, projectilesPerShot: 1,
+    spreadDeg: 3, projectileSpeed: 360, fireRate: 3, magSize: 999,
+    reloadTime: 0.4, knockback: 25, recoilShake: 0.12,
+    sprite: 'wpn_bow', projSprite: 'proj_arrow', sound: 'shot_bow',
+    projRadius: 2, projLife: 1.4, ammoType: 'arrow', infiniteAmmo: true,
   },
-  rifle: {
-    id: 'rifle', name: 'Винтовка', damage: 5, projectilesPerShot: 1,
-    spreadDeg: 0.5, projectileSpeed: 480, fireRate: 1.6, magSize: 5,
-    reloadTime: 1.8, knockback: 45, recoilShake: 0.35,
-    sprite: 'gun_rifle', projSprite: 'proj_long', sound: 'shot_heavy',
-    projRadius: 2, projLife: 1.6, ammoType: 'heavy',
+  huntbow: {
+    id: 'huntbow', name: 'Охотничий лук', damage: 6, projectilesPerShot: 1,
+    spreadDeg: 1, projectileSpeed: 480, fireRate: 1.5, magSize: 1,
+    reloadTime: 0.5, knockback: 45, recoilShake: 0.3,
+    sprite: 'wpn_bow2', projSprite: 'proj_arrow', sound: 'shot_bow',
+    projRadius: 2, projLife: 1.8, ammoType: 'arrow',
   },
   crossbow: {
-    id: 'crossbow', name: 'Арбалет', damage: 7, projectilesPerShot: 1,
-    spreadDeg: 1, projectileSpeed: 380, fireRate: 0.9, magSize: 1,
-    reloadTime: 1.2, knockback: 70, recoilShake: 0.3,
-    sprite: 'gun_crossbow', projSprite: 'proj_bolt', sound: 'shot_bow',
-    projRadius: 2, projLife: 1.8, ammoType: 'heavy',
+    id: 'crossbow', name: 'Арбалет', damage: 8, projectilesPerShot: 1,
+    spreadDeg: 1, projectileSpeed: 420, fireRate: 0.9, magSize: 1,
+    reloadTime: 1.2, knockback: 80, recoilShake: 0.35,
+    sprite: 'wpn_crossbow', projSprite: 'proj_bolt', sound: 'shot_crossbow',
+    projRadius: 2, projLife: 1.9, ammoType: 'bolt',
   },
-  laser: {
-    id: 'laser', name: 'Лучемёт', damage: 2, projectilesPerShot: 1,
-    spreadDeg: 0, projectileSpeed: 520, fireRate: 7, magSize: 20,
-    reloadTime: 1.5, knockback: 5, recoilShake: 0.08,
-    sprite: 'gun_laser', projSprite: 'proj_laser', sound: 'shot_laser',
-    projRadius: 2, projLife: 0.8, ammoType: 'cell',
+  knives: {
+    id: 'knives', name: 'Метательные ножи', damage: 2, projectilesPerShot: 3,
+    spreadDeg: 22, projectileSpeed: 320, fireRate: 1.6, magSize: 6,
+    reloadTime: 1.3, knockback: 30, recoilShake: 0.25,
+    sprite: 'wpn_dagger', projSprite: 'proj_knife', sound: 'shot_knife',
+    projRadius: 2, projLife: 0.7, ammoType: 'knife',
+  },
+  firestaff: {
+    id: 'firestaff', name: 'Посох огня', damage: 3, projectilesPerShot: 1,
+    spreadDeg: 4, projectileSpeed: 240, fireRate: 5, magSize: 20,
+    reloadTime: 1.5, knockback: 12, recoilShake: 0.1,
+    sprite: 'wpn_staff_fire', projSprite: 'proj_fire', sound: 'shot_fire',
+    projRadius: 3, projLife: 1.0, ammoType: 'mana',
+  },
+  froststaff: {
+    id: 'froststaff', name: 'Посох льда', damage: 5, projectilesPerShot: 1,
+    spreadDeg: 0, projectileSpeed: 300, fireRate: 2.4, magSize: 12,
+    reloadTime: 1.5, knockback: 20, recoilShake: 0.12,
+    sprite: 'wpn_staff_frost', projSprite: 'proj_frost', sound: 'shot_frost',
+    projRadius: 3, projLife: 1.3, ammoType: 'mana',
   },
 };
 
 export const AMMO_NAMES = {
-  light: 'лёгкие патроны', shell: 'дробь', heavy: 'тяжёлые патроны', cell: 'батареи',
+  arrow: 'стрелы', bolt: 'болты', mana: 'мана', knife: 'ножи',
 };
 
-export const STARTING_WEAPONS = ['pistol'];
+export const STARTING_WEAPONS = ['sword', 'bow'];

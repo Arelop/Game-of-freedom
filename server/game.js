@@ -28,14 +28,14 @@ const FOOD_VALUE = { meat: 15, cooked_meat: 40, bread: 30 };
 const RECIPES = [
   { id: 'bandage', name: 'Бинт (2 травы)', needs: { herb: 2 }, gives: { bandage: 1 } },
   { id: 'cooked_meat', name: 'Жареное мясо (сырое мясо)', needs: { meat: 1 }, gives: { cooked_meat: 1 } },
-  { id: 'ammo_light', name: 'Лёгкие патроны x12 (1 древесина)', needs: { wood: 1 }, gives: { ammo_light: 12 } },
-  { id: 'ammo_shell', name: 'Дробь x6 (1 древесина, 1 шкура)', needs: { wood: 1, hide: 1 }, gives: { ammo_shell: 6 } },
+  { id: 'ammo_arrow', name: 'Стрелы x10 (1 древесина)', needs: { wood: 1 }, gives: { ammo_arrow: 10 } },
+  { id: 'ammo_knife', name: 'Ножи x4 (1 древесина, 1 шкура)', needs: { wood: 1, hide: 1 }, gives: { ammo_knife: 4 } },
 ];
 
 const SHOP = [
   { item: 'bread', price: 8 }, { item: 'bandage', price: 15 },
-  { item: 'ammo_light', price: 12, count: 20 }, { item: 'ammo_shell', price: 15, count: 8 },
-  { item: 'ammo_heavy', price: 18, count: 8 }, { item: 'ammo_cell', price: 18, count: 12 },
+  { item: 'ammo_arrow', price: 10, count: 20 }, { item: 'ammo_bolt', price: 15, count: 8 },
+  { item: 'ammo_mana', price: 18, count: 15 }, { item: 'ammo_knife', price: 14, count: 8 },
 ];
 
 export class Game {
@@ -77,9 +77,9 @@ export class Game {
       id, name, ws, mapId: 'over',
       skin: (id - 1) % 4,
       hp: PLAYER_MAX_HP, maxHp: PLAYER_MAX_HP,
-      weapons: ['pistol'], weaponIdx: 0,
-      mags: { pistol: WEAPONS.pistol.magSize },
-      ammo: { light: 30, shell: 6, heavy: 0, cell: 0 },
+      weapons: ['sword', 'bow'], weaponIdx: 0,
+      mags: { sword: 1, bow: 1 },
+      ammo: { arrow: 40, bolt: 6, mana: 0, knife: 0 },
       inventory: { bread: 2, bandage: 1 },
       coins: 20, hunger: HUNGER_MAX,
       rep: makeReputation(), aggroFactions: new Set(),
@@ -98,10 +98,12 @@ export class Game {
   weapon(p) { return WEAPONS[p.weapons[p.weaponIdx]]; }
 
   // ---------- главный тик ----------
+  // Внимание: pendingFx НЕ очищается здесь — события, порождённые обработчиками
+  // сетевых сообщений между тиками (interact, dialogChoice), должны дожить до
+  // ближайшего broadcast(). Очистку делает игровой цикл после рассылки.
   step() {
     this.tick++;
     const dt = TICK_DT;
-    this.pendingFx.length = 0;
 
     // время суток
     const wasNight = this.isNight();
@@ -152,16 +154,20 @@ export class Game {
     }
     p.inputs.length = 0;
 
-    // автоперезарядка пустого магазина
-    if (p.mags[w.id] <= 0 && p.reloadT <= 0) this.startReload(p);
-    if (p.reloadT === 0 && p.reloadPending) {
-      p.mags[w.id] = this.finishReload(p, w);
-      p.reloadPending = false;
+    // сначала завершаем идущую перезарядку, потом при нужде запускаем новую
+    if (!w.melee) {
+      if (p.reloadPending && p.reloadT <= 0) {
+        p.mags[w.id] = this.finishReload(p, w);
+        p.reloadPending = false;
+      }
+      if (!p.reloadPending && p.mags[w.id] <= 0 && p.reloadT <= 0) this.startReload(p);
     }
   }
 
   startReload(p) {
     const w = this.weapon(p);
+    if (w.melee || w.infiniteAmmo && p.mags[w.id] >= w.magSize) return;
+    if (p.reloadPending || p.reloadT > 0) return;
     if (p.mags[w.id] >= w.magSize) return;
     if (!w.infiniteAmmo && (p.ammo[w.ammoType] || 0) <= 0) return;
     p.reloadT = w.reloadTime;
@@ -178,7 +184,9 @@ export class Game {
 
   tryFire(p, aim) {
     const w = this.weapon(p);
-    if (p.fireCd > 0 || p.rollT > 0 || p.reloadT > 0 || p.dead) return;
+    if (p.fireCd > 0 || p.rollT > 0 || p.dead) return;
+    if (w.melee) { this.meleeSwing(p, w, aim); return; }
+    if (p.reloadT > 0) return;
     if ((p.mags[w.id] || 0) <= 0) { this.startReload(p); return; }
     p.fireCd = 1 / w.fireRate;
     p.mags[w.id]--;
@@ -186,6 +194,29 @@ export class Game {
     this.spawnPlayerBullets(p, w, aim, seed);
     // событие остальным клиентам (стрелявший рисует свои пули сам)
     this.fx({ t: 'shot', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, seed, tick: this.tick }, p.mapId, p.x, p.y);
+  }
+
+  // Ближний бой: мгновенный удар по дуге перед игроком.
+  meleeSwing(p, w, aim) {
+    p.fireCd = 1 / w.fireRate;
+    const half = (w.arcDeg || 100) * Math.PI / 360;
+    const r = w.range || 26;
+    const hitFake = { vx: Math.cos(aim), vy: Math.sin(aim), knockback: w.knockback };
+    for (const e of [...this.entities.values()]) {
+      if (e.entType === 'enemy' && e.mapId === p.mapId) {
+        const def = ENEMIES[e.kind];
+        if (dist2(p.x, p.y, e.x, e.y) > (r + def.radius) ** 2) continue;
+        let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
+        da = Math.atan2(Math.sin(da), Math.cos(da));
+        if (Math.abs(da) <= half) this.damageEnemy(e, w.damage, hitFake);
+      } else if (e.entType === 'npc' && e.mapId === p.mapId) {
+        if (dist2(p.x, p.y, e.x, e.y) > (r + 5) ** 2) continue;
+        let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
+        da = Math.atan2(Math.sin(da), Math.cos(da));
+        if (Math.abs(da) <= half) this.damageNpc(e, w.damage, p);
+      }
+    }
+    this.fx({ t: 'swing', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, range: r, arc: w.arcDeg || 100 }, p.mapId, p.x, p.y);
   }
 
   spawnPlayerBullets(p, w, aim, seed) {
@@ -207,7 +238,7 @@ export class Game {
       life: 1.2, radius: 2, dmg: 2, knockback: 20,
       owner: npc.id, friendly: true, guard: true, mapId: npc.mapId,
     });
-    this.fx({ t: 'shot', pid: npc.id, weapon: 'pistol', x: npc.x, y: npc.y, aim: ang, seed: 1, tick: this.tick }, npc.mapId, npc.x, npc.y);
+    this.fx({ t: 'shot', pid: npc.id, weapon: 'bow', x: npc.x, y: npc.y, aim: ang, seed: 1, tick: this.tick }, npc.mapId, npc.x, npc.y);
   }
 
   // ---------- сущности ----------
@@ -520,7 +551,7 @@ export class Game {
         const wid = drop.item.split(':')[1];
         if (!p.weapons.includes(wid)) {
           p.weapons.push(wid);
-          p.mags[wid] = WEAPONS[wid].magSize;
+          p.mags[wid] = WEAPONS[wid].magSize || 1;
           this.toast(p, STR.pickupWeapon(WEAPONS[wid].name));
         } else { p.coins += 10; }
       } else if (drop.item.startsWith('ammo_')) {
@@ -538,7 +569,7 @@ export class Game {
   }
 
   dropRandomWeapon(mapId, x, y) {
-    const pool = ['smg', 'shotgun', 'rifle', 'crossbow', 'laser'];
+    const pool = ['axe', 'huntbow', 'crossbow', 'knives', 'firestaff', 'froststaff'];
     this.spawnDrop('weapon:' + pick(this.rand, pool), 1, mapId, x, y);
   }
 
@@ -629,12 +660,16 @@ export class Game {
         return;
       }
     }
-    // NPC рядом
-    let npc = null, best = 30 * 30;
+    // NPC рядом: приоритет старейшине/торговцу над стражей/жителями
+    const ROLE_PRIO = { elder: 3, merchant: 2, trader: 2 };
+    let npc = null, bestScore = -Infinity;
+    const R2 = 40 * 40;
     for (const e of this.entities.values()) {
       if (e.entType !== 'npc' || e.mapId !== p.mapId) continue;
       const d = dist2(p.x, p.y, e.x, e.y);
-      if (d < best) { best = d; npc = e; }
+      if (d > R2) continue;
+      const score = (ROLE_PRIO[e.role] || 0) * 1e7 - d;
+      if (score > bestScore) { bestScore = score; npc = e; }
     }
     if (npc) { this.openDialog(p, npc); return; }
 

@@ -51,6 +51,19 @@ let fps = 0, frames = 0, fpsT = 0;
 let bigMap = false;
 let localMag = 0, localWeapon = '';
 let invRefresh = 0;
+let swingAnim = 0;       // анимация замаха своего игрока
+const swings = [];       // {x,y,aim,range,arc,t,maxT,color}
+
+function spawnSwing(x, y, aim, range, arc, w) {
+  swings.push({ x, y, aim, range: range || 28, arc: (arc || 100) * Math.PI / 180, t: 0.18, maxT: 0.18, color: w?.swingColor || '#eee' });
+  // искры вдоль дуги
+  const half = (arc || 100) * Math.PI / 360;
+  for (let i = 0; i < 6; i++) {
+    const a = aim - half + Math.random() * half * 2;
+    const r = (range || 28) * (0.6 + Math.random() * 0.4);
+    particles.spawn({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, vx: Math.cos(a) * 40, vy: Math.sin(a) * 40, color: w?.swingColor || '#eee', life: 0.18, size: 1, drag: 0.05 });
+  }
+}
 
 // ---------- меню ----------
 const menu = document.getElementById('menu');
@@ -82,6 +95,9 @@ net.handlers.onMapChange = m => {
 net.handlers.onFx = (kind, m) => {
   switch (kind) {
     case 'shot': particles.muzzle(m.x, m.y, m.aim); if (m.pid !== net.myId) playWeaponSound(WEAPONS[m.weapon]?.sound); break;
+    case 'swing':
+      if (m.pid !== net.myId) { spawnSwing(m.x, m.y, m.aim, m.range, m.arc, WEAPONS[m.weapon]); playWeaponSound(WEAPONS[m.weapon]?.sound); }
+      break;
     case 'eshot': SFX.enemy_shot(); break;
     case 'hit':
       if (m.kind === 'wall') particles.burst(m.x, m.y, '#847e87', 4, 40, 0.25);
@@ -159,22 +175,32 @@ function simStep() {
 
   net.simStep({ mx: mv.mx, my: mv.my, aim, fire, roll });
 
-  // локальная стрельба (косметика; авторитет — сервер)
+  // локальная атака (косметика; авторитет — сервер)
   const you = net.you;
   if (you) {
     const w = WEAPONS[you.w];
-    if (you.w !== localWeapon) { localWeapon = you.w; localMag = you.mag; fireCd = 0; }
-    localMag = Math.min(localMag, you.mag) || you.mag; // сервер — источник истины
+    if (you.w !== localWeapon) { localWeapon = you.w; fireCd = 0; }
     fireCd = Math.max(0, fireCd - SIM_DT);
-    if (fire && w && fireCd <= 0 && net.pred.rollT <= 0 && you.rt <= 0 && you.mag > 0 && !you.dead) {
+    const canAct = fire && w && fireCd <= 0 && net.pred.rollT <= 0 && !you.dead;
+    if (canAct && w.melee) {
+      fireCd = 1 / w.fireRate;
+      spawnSwing(net.pred.x, net.pred.y, aim, w.range, w.arcDeg, w);
+      swingAnim = 0.18;
+      cam.addTrauma(w.recoilShake * 0.5);
+      playWeaponSound(w.sound);
+    } else if (canAct && you.rt <= 0 && you.mag > 0) {
       fireCd = 1 / w.fireRate;
       net.spawnWeaponBullets(net.pred.x, net.pred.y, aim, w, (net.seq * 2654435761) >>> 0);
       particles.muzzle(net.pred.x + Math.cos(aim) * 8, net.pred.y - 4 + Math.sin(aim) * 8, aim);
-      particles.casing(net.pred.x, net.pred.y - 4, aim);
       cam.addTrauma(w.recoilShake * 0.5);
       playWeaponSound(w.sound);
     }
   }
+
+  // затухание свингов
+  swingAnim = Math.max(0, swingAnim - SIM_DT);
+  for (const s of swings) s.t -= SIM_DT;
+  for (let i = swings.length - 1; i >= 0; i--) if (swings[i].t <= 0) swings.splice(i, 1);
 
   // перекат: эффекты на старте
   if (net.pred.rollT > 0 && !wasRolling) { particles.dust(net.pred.x, net.pred.y); SFX.roll(); }
@@ -247,6 +273,21 @@ function render(timeSec) {
     atlas.draw(ctx, b.sprite, s.x, s.y, { rot: b.ang });
   }
 
+  // дуги ударов ближнего боя
+  for (const sw of swings) {
+    const c = cam.toScreen(sw.x, sw.y);
+    const k = 1 - sw.t / sw.maxT;                 // 0..1 прогресс замаха
+    const a0 = sw.aim - sw.arc / 2;
+    const cur = a0 + sw.arc * k;
+    ctx.strokeStyle = sw.color;
+    ctx.globalAlpha = 1 - k;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y - 2, sw.range, a0, cur);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   particles.render(ctx, cam);
   renderLight(timeSec);
 
@@ -285,12 +326,21 @@ function drawMe(timeSec) {
     atlas.draw(ctx, sprite, s.x, s.y - 2, { rot: prog * Math.PI * 2 * (flipX ? -1 : 1) });
   } else {
     atlas.draw(ctx, sprite, s.x, s.y - bob, { flipX });
-    // оружие
-    const w = WEAPONS[you.w];
-    if (w) {
-      const gx = s.x + Math.cos(p.aim) * 7, gy = s.y - 2 + Math.sin(p.aim) * 7;
-      atlas.draw(ctx, w.sprite, gx, gy, { rot: flipX ? p.aim + Math.PI : p.aim, flipX });
-    }
+    drawWeapon(WEAPONS[you.w], s.x, s.y - 2 - bob, p.aim, flipX, swingAnim);
+  }
+}
+
+// Оружие в руке: у мелее — замах по дуге, у дальнего — направление прицела.
+function drawWeapon(w, cx, cy, aim, flipX, swingT = 0) {
+  if (!w) return;
+  if (w.melee) {
+    const half = (w.arcDeg || 100) * Math.PI / 360;
+    const k = swingT > 0 ? 1 - swingT / 0.18 : 0.5;   // покой = середина дуги
+    const ang = aim - half + half * 2 * k;
+    const reach = 8 + (swingT > 0 ? (1 - Math.abs(k - 0.5) * 2) * 6 : 0);
+    atlas.draw(ctx, w.sprite, cx + Math.cos(ang) * reach, cy + Math.sin(ang) * reach, { rot: ang + Math.PI / 2 });
+  } else {
+    atlas.draw(ctx, w.sprite, cx + Math.cos(aim) * 7, cy + Math.sin(aim) * 7, { rot: flipX ? aim + Math.PI : aim, flipX });
   }
 }
 
@@ -320,9 +370,7 @@ function drawEntity(id, r, p, nowMs, timeSec) {
     if (e.dn) { atlas.draw(ctx, e.k, s.x, s.y, { rot: Math.PI / 2, alpha: 0.7 }); return; }
     if (flash) atlas.drawTinted(ctx, e.k, s.x, s.y, '#fff', { flipX });
     else atlas.draw(ctx, e.k, s.x, s.y, { flipX });
-    if (e.rl) { /* перекат — можно добавить поворот */ }
-    const w = WEAPONS[e.w];
-    if (w) atlas.draw(ctx, w.sprite, s.x + Math.cos(p.a) * 7, s.y - 2 + Math.sin(p.a) * 7, { rot: flipX ? p.a + Math.PI : p.a, flipX });
+    drawWeapon(WEAPONS[e.w], s.x, s.y - 2, p.a || 0, flipX, 0);
     ctx.font = '8px monospace';
     ctx.fillStyle = '#99e550';
     ctx.textAlign = 'center';

@@ -46,10 +46,15 @@ function play({ type = 'square', f0 = 440, f1 = f0, len = 0.1, vol = 0.15, noise
 }
 
 export const SFX = {
-  shot_light: () => play({ type: 'square', f0: 700, f1: 180, len: 0.09, vol: 0.10, noiseAmt: 0.5 }),
-  shot_heavy: () => play({ type: 'sawtooth', f0: 320, f1: 60, len: 0.22, vol: 0.20, noiseAmt: 0.7 }),
-  shot_laser: () => play({ type: 'sawtooth', f0: 1400, f1: 300, len: 0.12, vol: 0.09 }),
+  // ближний бой
+  swing: () => play({ type: 'triangle', f0: 620, f1: 180, len: 0.12, vol: 0.10, noiseAmt: 0.6 }),
+  swing_heavy: () => play({ type: 'sawtooth', f0: 300, f1: 80, len: 0.22, vol: 0.16, noiseAmt: 0.7 }),
+  // дальний бой
   shot_bow: () => play({ type: 'triangle', f0: 500, f1: 120, len: 0.14, vol: 0.13, noiseAmt: 0.3 }),
+  shot_crossbow: () => play({ type: 'triangle', f0: 360, f1: 90, len: 0.16, vol: 0.15, noiseAmt: 0.4 }),
+  shot_knife: () => play({ type: 'square', f0: 700, f1: 300, len: 0.08, vol: 0.08, noiseAmt: 0.4 }),
+  shot_fire: () => play({ type: 'sawtooth', f0: 260, f1: 120, len: 0.16, vol: 0.11, noiseAmt: 0.5 }),
+  shot_frost: () => play({ type: 'sine', f0: 900, f1: 400, len: 0.14, vol: 0.09, noiseAmt: 0.2 }),
   enemy_shot: () => play({ type: 'square', f0: 380, f1: 140, len: 0.1, vol: 0.05 }),
   hit: () => play({ type: 'square', f0: 260, f1: 90, len: 0.07, vol: 0.10, noiseAmt: 0.4 }),
   hurt: () => play({ type: 'sawtooth', f0: 190, f1: 55, len: 0.28, vol: 0.22, noiseAmt: 0.4 }),
@@ -63,4 +68,4 @@ export const SFX = {
   quest: () => { play({ type: 'square', f0: 523, f1: 523, len: 0.09, vol: 0.08 }); play({ type: 'square', f0: 784, f1: 784, len: 0.14, vol: 0.08, delay: 0.09 }); },
 };
 
-export function playWeaponSound(soundId) { (SFX[soundId] || SFX.shot_light)(); }
+export function playWeaponSound(soundId) { (SFX[soundId] || SFX.shot_bow)(); }

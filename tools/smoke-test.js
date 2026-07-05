@@ -36,7 +36,7 @@ function makeBot(name) {
           if (!bot.firstPos) bot.firstPos = { x: msg.you.x, y: msg.you.y };
           bot.lastPos = { x: msg.you.x, y: msg.you.y };
         }
-        if (msg.t === 'shot') bot.shots++;
+        if (msg.t === 'shot' || msg.t === 'swing') bot.shots++;
       }
     }
   });
@@ -51,6 +51,9 @@ await new Promise(r => setTimeout(r, 800));
 if (!b1.welcome || !b2.welcome) fail('welcome не получен');
 if (!b1.welcome.mapInfo.settlements.length) fail('в мире нет поселений');
 console.log(`ok: welcome, поселений: ${b1.welcome.mapInfo.settlements.length}, POI: ${b1.welcome.mapInfo.pois.length}`);
+
+// бот-1 берёт лук (слот 1) — проверяем сетевую передачу снарядов
+b1.ws.send(JSON.stringify({ t: 'switchWeapon', slot: 1 }));
 
 // бот-1 бежит вправо и стреляет, бот-2 стоит
 const timer = setInterval(() => {

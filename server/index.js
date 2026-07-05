@@ -56,6 +56,7 @@ setInterval(() => {
     const t0 = performance.now();
     game.step();
     net.broadcast();
+    game.pendingFx.length = 0;   // события разосланы — можно очищать
     acc -= TICK_MS;
     steps++;
     const el = performance.now() - t0;
