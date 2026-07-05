@@ -1,8 +1,8 @@
 // DOM-панели: тосты, диалоги, инвентарь с экипировкой, экран смерти.
 import { STR, ITEM_NAMES } from '../../shared/strings.js';
 import { MSG } from '../../shared/protocol.js';
-import { ITEMS, GEAR_SLOTS, SLOT_NAMES, isGear, isPotion, describeItem } from '../../shared/items.js';
-import { AMMO_NAMES } from '../../shared/weapons.js';
+import { ITEMS, GEAR_SLOTS, SLOT_NAMES, isGear, isPotion, describeItem, isWeaponItem, weaponIdOf, sellPrice } from '../../shared/items.js';
+import { AMMO_NAMES, WEAPONS } from '../../shared/weapons.js';
 import { CLASSES, STAT_KEYS, STAT_NAMES, STAT_DESC, xpNeed, MAX_LEVEL } from '../../shared/classes.js';
 import { TALENTS, TIER_REQ } from '../../shared/talents.js';
 import { SFX } from '../sfx.js';
@@ -64,8 +64,16 @@ export class Panels {
 
   toggleInventory() {
     this.invOpen = !this.invOpen;
+    if (!this.invOpen) this.sellMode = false;
     this.invEl.style.display = this.invOpen ? 'block' : 'none';
     if (this.invOpen) this.renderInventory();
+  }
+
+  openSellMode() {
+    this.sellMode = true;
+    this.invOpen = true;
+    this.invEl.style.display = 'block';
+    this.renderInventory();
   }
 
   // Иконка 32x32 из атласа (кэш DOM-канвасов)
@@ -89,14 +97,66 @@ export class Panels {
     return c;
   }
 
-  itemName(id) { return ITEMS[id]?.name || ITEM_NAMES[id] || id; }
-  itemIcon(id) { return ITEMS[id]?.icon || 'item_' + id; }
+  itemName(id) {
+    if (isWeaponItem(id)) return WEAPONS[weaponIdOf(id)]?.name || id;
+    return ITEMS[id]?.name || ITEM_NAMES[id] || id;
+  }
+  itemIcon(id) {
+    if (isWeaponItem(id)) return WEAPONS[weaponIdOf(id)]?.sprite || 'item_coin';
+    return ITEMS[id]?.icon || 'item_' + id;
+  }
+
+  weaponTooltip(wid) {
+    const w = WEAPONS[wid];
+    if (!w) return wid;
+    const school = { melee: 'ближний бой', ranged: 'дальний бой', magic: 'магия' }[w.school];
+    const parts = [`${w.name} — ${school}`, `урон ${w.damage}, темп ${w.fireRate}/с`];
+    if (w.ammoType) parts.push(`боеприпас: ${AMMO_NAMES[w.ammoType]}`);
+    if (w.slow) parts.push('замедляет врагов');
+    if (w.explode) parts.push('взрывается по области');
+    if (w.chain) parts.push('молния перескакивает на врагов');
+    return parts.join('\n');
+  }
 
   renderInventory() {
     if (!this.invOpen || !this.net.you) return;
     const you = this.net.you;
     const el = this.invEl;
     el.innerHTML = '';
+
+    if (this.sellMode) {
+      const banner = document.createElement('div');
+      banner.className = 'sellbanner';
+      banner.textContent = '💰 ПРОДАЖА: клик по предмету в сумке продаёт его';
+      el.appendChild(banner);
+    }
+
+    // --- оружие (ячейки 1-4) ---
+    el.appendChild(header('Оружие (клавиши 1–4)'));
+    const wpnRow = document.createElement('div');
+    wpnRow.className = 'eqrow';
+    for (let i = 0; i < 4; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'eqslot wslot';
+      const wid = you.ws?.[i];
+      if (wid) {
+        cell.appendChild(this.freshIcon(WEAPONS[wid]?.sprite));
+        cell.title = this.weaponTooltip(wid) + '\n(клик — убрать в сумку)';
+        cell.classList.add('filled');
+        if (i === you.wi) cell.classList.add('active');
+        const num = document.createElement('span');
+        num.className = 'slotnum'; num.textContent = i + 1;
+        cell.appendChild(num);
+        cell.onclick = () => { SFX.ui(); this.net.send({ t: MSG.UNEQUIP, slot: 'w' + i }); setTimeout(() => this.renderInventory(), 150); };
+      } else {
+        const lbl = document.createElement('span');
+        lbl.className = 'eqlabel'; lbl.textContent = '—';
+        cell.title = 'Пустая ячейка оружия';
+        cell.appendChild(lbl);
+      }
+      wpnRow.appendChild(cell);
+    }
+    el.appendChild(wpnRow);
 
     // --- экипировка ---
     el.appendChild(header('Экипировка'));
@@ -131,8 +191,8 @@ export class Panels {
       el.appendChild(b);
     }
 
-    // --- предметы ---
-    el.appendChild(header(STR.inventory));
+    // --- сумка ---
+    el.appendChild(header('Сумка'));
     const grid = document.createElement('div');
     grid.className = 'invgrid';
     const entries = Object.entries(you.inv || {}).filter(([, n]) => n > 0);
@@ -150,16 +210,34 @@ export class Panels {
         badge.className = 'count'; badge.textContent = n;
         cell.appendChild(badge);
       }
-      const desc = describeItem(item);
-      const action = isGear(item) ? 'надеть' : (USABLE_FOOD.has(item) || isPotion(item)) ? 'использовать' : null;
-      cell.title = this.itemName(item) + (desc ? ` — ${desc}` : '') + (action ? `\n(клик — ${action})` : '');
-      if (action) {
-        cell.classList.add('usable');
+      const isWpn = isWeaponItem(item);
+      const desc = isWpn ? this.weaponTooltip(weaponIdOf(item)) : describeItem(item);
+      const price = sellPrice(item, WEAPONS);
+
+      if (this.sellMode) {
+        cell.classList.add('sellable');
+        cell.title = `${this.itemName(item)}\nПродать за ${price} мон.`;
+        const tag = document.createElement('span');
+        tag.className = 'pricetag'; tag.textContent = price;
+        cell.appendChild(tag);
         cell.onclick = () => {
-          SFX.ui();
-          this.net.send(isGear(item) ? { t: MSG.EQUIP, item } : { t: MSG.USE_ITEM, item });
+          SFX.pickup();
+          this.net.send({ t: MSG.SELL_ITEM, item });
           setTimeout(() => this.renderInventory(), 150);
         };
+      } else {
+        const action = (isWpn || isGear(item)) ? (isWpn ? 'взять в руки' : 'надеть')
+          : (USABLE_FOOD.has(item) || isPotion(item)) ? 'использовать' : null;
+        cell.title = (isWpn ? desc : this.itemName(item) + (desc ? ` — ${desc}` : ''))
+          + (action ? `\n(клик — ${action})` : '') + `\nЦена продажи: ${price} мон.`;
+        if (action) {
+          cell.classList.add('usable');
+          cell.onclick = () => {
+            SFX.ui();
+            this.net.send((isWpn || isGear(item)) ? { t: MSG.EQUIP, item } : { t: MSG.USE_ITEM, item });
+            setTimeout(() => this.renderInventory(), 150);
+          };
+        }
       }
       grid.appendChild(cell);
     }

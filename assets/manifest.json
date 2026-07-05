@@ -94,6 +94,10 @@
     "wpn_bow2":     { "proc": "bow", "args": { "kind": "hunt" } },
     "wpn_crossbow": { "proc": "crossbow" },
     "wpn_staff_fire": { "proc": "staff", "args": { "gem": "fire" } },
+    "wpn_staff_bomb": { "proc": "staff", "args": { "gem": "bomb" } },
+    "wpn_staff_storm": { "proc": "staff", "args": { "gem": "storm" } },
+    "proj_fireball": { "proc": "fireballOrb" },
+    "proj_lightning": { "proc": "lightningBolt" },
 
     "proj_orb":    { "proc": "orb", "args": { "color": "purple" } },
     "proj_arrow":  { "proc": "arrow" },

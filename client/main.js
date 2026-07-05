@@ -55,6 +55,7 @@ let invRefresh = 0;
 let swingAnim = 0;       // анимация замаха своего игрока
 const swings = [];       // {x,y,aim,range,arc,t,maxT,color}
 const floatTexts = [];   // летящие цифры урона {x,y,text,color,t,big}
+const chainFx = [];      // молнии {pts:[[x,y]..], t}
 
 function addFloatText(x, y, text, color, big = false) {
   floatTexts.push({ x: x + (Math.random() - 0.5) * 8, y: y - 10, text, color, t: 0.9, big });
@@ -148,6 +149,17 @@ net.handlers.onFx = (kind, m) => {
     case 'die': particles.blood(m.x, m.y, 12); SFX.die(); cam.addTrauma(0.15); break;
     case 'pickup': particles.sparkle(m.x, m.y); SFX.pickup(); break;
     case 'chest': particles.sparkle(m.x, m.y); SFX.pickup(); break;
+    case 'boom':
+      particles.burst(m.x, m.y, '#df7126', 18, 110, 0.5, 2);
+      particles.burst(m.x, m.y, '#fbf236', 10, 70, 0.35);
+      cam.addTrauma(0.45);
+      SFX.boom();
+      break;
+    case 'chain':
+      chainFx.push({ pts: m.pts, t: 0.22 });
+      SFX.zap();
+      break;
+    case 'sellMode': panels.openSellMode(); break;
     case 'toast': panels.toast(m.text); break;
     case 'dialog': panels.showDialog(m); break;
     case 'marker': net.mapInfo.markers = net.mapInfo.markers || []; net.mapInfo.markers.push(m); break;
@@ -232,6 +244,8 @@ function simStep() {
   for (let i = swings.length - 1; i >= 0; i--) if (swings[i].t <= 0) swings.splice(i, 1);
   for (const f of floatTexts) { f.t -= SIM_DT; f.y -= 18 * SIM_DT; }
   for (let i = floatTexts.length - 1; i >= 0; i--) if (floatTexts[i].t <= 0) floatTexts.splice(i, 1);
+  for (const c of chainFx) c.t -= SIM_DT;
+  for (let i = chainFx.length - 1; i >= 0; i--) if (chainFx[i].t <= 0) chainFx.splice(i, 1);
 
   // перекат: эффекты на старте
   if (net.pred.rollT > 0 && !wasRolling) { particles.dust(net.pred.x, net.pred.y); SFX.roll(); }
@@ -320,6 +334,27 @@ function render(timeSec) {
     ctx.beginPath();
     ctx.arc(c.x, c.y - 2, sw.range, a0, cur);
     ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // цепные молнии: ломаные линии между жертвами
+  for (const c of chainFx) {
+    ctx.strokeStyle = c.t > 0.1 ? '#fbf236' : '#eeeeee';
+    ctx.globalAlpha = Math.min(1, c.t / 0.12);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < c.pts.length - 1; i++) {
+      const a = cam.toScreen(c.pts[i][0], c.pts[i][1]);
+      const b = cam.toScreen(c.pts[i + 1][0], c.pts[i + 1][1]);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y - 4);
+      // зигзаг через две случайные промежуточные точки
+      for (const k of [0.33, 0.66]) {
+        ctx.lineTo(a.x + (b.x - a.x) * k + (Math.random() - 0.5) * 8,
+          a.y - 4 + (b.y - a.y) * k + (Math.random() - 0.5) * 8);
+      }
+      ctx.lineTo(b.x, b.y - 4);
+      ctx.stroke();
+    }
     ctx.globalAlpha = 1;
   }
 

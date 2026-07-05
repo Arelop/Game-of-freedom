@@ -169,9 +169,32 @@ const GEN = {
   staff({ gem = 'fire' } = {}) {
     const s = make(10, 16);
     for (let y = 4; y < 15; y++) { px(s, 5, y, C.brown); px(s, 4, y, C.dbrown); } // древко
-    const g = gem === 'frost' ? C.cyan : gem === 'arcane' ? C.purple : C.orange;
-    const gd = gem === 'frost' ? C.blue : gem === 'arcane' ? C.navy : C.red;
-    disc(s, 5, 3, 2, gd); disc(s, 5, 3, 1, g); px(s, 4, 2, C.white);
+    const palette = {
+      fire: [C.red, C.orange], frost: [C.blue, C.cyan],
+      arcane: [C.navy, C.purple], bomb: [C.dred, C.red], storm: [C.orange, C.yellow],
+    };
+    const [gd, g] = palette[gem] || palette.fire;
+    if (gem === 'bomb') { disc(s, 5, 3, 3, gd); disc(s, 5, 3, 2, g); px(s, 4, 2, C.yellow); }
+    else if (gem === 'storm') {
+      disc(s, 5, 3, 2, gd); disc(s, 5, 3, 1, g);
+      px(s, 3, 1, C.yellow); px(s, 7, 1, C.yellow); px(s, 5, 0, C.white);
+    } else { disc(s, 5, 3, 2, gd); disc(s, 5, 3, 1, g); px(s, 4, 2, C.white); }
+    return s;
+  },
+  fireballOrb() {
+    const s = make(10, 10);
+    disc(s, 5, 5, 4, C.dred); disc(s, 5, 5, 3, C.red); disc(s, 4, 4, 2, C.orange);
+    px(s, 3, 3, C.yellow); px(s, 4, 3, C.yellow);
+    px(s, 0, 5, C.orange); px(s, 1, 6, C.red); px(s, 9, 3, C.orange);
+    return s;
+  },
+  lightningBolt() {
+    const s = make(10, 6);
+    // зигзаг
+    px(s, 0, 3, C.yellow); px(s, 1, 2, C.yellow); px(s, 2, 3, C.white); px(s, 3, 2, C.yellow);
+    px(s, 4, 1, C.white); px(s, 5, 2, C.yellow); px(s, 6, 3, C.white); px(s, 7, 2, C.yellow);
+    px(s, 8, 2, C.white); px(s, 9, 2, C.yellow);
+    px(s, 2, 4, C.orange, 160); px(s, 6, 4, C.orange, 160);
     return s;
   },
   orb({ color = 'purple' } = {}) {

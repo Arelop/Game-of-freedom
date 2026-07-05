@@ -66,6 +66,25 @@ export const ITEMS = {
 
 export function isGear(itemId) { return !!ITEMS[itemId]?.slot; }
 export function isPotion(itemId) { return !!ITEMS[itemId]?.use; }
+export function isWeaponItem(itemId) { return itemId.startsWith('weapon:'); }
+export function weaponIdOf(itemId) { return itemId.slice(7); }
+
+// Базовые цены материалов/еды (для продажи торговцу)
+export const MATERIAL_PRICES = {
+  bread: 8, meat: 5, cooked_meat: 12, bandage: 15, wood: 6, hide: 9, herb: 5, coin: 1,
+};
+
+// Цена продажи торговцу (~40% от стоимости). WEAPONS передаётся параметром,
+// чтобы не плодить циклический импорт.
+export function sellPrice(itemId, WEAPONS) {
+  if (isWeaponItem(itemId)) {
+    const w = WEAPONS?.[weaponIdOf(itemId)];
+    return w ? Math.max(5, Math.round(w.price * 0.4)) : 5;
+  }
+  if (ITEMS[itemId]?.price) return Math.max(2, Math.round(ITEMS[itemId].price * 0.4));
+  if (MATERIAL_PRICES[itemId]) return Math.max(1, Math.round(MATERIAL_PRICES[itemId] * 0.5));
+  return 1;
+}
 
 // Русское описание статов: «+1 сердце, +12% скорость»
 export function describeItem(itemId) {

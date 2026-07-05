@@ -82,6 +82,7 @@ export class Net {
       case MSG.UNEQUIP: game.unequipItem(p, String(m.slot || '')); break;
       case MSG.SPEND_STAT: game.spendStat(p, String(m.stat || '')); break;
       case MSG.LEARN_TALENT: game.learnTalent(p, String(m.id || '')); break;
+      case MSG.SELL_ITEM: game.sellItem(p, String(m.item || '')); break;
     }
   }
 

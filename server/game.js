@@ -19,7 +19,7 @@ import { AbstractSim } from './sim/abstract.js';
 import { EventLog } from './sim/events.js';
 import { makeReputation, FACTIONS, priceMultiplier } from './sim/factions.js';
 import { STR, ITEM_NAMES } from '../shared/strings.js';
-import { ITEMS, GEAR_SLOTS, isGear, isPotion, describeItem } from '../shared/items.js';
+import { ITEMS, GEAR_SLOTS, isGear, isPotion, describeItem, isWeaponItem, weaponIdOf, sellPrice } from '../shared/items.js';
 import { AMMO_NAMES } from '../shared/weapons.js';
 import { CLASSES, STAT_KEYS, statBonuses, xpNeed, MAX_LEVEL } from '../shared/classes.js';
 import { TALENTS, findTalent, canLearn } from '../shared/talents.js';
@@ -43,7 +43,12 @@ const SHOP = [
   { item: 'ammo_mana', price: 18, count: 15 }, { item: 'ammo_knife', price: 14, count: 8 },
   { item: 'leather_armor', price: 40 }, { item: 'wood_shield', price: 25 },
   { item: 'iron_helmet', price: 65 }, { item: 'wolf_amulet', price: 55 },
+  { item: 'weapon:huntbow', price: 85 }, { item: 'weapon:firestaff', price: 100 },
+  { item: 'weapon:axe', price: 90 },
 ];
+
+const MAX_WEAPON_SLOTS = 4;
+const SCHOOL_NAMES = { melee: 'ближний бой', ranged: 'дальний бой', magic: 'магия' };
 
 // какое оружие использует данный тип боеприпасов (для подсказок в магазине)
 function ammoUsers(type) {
@@ -107,8 +112,12 @@ export class Game {
       fireHeld: false, fireLatch: false,
       hungerTickT: 0,
     };
-    if (process.env.DEV_GEAR) { // отладка: стартовый набор экипировки
-      Object.assign(p.inventory, { leather_armor: 1, iron_helmet: 1, wolf_amulet: 1, heal_potion: 2, swift_potion: 1 });
+    if (process.env.DEV_GEAR) { // отладка: стартовый набор экипировки и оружия
+      Object.assign(p.inventory, {
+        leather_armor: 1, iron_helmet: 1, wolf_amulet: 1, heal_potion: 2, swift_potion: 1,
+        'weapon:fireball': 1, 'weapon:stormstaff': 1, 'weapon:axe': 1,
+      });
+      p.ammo.mana = 60;
     }
     if (process.env.DEV_LEVEL) { // отладка: сразу N уровней
       for (let i = 1; i < +process.env.DEV_LEVEL; i++) { p.level++; p.statPts++; p.talentPts++; }
@@ -218,9 +227,17 @@ export class Game {
     this.toast(p, `Талант изучен: ${findTalent(p.cls, id).name}`);
   }
 
+  // Общее имя предмета (включая оружие-предметы weapon:xxx)
+  itemName(itemId) {
+    if (isWeaponItem(itemId)) return WEAPONS[weaponIdOf(itemId)]?.name || itemId;
+    return ITEMS[itemId]?.name || ITEM_NAMES[itemId] || itemId;
+  }
+
   equipItem(p, itemId) {
+    if ((p.inventory[itemId] || 0) <= 0) return;
+    if (isWeaponItem(itemId)) { this.equipWeapon(p, itemId); return; }
     const it = ITEMS[itemId];
-    if (!it?.slot || (p.inventory[itemId] || 0) <= 0) return;
+    if (!it?.slot) return;
     p.inventory[itemId]--;
     const prev = p.equipment[it.slot];
     if (prev) p.inventory[prev] = (p.inventory[prev] || 0) + 1;
@@ -229,12 +246,59 @@ export class Game {
     this.toast(p, `Надето: ${it.name}`);
   }
 
+  equipWeapon(p, itemId) {
+    const wid = weaponIdOf(itemId);
+    if (!WEAPONS[wid]) return;
+    if (p.weapons.includes(wid)) { this.toast(p, 'Такое оружие уже в руках'); return; }
+    p.inventory[itemId]--;
+    if (p.inventory[itemId] <= 0) delete p.inventory[itemId];
+    if (p.weapons.length < MAX_WEAPON_SLOTS) {
+      p.weapons.push(wid);
+    } else {
+      // все ячейки заняты — меняем с активным
+      const old = p.weapons[p.weaponIdx];
+      p.inventory['weapon:' + old] = (p.inventory['weapon:' + old] || 0) + 1;
+      p.weapons[p.weaponIdx] = wid;
+    }
+    if (p.mags[wid] === undefined) p.mags[wid] = WEAPONS[wid].magSize || 1;
+    this.toast(p, `В руках: ${WEAPONS[wid].name}`);
+  }
+
+  // slot: 'armor'|'helmet'|... или 'w0'..'w3' (ячейка оружия)
   unequipItem(p, slot) {
+    if (slot.startsWith('w')) {
+      const idx = +slot.slice(1);
+      if (!(idx >= 0 && idx < p.weapons.length)) return;
+      if (p.weapons.length <= 1) { this.toast(p, 'Нельзя остаться без оружия'); return; }
+      const wid = p.weapons[idx];
+      p.weapons.splice(idx, 1);
+      p.inventory['weapon:' + wid] = (p.inventory['weapon:' + wid] || 0) + 1;
+      if (p.weaponIdx >= p.weapons.length) p.weaponIdx = p.weapons.length - 1;
+      p.reloadT = 0; p.reloadPending = false;
+      return;
+    }
     const itemId = p.equipment[slot];
     if (!itemId) return;
     p.equipment[slot] = null;
     p.inventory[itemId] = (p.inventory[itemId] || 0) + 1;
     this.recomputeStats(p);
+  }
+
+  // Продажа торговцу (нужен торговец в 45px)
+  sellItem(p, itemId) {
+    if ((p.inventory[itemId] || 0) <= 0) return;
+    let merchant = null;
+    for (const e of this.entities.values()) {
+      if (e.entType !== 'npc' || e.mapId !== p.mapId) continue;
+      if (e.role !== 'merchant' && e.role !== 'trader') continue;
+      if (dist2(p.x, p.y, e.x, e.y) < 45 * 45) { merchant = e; break; }
+    }
+    if (!merchant) { this.toast(p, 'Рядом нет торговца'); return; }
+    const price = sellPrice(itemId, WEAPONS);
+    p.inventory[itemId]--;
+    if (p.inventory[itemId] <= 0) delete p.inventory[itemId];
+    p.coins += price;
+    this.toast(p, `Продано: ${this.itemName(itemId)} (+${price} мон.)`);
   }
 
   // ---------- главный тик ----------
@@ -425,6 +489,7 @@ export class Game {
         x: p.x, y: p.y - 4, vx: Math.cos(a) * w.projectileSpeed, vy: Math.sin(a) * w.projectileSpeed,
         life: w.projLife, radius: w.projRadius, dmg: atk.dmg, crit: atk.crit,
         knockback: w.knockback, slow, school: w.school,
+        explode: w.explode, chain: w.chain,
         owner: p.id, friendly: true, mapId: p.mapId,
       });
     }
@@ -595,13 +660,50 @@ export class Game {
     this.fx({ t: 'eshot', eid: e.id, pattern: shot.pattern, x: e.x, y: e.y, aim: shot.aim, shotIndex, seed, tick: this.tick }, e.mapId, e.x, e.y);
   }
 
+  // Взрыв: урон всем врагам в радиусе + событие для эффектов
+  explodeAt(mapId, x, y, dmg, radius, owner) {
+    for (const e of [...this.entities.values()]) {
+      if (e.entType !== 'enemy' || e.mapId !== mapId) continue;
+      const def = ENEMIES[e.kind];
+      const d = Math.sqrt(dist2(x, y, e.x, e.y));
+      if (d > radius + def.radius) continue;
+      const a = Math.atan2(e.y - y, e.x - x);
+      this.damageEnemy(e, dmg, { vx: Math.cos(a), vy: Math.sin(a), knockback: 90, owner, school: 'magic' });
+    }
+    this.fx({ t: 'boom', x, y, r: radius }, mapId, x, y);
+  }
+
+  // Цепная молния: перескакивает на ближайших врагов
+  chainLightning(pr, firstTarget) {
+    const hitIds = new Set([firstTarget.id]);
+    const pts = [[Math.round(firstTarget.x), Math.round(firstTarget.y)]];
+    let from = firstTarget;
+    let dmg = pr.dmg;
+    for (let hop = 0; hop < pr.chain.count; hop++) {
+      dmg = Math.round(dmg * pr.chain.falloff * 10) / 10;
+      let next = null, best = pr.chain.radius ** 2;
+      for (const e of this.entities.values()) {
+        if (e.entType !== 'enemy' || e.mapId !== pr.mapId || hitIds.has(e.id)) continue;
+        const d = dist2(from.x, from.y, e.x, e.y);
+        if (d < best) { best = d; next = e; }
+      }
+      if (!next) break;
+      hitIds.add(next.id);
+      pts.push([Math.round(next.x), Math.round(next.y)]);
+      this.damageEnemy(next, dmg, { vx: 0, vy: 0, knockback: 0, owner: pr.owner, school: 'magic' });
+      from = next;
+    }
+    if (pts.length > 1) this.fx({ t: 'chain', pts }, pr.mapId, pts[0][0], pts[0][1]);
+  }
+
   stepProjectiles(dt) {
     const alive = [];
     for (const pr of this.projectiles) {
       if (pr.delay > 0) { pr.delay -= dt; alive.push(pr); continue; }
       const map = this.mapFor(pr.mapId);
       if (!stepProjectile(pr, dt, map)) {
-        this.fx({ t: 'hit', kind: 'wall', x: pr.x, y: pr.y }, pr.mapId, pr.x, pr.y);
+        if (pr.explode) this.explodeAt(pr.mapId, pr.x, pr.y, pr.dmg, pr.explode.radius, pr.owner);
+        else this.fx({ t: 'hit', kind: 'wall', x: pr.x, y: pr.y }, pr.mapId, pr.x, pr.y);
         continue;
       }
       let hit = false;
@@ -611,7 +713,12 @@ export class Game {
           if (e.entType !== 'enemy' || e.mapId !== pr.mapId) continue;
           const def = ENEMIES[e.kind];
           if (circlesOverlap(pr.x, pr.y, pr.radius, e.x, e.y, def.radius)) {
-            this.damageEnemy(e, pr.dmg, pr);
+            if (pr.explode) {
+              this.explodeAt(pr.mapId, pr.x, pr.y, pr.dmg, pr.explode.radius, pr.owner);
+            } else {
+              this.damageEnemy(e, pr.dmg, pr);
+              if (pr.chain) this.chainLightning(pr, e);
+            }
             hit = true; break;
           }
         }
@@ -760,12 +867,8 @@ export class Game {
       if (!circlesOverlap(p.x, p.y, PLAYER_RADIUS + 6, drop.x, drop.y, 4)) continue;
       if (drop.item === 'coin') p.coins += drop.count;
       else if (drop.item.startsWith('weapon:')) {
-        const wid = drop.item.split(':')[1];
-        if (!p.weapons.includes(wid)) {
-          p.weapons.push(wid);
-          p.mags[wid] = WEAPONS[wid].magSize || 1;
-          this.toast(p, STR.pickupWeapon(WEAPONS[wid].name));
-        } else { p.coins += 10; }
+        p.inventory[drop.item] = (p.inventory[drop.item] || 0) + 1;
+        this.toast(p, STR.pickupWeapon(this.itemName(drop.item)) + ' (в сумке)');
       } else if (drop.item.startsWith('ammo_')) {
         const type = drop.item.slice(5);
         p.ammo[type] = (p.ammo[type] || 0) + drop.count * 6;
@@ -781,7 +884,7 @@ export class Game {
   }
 
   dropRandomWeapon(mapId, x, y) {
-    const pool = ['axe', 'huntbow', 'crossbow', 'knives', 'firestaff', 'froststaff'];
+    const pool = ['axe', 'huntbow', 'crossbow', 'knives', 'firestaff', 'froststaff', 'fireball', 'stormstaff'];
     this.spawnDrop('weapon:' + pick(this.rand, pool), 1, mapId, x, y);
   }
 
@@ -928,21 +1031,26 @@ export class Game {
     if (npc.role === 'merchant' || npc.role === 'trader') {
       const mult = priceMultiplier(s ? p.rep[s.faction] : 0);
       const choices = SHOP.map((it, i) => {
-        const name = ITEMS[it.item]?.name || ITEM_NAMES[it.item] || it.item;
+        const name = this.itemName(it.item);
         let note = '';
         if (it.item.startsWith('ammo_')) {
           const type = it.item.slice(5);
           const users = ammoUsers(type);
-          const hasWeapon = p.weapons.some(w => WEAPONS[w].ammoType === type);
+          const hasWeapon = p.weapons.some(w => WEAPONS[w].ammoType === type)
+            || Object.keys(p.inventory).some(k => isWeaponItem(k) && WEAPONS[weaponIdOf(k)]?.ammoType === type);
           note = hasWeapon ? '' : ` [нужен: ${users}]`;
         } else if (ITEMS[it.item]?.slot) {
           note = ` (${describeItem(it.item)})`;
+        } else if (isWeaponItem(it.item)) {
+          const w = WEAPONS[weaponIdOf(it.item)];
+          note = ` (${SCHOOL_NAMES[w.school]}, урон ${w.damage})`;
         }
         return {
           id: 'buy:' + i,
           label: `${name}${it.count ? ' x' + it.count : ''}${note} — ${Math.ceil(it.price * mult)} мон.`,
         };
       });
+      choices.push({ id: 'sell', label: '💰 Продать вещи' });
       choices.push({ id: 'close', label: STR.bye });
       this.sendDialog(p, npc.id, 'Торговец', [`Добро пожаловать! (у тебя ${p.coins} мон.)`], choices);
     } else if (npc.role === 'elder') {
@@ -988,7 +1096,7 @@ export class Game {
       p.coins -= price;
       if (it.item.startsWith('ammo_')) p.ammo[it.item.slice(5)] = (p.ammo[it.item.slice(5)] || 0) + (it.count || 1);
       else p.inventory[it.item] = (p.inventory[it.item] || 0) + 1;
-      this.toast(p, STR.pickup(ITEMS[it.item]?.name || ITEM_NAMES[it.item] || it.item));
+      this.toast(p, STR.pickup(this.itemName(it.item)));
       if (s) { p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + 1); }
       return;
     }
@@ -1005,6 +1113,7 @@ export class Game {
       this.toast(p, STR.pickup(ITEM_NAMES[Object.keys(r.gives)[0]]));
       return;
     }
+    if (choice === 'sell') { this.fx({ t: 'sellMode', pid: p.id }, null); return; }
     if (choice === 'quest') { this.giveQuest(p, dialogId); return; }
     if (choice === 'turnin') { this.turnInQuest(p); return; }
     if (choice === 'rumor') {
