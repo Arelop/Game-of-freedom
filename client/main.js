@@ -534,9 +534,10 @@ function renderBigMap() {
   ctx.font = '8px monospace';
   for (const s of net.mapInfo.settlements) {
     const x = x0 + s.x * TILE * k, y = y0 + s.y * TILE * k;
+    const sz = Math.min(7, 3 + Math.floor((s.pop || 6) / 4)); // размер точки = размер деревни
     ctx.fillStyle = '#99e550';
-    ctx.fillRect(x - 2, y - 2, 4, 4);
-    ctx.fillText(s.name, x - 18, y - 10);
+    ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+    ctx.fillText(s.name + (s.pop ? ` (${s.pop})` : ''), x - 18, y - 10);
   }
   for (const p of net.mapInfo.pois) {
     ctx.fillStyle = p.cleared ? '#696a6a' : p.type === 'dungeon' ? '#d9574a' : '#df7126';

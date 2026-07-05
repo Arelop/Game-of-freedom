@@ -1,12 +1,60 @@
 // Штамповка построек поселения в world.edits + запись якорей для
 // распорядка дня NPC (кровати, рабочие места, костёр, прилавки).
+// Также рантайм-строительство: цивилизации возводят дома/поля/башни на лету.
 import { T } from '../../shared/constants.js';
 import { randInt } from '../../shared/rng.js';
+import { baseTile } from './worldgen.js';
 
 function set(world, x, y, t) { world.edits.set(x + ',' + y, t); }
 
+// Свободна ли площадка w x h с углом (x0,y0): нет правок и рельеф проходим
+export function siteFree(world, x0, y0, w, h) {
+  for (let y = y0 - 1; y < y0 + h + 1; y++) {
+    for (let x = x0 - 1; x < x0 + w + 1; x++) {
+      const e = world.edits.get(x + ',' + y);
+      if (e !== undefined && e !== T.GRASS && e !== T.ROAD) return false;
+      const b = baseTile(world.seed, x, y);
+      if (b === T.WATER || b === T.DEEP_WATER || b === T.ROCK) return false;
+    }
+  }
+  return true;
+}
+
+// Спиральный поиск места под постройку вокруг центра поселения
+export function findBuildSite(world, s, w, h, rand) {
+  for (let r = 8; r <= 26; r += 3) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const a = rand() * Math.PI * 2;
+      const x0 = Math.round(s.x + Math.cos(a) * r) - Math.floor(w / 2);
+      const y0 = Math.round(s.y + Math.sin(a) * r) - Math.floor(h / 2);
+      if (siteFree(world, x0, y0, w, h)) return { x: x0, y: y0 };
+    }
+  }
+  return null;
+}
+
+// Рантайм-постройки. Возвращают занятые тайлы (для remap чанков).
+export function buildHouse(world, s, site, rand) {
+  const w = randInt(rand, 4, 6), h = randInt(rand, 4, 5);
+  stampHouse(world, site.x, site.y, w, h, s.anchors);
+  return { w, h };
+}
+
+export function buildField(world, s, site) {
+  for (let y = site.y; y < site.y + 3; y++)
+    for (let x = site.x; x < site.x + 4; x++) set(world, x, y, T.FIELD);
+  s.anchors.works.push({ x: site.x + 2, y: site.y + 1 });
+  return { w: 4, h: 3 };
+}
+
+export function buildTower(world, s, site) {
+  for (let y = site.y; y < site.y + 2; y++)
+    for (let x = site.x; x < site.x + 2; x++) set(world, x, y, T.TOWER);
+  return { w: 2, h: 2 };
+}
+
 // Дом размером w x h с дверью снизу; внутри кровать (+стол в больших)
-function stampHouse(world, x0, y0, w, h, anchors) {
+export function stampHouse(world, x0, y0, w, h, anchors) {
   for (let y = y0; y < y0 + h; y++)
     for (let x = x0; x < x0 + w; x++) {
       const border = x === x0 || y === y0 || x === x0 + w - 1 || y === y0 + h - 1;

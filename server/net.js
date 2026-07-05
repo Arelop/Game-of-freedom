@@ -67,7 +67,10 @@ export class Net {
       }
       case MSG.CHUNK_REQ: this.sendChunk(ws, p, m.cx | 0, m.cy | 0); break;
       case MSG.PING:
-        ws.send(JSON.stringify({ t: MSG.PONG, t0: m.t0, tick: game.tick, time: game.world.time, day: game.world.day }));
+        ws.send(JSON.stringify({
+          t: MSG.PONG, t0: m.t0, tick: game.tick, time: game.world.time, day: game.world.day,
+          pops: game.world.settlements.map(s => s.population),
+        }));
         break;
       case MSG.SWITCH_WEAPON: {
         const idx = m.slot | 0;

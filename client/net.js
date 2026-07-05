@@ -65,6 +65,8 @@ export class Net {
     if (m.t === MSG.PONG) {
       this.ping = Math.round(performance.now() - m.t0);
       this.worldTime = m.time; this.day = m.day;
+      // живое население для карты
+      if (m.pops) m.pops.forEach((n, i) => { if (this.mapInfo.settlements[i]) this.mapInfo.settlements[i].pop = n; });
       return;
     }
     if (m.t === MSG.CHUNK) {
@@ -110,6 +112,16 @@ export class Net {
         const tiles = this.chunks.get(key);
         if (tiles) {
           tiles[(m.y % CHUNK) * CHUNK + (m.x % CHUNK)] = m.tile;
+          this.handlers.onChunk?.(key);
+        }
+        break;
+      }
+      case 'remap': {
+        // цивилизация что-то построила — сбрасываем чанки, перезапросим
+        for (const [cx, cy] of m.chunks || []) {
+          const key = m.mapId + ':' + cx + ',' + cy;
+          this.chunks.delete(key);
+          this.chunkPending.delete(key);
           this.handlers.onChunk?.(key);
         }
         break;

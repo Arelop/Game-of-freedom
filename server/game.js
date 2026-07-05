@@ -16,6 +16,7 @@ import { generateDungeon, roomAt } from './world/dungeon.js';
 import { updateEnemy } from './sim/ai.js';
 import { updateNpc } from './sim/npc.js';
 import { AbstractSim } from './sim/abstract.js';
+import { CivSim } from './sim/civ.js';
 import { EventLog } from './sim/events.js';
 import { makeReputation, FACTIONS, priceMultiplier } from './sim/factions.js';
 import { STR, ITEM_NAMES } from '../shared/strings.js';
@@ -37,7 +38,7 @@ const RECIPES = [
 ];
 
 const SHOP = [
-  { item: 'bread', price: 8 }, { item: 'bandage', price: 15 },
+  { item: 'bread', price: 8 }, { item: 'bandage', price: 15 }, { item: 'wood', price: 6 },
   { item: 'heal_potion', price: 30 }, { item: 'swift_potion', price: 35 },
   { item: 'ammo_arrow', price: 10, count: 20 }, { item: 'ammo_bolt', price: 15, count: 8 },
   { item: 'ammo_mana', price: 18, count: 15 }, { item: 'ammo_knife', price: 14, count: 8 },
@@ -61,6 +62,7 @@ export class Game {
     this.chunks = new ChunkStore(this.world);
     this.events = new EventLog();
     this.abstract = new AbstractSim(this);
+    this.civ = new CivSim(this);
     this.rand = mulberry32(seed ^ 0x5eed);
     this.players = new Map();
     this.entities = new Map();   // враги, NPC, дропы
@@ -322,6 +324,7 @@ export class Game {
     this.stepEntities(dt);
     this.stepProjectiles(dt);
     this.abstract.update(dt);
+    this.civ.update(dt);
     this.checkDungeonRooms();
   }
 
@@ -463,6 +466,20 @@ export class Game {
         if (arcDeg >= 360 || Math.abs(da) <= half) this.damageNpc(e, w.damage, p);
       }
     }
+    // рубка деревьев: дерево перед бойцом падает и даёт древесину
+    if (p.mapId === 'over') {
+      for (const dd of [12, 22]) {
+        const tx = Math.floor((p.x + Math.cos(aim) * dd) / TILE);
+        const ty = Math.floor((p.y + Math.sin(aim) * dd) / TILE);
+        if (this.chunks.tileAt('over', tx, ty) === T.TREE) {
+          this.chunks.setTile('over', tx, ty, T.GRASS);
+          this.spawnDrop('wood', 1 + (this.rand() < 0.4 ? 1 : 0), 'over', tx * TILE + 8, ty * TILE + 8);
+          this.fx({ t: 'hit', kind: 'wall', x: tx * TILE + 8, y: ty * TILE + 8 }, 'over', tx * TILE, ty * TILE);
+          this.civ.remapArea(tx, ty, 1, 1);
+          break;
+        }
+      }
+    }
     this.fx({ t: 'swing', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, range: r, arc: arcDeg }, p.mapId, p.x, p.y);
   }
 
@@ -555,8 +572,10 @@ export class Game {
         const a = s.anchors;
         ids.push(this.spawnNpc('elder', s.id, 'over', sx + 20, sy - 10));
         ids.push(this.spawnNpc('merchant', s.id, 'over', (a.stalls[0]?.x ?? s.x) * TILE + 8, (a.stalls[0]?.y ?? s.y) * TILE + 8));
-        ids.push(this.spawnNpc('guard', s.id, 'over', sx - 30, sy));
-        ids.push(this.spawnNpc('guard', s.id, 'over', sx + 30, sy));
+        for (let gi = 0; gi < (s.guards || 2); gi++) {
+          const ga = gi / Math.max(1, s.guards) * Math.PI * 2;
+          ids.push(this.spawnNpc('guard', s.id, 'over', sx + Math.cos(ga) * 34, sy + Math.sin(ga) * 34));
+        }
         const villagers = Math.max(2, s.population - 4);
         for (let i = 0; i < villagers; i++) {
           const bed = a.beds[i % a.beds.length];
@@ -1056,14 +1075,27 @@ export class Game {
     } else if (npc.role === 'elder') {
       this.checkDeliver(p, npc);
       const lines = [`Старейшина ${s ? s.name : ''} (${fname})`];
+      if (s) {
+        lines.push(`Жителей: ${s.population}/${Math.floor(s.housingCap)} · стражи: ${s.guards} · еда: ${Math.round(s.food)} · лес: ${Math.round(s.wood)}`);
+        if (s.project) {
+          const pct = Math.round(100 * s.project.progress / s.project.ticks);
+          lines.push(`Идёт стройка (${pct}%)`);
+        }
+        if (s.food < 25) lines.push('⚠ Припасы на исходе — нам нужна еда!');
+      }
       const choices = [];
-      if (p.quest && !p.quest.done && p.quest.giver === npc.home) {
+      if (p.quest && p.quest.type === 'supply' && !p.quest.done && p.quest.giver === npc.home) {
+        const have = p.inventory[p.quest.item] || 0;
+        choices.push({ id: 'supply', label: `Отдать припасы (${Math.min(have, p.quest.count)}/${p.quest.count})` });
+      } else if (p.quest && !p.quest.done && p.quest.giver === npc.home) {
         lines.push('Как продвигается дело?');
       } else if (p.quest && p.quest.done && p.quest.giver === npc.home) {
         choices.push({ id: 'turnin', label: STR.questTurnIn });
       } else if (!p.quest) {
         choices.push({ id: 'quest', label: STR.questAccept });
       }
+      if (s?.project && (p.inventory.wood || 0) >= 5)
+        choices.push({ id: 'donate', label: 'Пожертвовать 5 древесины на стройку (+реп)' });
       choices.push({ id: 'rumor', label: STR.rumor });
       choices.push({ id: 'close', label: STR.bye });
       this.sendDialog(p, npc.id, 'Старейшина', lines, choices);
@@ -1114,6 +1146,32 @@ export class Game {
       return;
     }
     if (choice === 'sell') { this.fx({ t: 'sellMode', pid: p.id }, null); return; }
+    if (choice === 'donate') {
+      const npc = this.entities.get(dialogId);
+      const s = npc && this.world.settlements.find(x => x.id === npc.home);
+      if (!s?.project || (p.inventory.wood || 0) < 5) return;
+      p.inventory.wood -= 5;
+      s.project.progress += 2;
+      p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + 8);
+      this.toast(p, STR.repUp(FACTIONS[s.faction]?.name || s.faction));
+      this.events.push(this.world.day, `${p.name} помог стройке в ${s.name}`, { x: s.x, y: s.y });
+      return;
+    }
+    if (choice === 'supply') {
+      const npc = this.entities.get(dialogId);
+      const s = npc && this.world.settlements.find(x => x.id === npc.home);
+      const q = p.quest;
+      if (!s || !q || q.type !== 'supply' || q.giver !== s.id) return;
+      const have = p.inventory[q.item] || 0;
+      const give = Math.min(have, q.count - (q.given || 0));
+      if (give <= 0) { this.toast(p, 'Нечего отдать — принеси ' + (ITEM_NAMES[q.item] || q.item)); return; }
+      p.inventory[q.item] -= give;
+      q.given = (q.given || 0) + give;
+      s.food = Math.min(140, s.food + give * 6);
+      if (q.given >= q.count) { q.done = true; this.turnInQuest(p); }
+      else this.toast(p, `Отдано ${q.given}/${q.count}`);
+      return;
+    }
     if (choice === 'quest') { this.giveQuest(p, dialogId); return; }
     if (choice === 'turnin') { this.turnInQuest(p); return; }
     if (choice === 'rumor') {
@@ -1132,6 +1190,17 @@ export class Game {
     const sx = s.x * TILE, sy = s.y * TILE;
     const roll = this.rand();
     let quest = null;
+    // голодающая деревня просит еду в первую очередь
+    if (s.food < 35) {
+      quest = {
+        type: 'supply', item: 'meat', count: 6, given: 0, giver: s.id, done: false,
+        title: `Принести 6 сырого мяса в ${s.name}`, tx: s.x, ty: s.y,
+        reward: { coins: 30, rep: 15, xp: 35 },
+      };
+      p.quest = quest;
+      this.toast(p, STR.questNew(quest.title));
+      return;
+    }
     if (roll < 0.45) {
       const poi = this.world.pois
         .filter(x => !x.cleared)

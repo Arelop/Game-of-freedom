@@ -14,7 +14,11 @@ export function saveWorld(game) {
     const data = {
       seed: w.seed, time: w.time, day: w.day,
       edits: [...w.edits.entries()],
-      settlements: w.settlements.map(s => ({ id: s.id, population: s.population, prosperity: s.prosperity, food: s.food })),
+      settlements: w.settlements.map(s => ({
+        id: s.id, population: s.population, prosperity: s.prosperity, food: s.food,
+        wood: s.wood, guards: s.guards, towers: s.towers, fields: s.fields,
+        housingCap: s.housingCap, project: s.project,
+      })),
       pois: w.pois.map(o => ({ id: o.id, cleared: o.cleared })),
       tokens: game.abstract.tokens.filter(t => !t.hydrated).map(({ hydrated, ...t }) => t),
       events: game.events.entries,

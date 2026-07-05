@@ -86,13 +86,27 @@ export function makeWorld(seed) {
   sites.forEach((site, i) => {
     const faction = townFactions[i % townFactions.length];
     const name = pick(rand, SYL_A) + pick(rand, SYL_B);
+    // богатство окрестных лесов — скорость добычи древесины
+    let forest = 0;
+    for (let a = 0; a < 16; a++) {
+      const fx = site.x + Math.round(Math.cos(a / 16 * Math.PI * 2) * 22);
+      const fy = site.y + Math.round(Math.sin(a / 16 * Math.PI * 2) * 22);
+      if (baseTile(seed, fx, fy) === T.FOREST_FLOOR) forest++;
+    }
     const s = {
       id: 'stl' + i, x: site.x, y: site.y, faction, name,
       population: randInt(rand, 6, 10), prosperity: randInt(rand, 40, 70),
       food: randInt(rand, 50, 90),
+      // --- цивилизация ---
+      wood: randInt(rand, 4, 10),
+      guards: 2, towers: 0, fields: 1,
+      housingCap: 0,        // заполнит stampSettlement по числу домов
+      forestRich: Math.min(4, 1 + Math.floor(forest / 4)),
+      project: null,        // { type, progress, need }
       anchors: null, // заполнит stampSettlement: beds, works, fire, stalls
     };
     stampSettlement(world, s, rand);
+    s.housingCap = s.anchors.beds.length * 2;
     world.settlements.push(s);
   });
 

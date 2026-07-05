@@ -69,18 +69,29 @@ export class AbstractSim {
         tok.y = Math.max(TILE * 20, Math.min(TILE * (WORLD_TILES - 20), tok.y));
       }
 
-      // стая близко к поселению — статистический налёт
-      if (tok.type === 'pack' && rand() < 0.06) {
+      // стаи множатся в глуши (особенно ночью)
+      if (tok.type === 'pack' && tok.units.length < 6) {
+        const nightBonus = this.game.isNight() ? 0.06 : 0.02;
+        if (rand() < nightBonus) tok.units.push(tok.units[0]);
+      }
+
+      // стая близко к поселению — осада против рейтинга обороны
+      if (tok.type === 'pack' && rand() < 0.07) {
         const s = world.settlements.find(s =>
           (s.x * TILE - tok.x) ** 2 + (s.y * TILE - tok.y) ** 2 < (TILE * 30) ** 2);
         if (s) {
-          const guards = 2, strength = tok.units.length;
-          if (strength > guards + (rand() < 0.5 ? 1 : 0)) {
-            s.prosperity = Math.max(5, s.prosperity - 10);
+          const defense = s.guards * 2 + s.towers * 3;
+          const strength = tok.units.length * 2 + tok.units.filter(u => u === 'banditHeavy').length * 2;
+          if (strength > defense + (rand() < 0.5 ? 2 : 0)) {
+            s.prosperity = Math.max(5, s.prosperity - 12);
             s.population = Math.max(2, s.population - 1);
-            events.push(world.day, `${cap(tok.name)} напали на ${s.name} — есть жертвы`, { x: s.x, y: s.y });
+            s.food = Math.max(0, s.food - 20);
+            if (s.guards > 0 && rand() < 0.6) s.guards--;
+            tok.units.length > 2 && rand() < 0.4 && tok.units.pop();
+            events.push(world.day, `${cap(tok.name)} разорили окраины ${s.name} — есть жертвы`, { x: s.x, y: s.y });
           } else {
             tok.units.pop();
+            if (rand() < 0.25 && s.guards > 1) s.guards--;
             if (!tok.units.length) tok.dead = true;
             events.push(world.day, `Стража ${s.name} отбила нападение (${tok.name})`, { x: s.x, y: s.y });
           }

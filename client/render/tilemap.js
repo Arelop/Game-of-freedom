@@ -33,6 +33,7 @@ const TILE_SPRITES = {
   [T.DUNGEON_DOOR]: ['tile_dungeon_floor', 'tile_door'],
   [T.DUNGEON_EXIT]: ['tile_dungeon_floor'], // портал — оверлей
   [T.FIELD]: ['tile_field'],
+  [T.TOWER]: ['tile_wall_stone'],
 };
 
 export class TileRenderer {
