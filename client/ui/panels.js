@@ -271,6 +271,63 @@ export class Panels {
     if (dead) this.deadEl.innerHTML = STR.dead + '<br>' + STR.respawnIn(Math.ceil(downT));
   }
 
+  // ---------- меню фракций (F) ----------
+  toggleFactions() {
+    this.facOpen = !this.facOpen;
+    let el = document.getElementById('factions');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'factions';
+      document.body.appendChild(el);
+    }
+    el.style.display = this.facOpen ? 'block' : 'none';
+    if (this.facOpen) this.renderFactions(el);
+  }
+
+  renderFactions(el) {
+    const you = this.net.you;
+    if (!you) return;
+    const NAMES = { severane: 'Северяне', ozerny: 'Озёрный союз', stepnyaki: 'Степняки', bandits: 'Вольница' };
+    el.innerHTML = '<h3>Фракции</h3>';
+    for (const [f, fname] of Object.entries(NAMES)) {
+      const rep = you.rep?.[f] ?? 0;
+      const col = rep > 20 ? '#99e550' : rep < -20 ? '#d9574a' : '#d9a066';
+      const block = document.createElement('div');
+      block.className = 'facblock';
+
+      // репутация полосой
+      const villages = this.net.mapInfo.settlements
+        .filter((s, i) => s.faction === f || (this.net.mapInfo.settlements[i].st === undefined && s.faction === f));
+      const vlist = this.net.mapInfo.settlements
+        .filter(s => s.faction === f)
+        .map(s => `${s.name}${s.st === 1 ? '⚔' : s.st === 2 ? '☠' : ''}`).join(', ');
+
+      // отношения с другими фракциями
+      const rels = Object.entries(this.net.relations?.[f] || {})
+        .filter(([o, v]) => NAMES[o] && v < -15)
+        .map(([o]) => NAMES[o]);
+
+      // доступные действия по репутации
+      const acts = [];
+      if (rep < -20) acts.push('⚔ стража атакует тебя на месте');
+      else {
+        acts.push('✓ торговля и квесты');
+        if (rep >= 20) acts.push('✓ скидки у торговцев, сбор урожая');
+        else acts.push('✗ скидки — нужна репутация 20');
+        if (rep >= 30) acts.push('✓ посредничество в конфликтах (старейшина)');
+        else acts.push('✗ дипломатия — нужна репутация 30');
+      }
+
+      block.innerHTML = `
+        <div class="facname">${fname} <span style="color:${col}">${rep}</span></div>
+        <div class="facbar"><div class="facfill" style="width:${Math.round((rep + 100) / 2)}%;background:${col}"></div></div>
+        ${vlist ? `<div class="facvill">Поселения: ${vlist}</div>` : ''}
+        ${rels.length ? `<div class="facrel">Вражда: ${rels.join(', ')}</div>` : ''}
+        <div class="facacts">${acts.map(a => `<div>${a}</div>`).join('')}</div>`;
+      el.appendChild(block);
+    }
+  }
+
   // ---------- лист персонажа (C) ----------
   toggleChar() {
     this.charOpen = !this.charOpen;

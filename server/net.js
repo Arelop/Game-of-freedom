@@ -6,6 +6,7 @@ import { ENEMIES } from '../shared/enemies.js';
 import { dist2 } from '../shared/simCore.js';
 import { xpNeed } from '../shared/classes.js';
 import { buildBiomeMap } from './world/worldgen.js';
+import { RELATIONS } from './sim/factions.js';
 
 export class Net {
   constructor(game, httpServer) {
@@ -74,6 +75,7 @@ export class Net {
           t: MSG.PONG, t0: m.t0, tick: game.tick, time: game.world.time, day: game.world.day,
           pops: game.world.settlements.map(s => s.population),
           sts: game.world.settlements.map(s => s.ruined ? 2 : s.captured ? 1 : 0),
+          rel: RELATIONS,
         }));
         break;
       case MSG.SWITCH_WEAPON: {

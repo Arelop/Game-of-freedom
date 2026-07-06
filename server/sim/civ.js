@@ -236,6 +236,10 @@ export class CivSim {
       liberator.rep[s.homeFaction] = Math.min(100, (liberator.rep[s.homeFaction] || 0) + 25);
       g.addXp(liberator, 60);
     }
+    // квесты «освободить деревню» с доски заказов
+    for (const p of g.players.values()) {
+      if (p.quest?.liberate === s.id) g.completeQuestObjective(p);
+    }
   }
 
   // Сброс чанков: сервер и клиенты перечитывают тайлы построенного

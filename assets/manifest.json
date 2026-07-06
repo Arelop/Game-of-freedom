@@ -95,6 +95,7 @@
     "obj_shrine":        { "proc": "shrine" },
     "obj_anvil":         { "proc": "anvil" },
     "npc_smith":         { "pack": "d", "tx": 4, "ty": 8 },
+    "npc_merc":          { "pack": "d", "tx": 2, "ty": 8 },
     "npc_innkeeper":     { "pack": "d", "tx": 2, "ty": 7 },
     "npc_hunter":        { "pack": "d", "tx": 4, "ty": 9 },
     "wpn_bombs":         { "proc": "bombsWeapon" },

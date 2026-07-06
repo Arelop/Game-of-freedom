@@ -39,6 +39,7 @@ const TILE_SPRITES = {
   [T.RUBBLE]: ['tile_rubble'],
   [T.FENCE]: ['tile_grass', 'tile_fence'],
   [T.ANVIL]: ['tile_floor_wood', 'obj_anvil'],
+  [T.BOARD]: ['tile_grass', 'obj_sign'],
 };
 
 export class TileRenderer {

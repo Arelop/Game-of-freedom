@@ -25,6 +25,12 @@ import { AMMO_NAMES } from '../shared/weapons.js';
 import { CLASSES, STAT_KEYS, statBonuses, xpNeed, MAX_LEVEL } from '../shared/classes.js';
 import { TALENTS, findTalent, canLearn } from '../shared/talents.js';
 
+const NPC_NAMES = [
+  'Радомир', 'Всеслав', 'Милана', 'Ярина', 'Добрыня', 'Горазд', 'Любава',
+  'Светозар', 'Мстислав', 'Забава', 'Тихомир', 'Велеслава', 'Богдан',
+  'Дарёна', 'Огнеслав', 'Рогнеда', 'Путята', 'Умила', 'Ратибор', 'Злата',
+];
+
 const HOT_RADIUS = 600;            // px: враги думают только рядом с игроками
 const SETTLEMENT_HYDRATE_R = 400;  // px
 const REVIVE_DIST = 26;
@@ -35,6 +41,13 @@ const RECIPES = [
   { id: 'cooked_meat', name: 'Жареное мясо (сырое мясо)', needs: { meat: 1 }, gives: { cooked_meat: 1 } },
   { id: 'ammo_arrow', name: 'Стрелы x10 (1 древесина)', needs: { wood: 1 }, gives: { ammo_arrow: 10 } },
   { id: 'ammo_knife', name: 'Ножи x4 (1 древесина, 1 шкура)', needs: { wood: 1, hide: 1 }, gives: { ammo_knife: 4 } },
+];
+
+// Крафт у наковальни: металл в дело
+const ANVIL_RECIPES = [
+  { id: 'ammo_bolt', name: 'Болты x8 (1 металл, 1 древесина)', needs: { metal: 1, wood: 1 }, gives: { ammo_bolt: 8 } },
+  { id: 'ammo_bomb', name: 'Бомбы x2 (2 металла, 1 древесина)', needs: { metal: 2, wood: 1 }, gives: { ammo_bomb: 2 } },
+  { id: 'fire_arrows_c', name: 'Горящие стрелы (1 металл, 2 травы)', needs: { metal: 1, herb: 2 }, gives: { fire_arrows: 1 } },
 ];
 
 const SHOP = [
@@ -605,8 +618,10 @@ export class Game {
 
   spawnNpc(role, home, mapId, x, y, extra = {}) {
     const id = 'n' + this.nextId++;
+    // стабильное имя: от деревни, роли и номера — NPC «узнаваем» между визитами
+    const name = NPC_NAMES[hash2(hashId(String(home)), hashId(role), extra.ni || 0) % NPC_NAMES.length];
     this.entities.set(id, {
-      id, entType: 'npc', role, home, mapId, x, y, aim: 0,
+      id, entType: 'npc', role, home, mapId, x, y, aim: 0, name,
       hp: role === 'guard' ? 12 : 6, maxHp: role === 'guard' ? 12 : 6,
       kind: extra.kind || ({
         guard: 'npc_guard', merchant: 'npc_merchant', elder: 'npc_elder',
@@ -746,7 +761,8 @@ export class Game {
 
       const map = this.mapFor(e.mapId);
       if (e.entType === 'enemy') {
-        const shots = updateEnemy(e, dt, map, [...this.players.values()], this.rand);
+        const npcs = [...this.entities.values()].filter(n => n.entType === 'npc' && n.mapId === e.mapId);
+        const shots = updateEnemy(e, dt, map, [...this.players.values()], this.rand, npcs);
         for (const s of shots) this.enemyFire(e, s);
         // контактный урон
         const def = ENEMIES[e.kind];
@@ -900,6 +916,16 @@ export class Game {
           if (circlesOverlap(pr.x, pr.y, pr.radius, p.x, p.y, PLAYER_RADIUS)) {
             this.damagePlayer(p, pr.dmg, null);
             hit = true; break;
+          }
+        }
+        // снаряды монстров ранят и жителей со стражей
+        if (!hit) {
+          for (const n of this.entities.values()) {
+            if (n.entType !== 'npc' || n.mapId !== pr.mapId) continue;
+            if (circlesOverlap(pr.x, pr.y, pr.radius, n.x, n.y, 5)) {
+              this.damageNpc(n, pr.dmg, null);
+              hit = true; break;
+            }
           }
         }
       }
@@ -1137,7 +1163,7 @@ export class Game {
     // NPC рядом: приоритет «полезным» ролям над стражей/жителями
     const ROLE_PRIO = { elder: 3, merchant: 2, trader: 2, blacksmith: 2, priest: 2, innkeeper: 2, hunter: 2 };
     let npc = null, bestScore = -Infinity;
-    const R2 = 40 * 40;
+    const R2 = 26 * 26; // ближе — иначе NPC перехватывают колодцы и доски
     for (const e of this.entities.values()) {
       if (e.entType !== 'npc' || e.mapId !== p.mapId) continue;
       const d = dist2(p.x, p.y, e.x, e.y);
@@ -1148,12 +1174,75 @@ export class Game {
     if (npc) { this.openDialog(p, npc); return; }
 
     const tx = Math.floor(p.x / TILE), ty = Math.floor(p.y / TILE);
-    // тайлы вокруг
+    // тайлы вокруг: у каждого здания своя польза
+    p.useCd = p.useCd || {};
+    const cdReady = (key, sec) => {
+      if ((p.useCd[key] || 0) > this.tick) { this.toast(p, 'Ещё не время (' + Math.ceil((p.useCd[key] - this.tick) / 30) + ' с)'); return false; }
+      p.useCd[key] = this.tick + sec * 30;
+      return true;
+    };
+    const homeTown = () => this.world.settlements.find(s => !s.ruined && !s.captured &&
+      (s.x - tx) ** 2 + (s.y - ty) ** 2 < 40 * 40);
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       const t = this.chunks.tileAt(p.mapId, tx + dx, ty + dy);
       if (t === T.CAMPFIRE) { this.openCrafting(p); return; }
+      if (t === T.ANVIL) { this.openAnvilCrafting(p); return; }
+      if (t === T.BOARD) { this.openBoard(p, homeTown()); return; }
       if (t === T.CHEST) { this.openChest(p, tx + dx, ty + dy); return; }
       if (t === T.DUNGEON_EXIT && p.mapId !== 'over') { this.exitDungeon(p); return; }
+      if (t === T.BED) {
+        if (p.hp >= p.maxHp) { this.toast(p, 'Ты не устал'); return; }
+        if (!cdReady('bed', 90)) return;
+        p.hp = Math.min(p.maxHp, p.hp + 2);
+        this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        this.toast(p, '💤 Вздремнул: +1 сердце');
+        return;
+      }
+      if (t === T.WELL) {
+        if (!cdReady('well', 45)) return;
+        p.hunger = Math.min(HUNGER_MAX, p.hunger + 8);
+        this.toast(p, '💧 Свежая вода: +сытость');
+        return;
+      }
+      if (t === T.MINE) {
+        if (!cdReady('mine', 60)) return;
+        p.inventory.metal = (p.inventory.metal || 0) + 1;
+        this.toast(p, '⛏ Добыл 1 металл');
+        this.fx({ t: 'hit', kind: 'wall', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        return;
+      }
+      if (t === T.SHRINE) {
+        if ((p.inventory.crystal || 0) < 1 && (p.ammo.mana || 0) < 5) {
+          this.toast(p, 'Духи ждут подношения (5 маны)');
+          return;
+        }
+        if (!cdReady('shrine', 60)) return;
+        p.ammo.mana = Math.max(0, (p.ammo.mana || 0) - 5);
+        p.buffs.blessed = { mult: 0.1, t: 120 };
+        this.recomputeStats(p);
+        this.toast(p, '✦ Духи довольны: +10% урона на 2 мин');
+        return;
+      }
+      if (t === T.TOWER) {
+        if (!cdReady('tower', 30)) return;
+        let found = 0;
+        for (const poi of this.world.pois) {
+          if (poi.cleared) continue;
+          if ((poi.x - tx) ** 2 + (poi.y - ty) ** 2 > 100 * 100) continue;
+          this.fx({ t: 'marker', pid: p.id, x: poi.x, y: poi.y, text: poi.name }, null);
+          found++;
+        }
+        this.toast(p, found ? `👁 С башни видно: ${found} лог. отмечено на карте` : '👁 Горизонт чист');
+        return;
+      }
+      if (t === T.FIELD && p.mapId === 'over') {
+        const s = homeTown();
+        if (s && (p.rep[s.faction] || 0) < 10) { this.toast(p, 'Жители против — это их урожай'); return; }
+        if (!cdReady('field', 120)) return;
+        p.inventory.bread = (p.inventory.bread || 0) + 1;
+        this.toast(p, '🌾 Собрал колосья: +1 хлеб');
+        return;
+      }
     }
     // вход в данж
     if (p.mapId === 'over') {
@@ -1177,6 +1266,18 @@ export class Game {
   }
 
   // ---------- диалоги / магазин / квесты / слухи ----------
+  // NPC помнят знакомых: первая встреча — представление, дальше — приветствие
+  npcGreeting(p, npc) {
+    p.met = p.met || new Set();
+    const key = npc.home + ':' + npc.role + ':' + npc.name;
+    if (p.met.has(key)) {
+      const warm = (p.rep[this.world.settlements.find(x => x.id === npc.home)?.faction] || 0) > 30;
+      return warm ? `«Рад видеть тебя снова, ${p.name}!»` : `«А, это снова ты, ${p.name}».`;
+    }
+    p.met.add(key);
+    return `«Будем знакомы — ${npc.name}».`;
+  }
+
   openDialog(p, npc) {
     const s = this.world.settlements.find(x => x.id === npc.home);
     const fname = s ? (FACTIONS[s.faction]?.name || '') : '';
@@ -1206,7 +1307,7 @@ export class Game {
       });
       choices.push({ id: 'sell', label: '💰 Продать вещи' });
       choices.push({ id: 'close', label: STR.bye });
-      this.sendDialog(p, npc.id, 'Торговец', [`Добро пожаловать! (у тебя ${p.coins} мон.)`], choices);
+      this.sendDialog(p, npc.id, `Торговец ${npc.name}`, [this.npcGreeting(p, npc), `Добро пожаловать! (у тебя ${p.coins} мон.)`], choices);
     } else if (npc.role === 'elder') {
       this.checkDeliver(p, npc);
       const lines = [`Старейшина ${s ? s.name : ''} (${fname})`];
@@ -1243,7 +1344,7 @@ export class Game {
         choices.push({ id: 'donate', label: 'Пожертвовать 5 древесины на стройку (+реп)' });
       choices.push({ id: 'rumor', label: STR.rumor });
       choices.push({ id: 'close', label: STR.bye });
-      this.sendDialog(p, npc.id, 'Старейшина', lines, choices);
+      this.sendDialog(p, npc.id, `Старейшина ${npc.name}`, [this.npcGreeting(p, npc), ...lines.slice(1)], choices);
     } else if (npc.role === 'blacksmith') {
       const w = this.weapon(p);
       const lvl = p.weaponUp?.[w.id] || 0;
@@ -1256,21 +1357,23 @@ export class Game {
         choices.push({ id: 'forge', label: `Улучшить (${costM} металла, ${costC} мон.)` });
       }
       choices.push({ id: 'close', label: STR.bye });
-      this.sendDialog(p, npc.id, 'Кузнец', lines, choices);
+      this.sendDialog(p, npc.id, `Кузнец ${npc.name}`, [this.npcGreeting(p, npc), ...lines.slice(1)], choices);
     } else if (npc.role === 'priest') {
       const choices = [
         { id: 'healme', label: 'Исцеление (12 мон.)' },
         { id: 'bless', label: 'Благословение: +15% урона на 3 мин (30 мон.)' },
         { id: 'close', label: STR.bye },
       ];
-      this.sendDialog(p, npc.id, 'Жрец', ['«Духи иного мира благосклонны к тебе».'], choices);
+      this.sendDialog(p, npc.id, `Жрец ${npc.name}`, [this.npcGreeting(p, npc), '«Духи иного мира благосклонны к тебе».'], choices);
     } else if (npc.role === 'innkeeper') {
+      const hasMerc = p.mercId && this.entities.has(p.mercId);
       const choices = [
         { id: 'rest', label: 'Отдых: полное восстановление (15 мон.)' },
+        ...(hasMerc ? [] : [{ id: 'hire', label: '⚔ Нанять бойца-компаньона (60 мон.)' }]),
         { id: 'rumor', label: STR.rumor },
         { id: 'close', label: STR.bye },
       ];
-      this.sendDialog(p, npc.id, 'Трактирщик', ['«Присаживайся, путник. Эль свежий, слухи свежее».'], choices);
+      this.sendDialog(p, npc.id, `Трактирщик ${npc.name}`, [this.npcGreeting(p, npc), '«Присаживайся! Эль свежий, слухи свежее».'], choices);
     } else if (npc.role === 'hunter') {
       const choices = [];
       if (!p.quest) choices.push({ id: 'huntquest', label: 'Взять заказ: 3 шкуры' });
@@ -1278,11 +1381,11 @@ export class Game {
         choices.push({ id: 'supply', label: `Отдать шкуры (${Math.min(p.inventory.hide || 0, p.quest.count)}/${p.quest.count})` });
       choices.push({ id: 'buyarrows', label: 'Купить стрелы x20 (7 мон.)' });
       choices.push({ id: 'close', label: STR.bye });
-      this.sendDialog(p, npc.id, 'Охотник', ['«Волки нынче жирные. Шкуры нужны — платим честно».'], choices);
+      this.sendDialog(p, npc.id, `Охотник ${npc.name}`, [this.npcGreeting(p, npc), '«Волки нынче жирные. Шкуры нужны — платим честно».'], choices);
     } else {
       const rumors = this.events.rumors(1);
       const line = rumors.length ? `Говорят, ${lc(rumors[0].text)}…` : 'Тихо у нас, и слава богам.';
-      this.sendDialog(p, npc.id, 'Житель', [line], [{ id: 'close', label: STR.bye }]);
+      this.sendDialog(p, npc.id, `${npc.name}`, [this.npcGreeting(p, npc), line], [{ id: 'close', label: STR.bye }]);
     }
   }
 
@@ -1290,6 +1393,56 @@ export class Game {
     const choices = RECIPES.map(r => ({ id: 'craft:' + r.id, label: r.name }));
     choices.push({ id: 'close', label: STR.close });
     this.sendDialog(p, 'campfire', STR.craft, ['Что будем делать?'], choices);
+  }
+
+  // Доска заказов гильдии: три задания на выбор
+  openBoard(p, s) {
+    if (!s) return;
+    if (p.quest) {
+      this.sendDialog(p, 'board', '📜 Доска заказов',
+        [`У тебя уже есть дело: «${p.quest.title}»`], [{ id: 'close', label: STR.close }]);
+      return;
+    }
+    const sx = s.x * TILE, sy = s.y * TILE;
+    const list = [];
+    const poi = this.world.pois.filter(x => !x.cleared)
+      .sort((a, b) => dist2(a.x * TILE, a.y * TILE, sx, sy) - dist2(b.x * TILE, b.y * TILE, sx, sy))[0];
+    if (poi) list.push({
+      type: 'clear', poi: poi.id, giver: s.id, done: false,
+      title: `Зачистить: ${poi.name}`, tx: poi.x, ty: poi.y,
+      reward: { coins: 40 + poi.difficulty * 25, rep: 15, xp: 40 + poi.difficulty * 20 },
+    });
+    const tok = this.abstract.tokens.filter(t => t.type === 'pack')
+      .sort((a, b) => dist2(a.x, a.y, sx, sy) - dist2(b.x, b.y, sx, sy))[0];
+    if (tok) list.push({
+      type: 'kill', token: tok.id, giver: s.id, done: false,
+      title: `Истребить: ${tok.name}`, tx: Math.round(tok.x / TILE), ty: Math.round(tok.y / TILE),
+      reward: { coins: 35, rep: 12, xp: 45 },
+    });
+    const to = this.world.settlements.filter(x => x.id !== s.id && !x.ruined && !x.captured)[0];
+    if (to) list.push({
+      type: 'deliver', to: to.id, giver: s.id, done: false,
+      title: `Доставить письмо в ${to.name}`, tx: to.x, ty: to.y,
+      reward: { coins: 25, rep: 10, xp: 30 },
+    });
+    const captured = this.world.settlements.find(x => x.captured);
+    if (captured) list.push({
+      type: 'clear', poi: null, giver: s.id, done: false, liberate: captured.id,
+      title: `⚔ ОСОБЫЙ: освободить ${captured.name} от бандитов!`,
+      tx: captured.x, ty: captured.y,
+      reward: { coins: 80, rep: 20, xp: 80 },
+    });
+    p.pendingBoard = list;
+    const choices = list.map((q, i) => ({ id: 'takeq:' + i, label: `${q.title} (+${q.reward.coins} мон.)` }));
+    choices.push({ id: 'close', label: STR.close });
+    this.sendDialog(p, 'board', '📜 Доска заказов гильдии', ['Свежие объявления:'], choices);
+  }
+
+  // Наковальня: кузнечный крафт из металла
+  openAnvilCrafting(p) {
+    const choices = ANVIL_RECIPES.map(r => ({ id: 'craft:' + r.id, label: r.name }));
+    choices.push({ id: 'close', label: STR.close });
+    this.sendDialog(p, 'anvil', '⚒ Наковальня', ['Металл звенит под молотом…'], choices);
   }
 
   sendDialog(p, id, name, lines, choices) {
@@ -1313,7 +1466,8 @@ export class Game {
       return;
     }
     if (choice.startsWith('craft:')) {
-      const r = RECIPES.find(x => x.id === choice.split(':')[1]);
+      const rid = choice.split(':')[1];
+      const r = RECIPES.find(x => x.id === rid) || ANVIL_RECIPES.find(x => x.id === rid);
       if (!r) return;
       for (const [item, n] of Object.entries(r.needs))
         if ((p.inventory[item] || 0) < n) { this.toast(p, 'Не хватает ресурсов'); return; }
@@ -1411,6 +1565,25 @@ export class Game {
       p.hunger = HUNGER_MAX;
       this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
       this.toast(p, '☘ Выспался и наелся — как новенький');
+      return;
+    }
+    if (choice === 'hire') {
+      if (p.mercId && this.entities.has(p.mercId)) return;
+      if (p.coins < 60) { this.toast(p, STR.notEnoughCoins); return; }
+      p.coins -= 60;
+      const id = this.spawnNpc('mercenary', null, p.mapId, p.x + 14, p.y, { owner: p.id, kind: 'npc_merc' });
+      const merc = this.entities.get(id);
+      merc.hp = merc.maxHp = 20;
+      p.mercId = id;
+      this.toast(p, `⚔ ${merc.name} теперь сражается за тебя`);
+      return;
+    }
+    if (choice.startsWith('takeq:')) {
+      const q = p.pendingBoard?.[+choice.split(':')[1]];
+      if (!q || p.quest) return;
+      p.quest = q;
+      p.pendingBoard = null;
+      this.toast(p, STR.questNew(q.title));
       return;
     }
     if (choice === 'huntquest') {

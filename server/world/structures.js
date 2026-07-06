@@ -115,6 +115,8 @@ export function stampSettlement(world, s, rand) {
   set(world, cx - 2, cy - 9, T.TABLE);
   set(world, cx + 1, cy - 9, T.TABLE);
   anchors.tavern = { x: cx - 1, y: cy - 8 };
+  // доска заказов гильдии на углу площади (подальше от дверей)
+  set(world, cx + 4, cy - 4, T.BOARD);
 
   // кузница — дом с наковальней на востоке
   stampHouse(world, cx + 6, cy - 6, 5, 5, anchors);

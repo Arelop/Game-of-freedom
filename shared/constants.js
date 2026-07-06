@@ -38,7 +38,7 @@ export const T = {
   DUNGEON_FLOOR: 15, DUNGEON_WALL: 16, DOOR: 17, WATER_EDGE: 18,
   CAMPFIRE: 19, STALL: 20, BED: 21, TABLE: 22, WELL: 23, CHEST: 24,
   DUNGEON_DOOR: 25, DUNGEON_EXIT: 26, FIELD: 27, TOWER: 28,
-  MINE: 29, SHRINE: 30, RUBBLE: 31, FENCE: 32, ANVIL: 33,
+  MINE: 29, SHRINE: 30, RUBBLE: 31, FENCE: 32, ANVIL: 33, BOARD: 34,
 };
 
 // Разрушаемые тайлы: прочность, во что превращаются, дроп.

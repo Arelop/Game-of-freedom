@@ -68,6 +68,7 @@ export class Net {
       // живое население и статусы для карты
       if (m.pops) m.pops.forEach((n, i) => { if (this.mapInfo.settlements[i]) this.mapInfo.settlements[i].pop = n; });
       if (m.sts) m.sts.forEach((st, i) => { if (this.mapInfo.settlements[i]) this.mapInfo.settlements[i].st = st; });
+      if (m.rel) this.relations = m.rel;
       return;
     }
     if (m.t === MSG.CHUNK) {

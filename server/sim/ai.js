@@ -6,7 +6,8 @@ import { moveWithCollision, dist2 } from '../../shared/simCore.js';
 const AGGRO_R2 = 190 * 190;
 const FORGET_R2 = 320 * 320;
 
-export function updateEnemy(e, dt, map, players, rand) {
+// npcs — жители/стража: монстры враждебны им так же, как игрокам
+export function updateEnemy(e, dt, map, players, rand, npcs = []) {
   const def = ENEMIES[e.kind];
   const shots = [];
 
@@ -15,12 +16,17 @@ export function updateEnemy(e, dt, map, players, rand) {
   if (e.slowT > 0) { e.slowT -= dt; slowF = e.slowMult || 0.65; }
   e.slowF = slowF;
 
-  // цель — ближайший живой игрок
+  // цель — ближайший игрок ИЛИ житель (игроки чуть приоритетнее)
   let target = null, bestD = Infinity;
   for (const p of players) {
     if (p.dead || p.mapId !== e.mapId) continue;
     const d = dist2(e.x, e.y, p.x, p.y);
     if (d < bestD) { bestD = d; target = p; }
+  }
+  for (const n of npcs) {
+    if (n.mapId !== e.mapId) continue;
+    const d = dist2(e.x, e.y, n.x, n.y) * 1.3; // лёгкий приоритет игрокам
+    if (d < bestD) { bestD = d; target = n; }
   }
   if (target && bestD < AGGRO_R2) e.aggro = true;
   if (!target || bestD > FORGET_R2) e.aggro = false;

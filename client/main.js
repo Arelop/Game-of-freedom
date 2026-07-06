@@ -209,6 +209,7 @@ input.onKey = k => {
   if (k === 'KeyR') net.send({ t: MSG.RELOAD });
   if (k === 'Tab') panels.toggleInventory();
   if (k === 'KeyC') panels.toggleChar();
+  if (k === 'KeyF') panels.toggleFactions();
   if (k === 'KeyM') bigMap = !bigMap;
   if (k === 'F3') hud.debug = !hud.debug;
   if (k === 'Escape') panels.hideDialog();
