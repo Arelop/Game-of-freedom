@@ -336,7 +336,8 @@ export class CivSim {
     }
     // квесты «освободить деревню» с доски заказов
     for (const p of g.players.values()) {
-      if (p.quest?.liberate === s.id) g.completeQuestObjective(p);
+      for (const q of p.quests || [])
+        if (q.liberate === s.id && !q.done) g.completeQuestObjective(p, q);
     }
   }
 

@@ -93,7 +93,8 @@ export class AbstractSim {
             s.prosperity = Math.min(100, s.prosperity + 4);
             // эскорт-квесты выполнены
             for (const p of this.game.players.values()) {
-              if (p.quest?.type === 'escort' && p.quest.token === tok.id) this.game.completeQuestObjective(p);
+              for (const q of p.quests || [])
+                if (q.type === 'escort' && q.token === tok.id && !q.done) this.game.completeQuestObjective(p, q);
             }
             if (tok.cargo) {
               s[tok.cargo.res] = Math.min(140, (s[tok.cargo.res] || 0) + tok.cargo.amount);
@@ -122,8 +123,9 @@ export class AbstractSim {
                 `${cap(raider.name)} разграбили караван с ${tok.cargo ? RES_NAMES[tok.cargo.res] : 'товаром'}!`,
                 { x: Math.round(tok.x / TILE), y: Math.round(tok.y / TILE) });
               for (const p of this.game.players.values()) {
-                if (p.quest?.type === 'escort' && p.quest.token === tok.id) {
-                  p.quest = null;
+                const fq = (p.quests || []).find(q => q.type === 'escort' && q.token === tok.id);
+                if (fq) {
+                  p.quests = p.quests.filter(q => q !== fq);
                   this.game.toast(p, '✖ Караван разграблен — задание провалено');
                 }
               }

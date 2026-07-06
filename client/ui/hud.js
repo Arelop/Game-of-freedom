@@ -71,10 +71,13 @@ export class Hud {
     ctx.fillStyle = '#eee';
     ctx.fillText(`${icon} День ${net.day} · ${SEASONS[seasonOf(net.day)]}`, VIEW_W / 2 - 36, 4);
 
-    // квест
-    if (you.q) {
-      ctx.fillStyle = you.q.done ? '#99e550' : '#fbf236';
-      ctx.fillText((you.q.done ? '✓ ' : '• ') + you.q.title, 5, 26);
+    // журнал заданий: до трёх строк (J — подробности)
+    const qs = you.qs || [];
+    let qy = 26;
+    for (const q of qs.slice(0, 3)) {
+      ctx.fillStyle = q.done ? '#99e550' : '#fbf236';
+      ctx.fillText((q.done ? '✓ ' : '• ') + q.title, 5, qy);
+      qy += 9;
     }
 
     // онбординг: цепочка первых целей для новичка
@@ -88,7 +91,7 @@ export class Hud {
       ];
       if (HINTS[you.hnt]) {
         ctx.fillStyle = '#63c5ff';
-        ctx.fillText('➤ ' + HINTS[you.hnt], 5, you.q ? 35 : 26);
+        ctx.fillText('➤ ' + HINTS[you.hnt], 5, qy);
       }
     }
 

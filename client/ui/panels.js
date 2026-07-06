@@ -133,6 +133,44 @@ export class Panels {
   }
   get dialogOpen() { return this.dialogEl.style.display === 'block' || this.shopOpen || this.stashOpen; }
 
+  // ---------- журнал заданий (J) ----------
+  toggleJournal() {
+    this.jrOpen = !this.jrOpen;
+    let el = document.getElementById('journal');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'journal';
+      document.body.appendChild(el);
+    }
+    el.style.display = this.jrOpen ? 'block' : 'none';
+    if (this.jrOpen) this.renderJournal();
+  }
+
+  renderJournal() {
+    const el = document.getElementById('journal');
+    const you = this.net.you;
+    if (!el || !you || !this.jrOpen) return;
+    const qs = you.qs || [];
+    el.innerHTML = `<h3>📖 Журнал заданий (${qs.length}/3)</h3>`;
+    if (!qs.length) {
+      const e = document.createElement('div');
+      e.className = 'jrempty';
+      e.textContent = 'Пусто. Задания дают старейшины, охотники и доска заказов у столба.';
+      el.appendChild(e);
+    }
+    for (const q of qs) {
+      const row = document.createElement('div');
+      row.className = 'jrquest' + (q.done ? ' done' : '');
+      row.innerHTML = `<div class="jrtitle">${q.done ? '✓' : '•'} ${q.title}</div>
+        <div class="jrstate">${q.done ? 'Выполнено — вернись к заказчику за наградой' : 'В работе' + (q.tx ? ' · цель отмечена на карте (M)' : '')}</div>`;
+      el.appendChild(row);
+    }
+    const hintEl = document.createElement('div');
+    hintEl.className = 'jrempty';
+    hintEl.textContent = 'Можно вести до трёх заданий одновременно.';
+    el.appendChild(hintEl);
+  }
+
   // ---------- общий сундук отряда (таверна) ----------
   showStash(m) {
     this.stashData = m.items || {};

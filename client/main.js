@@ -258,6 +258,7 @@ input.onKey = k => {
   if (k === 'KeyC') panels.toggleChar();
   if (k === 'KeyP') panels.toggleFactions();
   if (k === 'KeyM') bigMap = !bigMap;
+  if (k === 'KeyJ') panels.toggleJournal();
   if (k === 'KeyN') panels.toast(Music.toggle() ? '🎵 Музыка включена' : '🔇 Музыка выключена');
   if (k === 'F3') hud.debug = !hud.debug;
   if (k === 'Escape') panels.hideDialog();
@@ -829,11 +830,12 @@ function renderBigMap() {
     ctx.fillStyle = '#fbf236';
     ctx.fillRect(x0 + m.x * TILE * k - 1, y0 + m.y * TILE * k - 1, 3, 3);
   }
-  if (net.you?.q?.tx) {
-    ctx.fillStyle = '#fbf236';
-    const qx = x0 + net.you.q.tx * TILE * k, qy = y0 + net.you.q.ty * TILE * k;
+  for (const q of net.you?.qs || []) {
+    if (!q.tx) continue;
+    ctx.fillStyle = q.done ? '#99e550' : '#fbf236';
+    const qx = x0 + q.tx * TILE * k, qy = y0 + q.ty * TILE * k;
     ctx.fillRect(qx - 2, qy, 5, 1); ctx.fillRect(qx, qy - 2, 1, 5);
-    ctx.fillText(net.you.q.title, qx - 30, qy + 6);
+    ctx.fillText(q.title, qx - 30, qy + 6);
   }
   // союзники на карте
   for (const [, r] of net.remotes) {

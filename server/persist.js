@@ -35,7 +35,7 @@ export function saveWorld(game) {
         name: p.name, x: p.x, y: p.y, mapId: 'over',
         hp: p.hp, hunger: p.hunger, coins: p.coins,
         weapons: p.weapons, ammo: p.ammo, inventory: p.inventory, rep: p.rep,
-        equipment: p.equipment,
+        equipment: p.equipment, quests: p.quests || [],
         cls: p.cls, level: p.level, xp: p.xp,
         statPts: p.statPts, talentPts: p.talentPts, stats: p.stats, talents: p.talents,
         weaponUp: p.weaponUp || {},
@@ -120,6 +120,9 @@ export function applySavedPlayer(game, p) {
     if (rec.story) p.story = { ...p.story, ...rec.story };
     if (rec.home) { p.home = rec.home; p.homeStash = rec.homeStash || {}; }
     if (rec.hintStage !== undefined) p.hintStage = rec.hintStage;
+    // журнал заданий (миграция старых сейвов с одиночным quest)
+    if (rec.quests) p.quests = rec.quests;
+    else if (rec.quest) p.quests = [rec.quest];
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);

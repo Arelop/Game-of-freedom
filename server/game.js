@@ -186,7 +186,7 @@ export class Game {
       coins: 20, hunger: HUNGER_MAX,
       rep: makeReputation(), aggroFactions: new Set(),
       dead: false, downT: 0,
-      quest: null,
+      quests: [], // журнал: до 3 активных заданий
       // сюжетные цепочки именных NPC: стадии, счётчики, осколки
       story: { rado: 0, capt: 0, mira: 0, bandits: 0, banditsGoal: 0, shards: [], captCamp: null },
       hintStage: 0, hintKills: 0, // онбординг: цепочка первых целей в HUD
@@ -693,6 +693,14 @@ export class Game {
         da = Math.atan2(Math.sin(da), Math.cos(da));
         if (arcDeg >= 360 || Math.abs(da) <= half) this.damageNpc(e, w.damage, p);
       }
+    }
+    // friendly fire: замах цепляет и союзников в дуге
+    for (const q of this.players.values()) {
+      if (q === p || q.dead || q.mapId !== p.mapId) continue;
+      if (dist2(p.x, p.y, q.x, q.y) > (r + PLAYER_RADIUS) ** 2) continue;
+      let da = Math.atan2(q.y - p.y, q.x - p.x) - aim;
+      da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (arcDeg >= 360 || Math.abs(da) <= half) this.damagePlayer(q, atk.dmg, p);
     }
     // удар по постройкам: дерево рубится, стены крошатся (по structDmg оружия)
     if (w.structDmg > 0) {
@@ -1234,6 +1242,12 @@ export class Game {
       const a = Math.atan2(e.y - y, e.x - x);
       this.damageEnemy(e, dmg, { vx: Math.cos(a), vy: Math.sin(a), knockback: 90, owner, school: 'magic' });
     }
+    // friendly fire: взрыв не разбирает своих — бьёт всех игроков в радиусе
+    for (const q of this.players.values()) {
+      if (q.dead || q.mapId !== mapId) continue;
+      if (dist2(x, y, q.x, q.y) > (radius + PLAYER_RADIUS) ** 2) continue;
+      this.damagePlayer(q, Math.max(1, Math.round(dmg / 2)), { x, y });
+    }
     if (structDmg > 0) {
       const attacker = this.players.get(owner);
       const t0x = Math.floor((x - radius) / TILE), t1x = Math.floor((x + radius) / TILE);
@@ -1313,6 +1327,16 @@ export class Game {
             if (n.entType !== 'npc' || n.mapId !== pr.mapId) continue;
             if (circlesOverlap(pr.x, pr.y, pr.radius, n.x, n.y, 5)) {
               this.damageNpc(n, pr.dmg, this.players.get(pr.owner));
+              hit = true; break;
+            }
+          }
+        }
+        // friendly fire: пули игроков ранят и союзников — целься аккуратно
+        if (!hit && !pr.guard) {
+          for (const q of this.players.values()) {
+            if (q.dead || q.mapId !== pr.mapId || q.id === pr.owner) continue;
+            if (circlesOverlap(pr.x, pr.y, pr.radius, q.x, q.y, PLAYER_RADIUS)) {
+              this.damagePlayer(q, pr.dmg, null);
               hit = true; break;
             }
           }
@@ -1445,9 +1469,10 @@ export class Game {
       this.events.push(this.world.day, `Пал грозный ${def.name}!`);
     }
     // квест «убить стаю» проверяется в onTokenUnitKilled через журнал
-    if (killer && killer.quest && killer.quest.type === 'kill' && e.token === killer.quest.token) {
-      const tokenGone = !this.abstract.tokens.some(t => t.id === e.token);
-      if (tokenGone) this.completeQuestObjective(killer);
+    if (killer && e.token) {
+      const kq = killer.quests?.find(q => q.type === 'kill' && q.token === e.token && !q.done);
+      if (kq && !this.abstract.tokens.some(t => t.id === e.token))
+        this.completeQuestObjective(killer, kq);
     }
   }
 
@@ -1523,6 +1548,21 @@ export class Game {
       p.dead = true;
       p.downT = 25;
       p.coins = Math.floor(p.coins * 0.8);
+      // смерть вытряхивает сумку: всё ненадетое рассыпается вокруг тела
+      // (экипировка, оружие в руках и боеприпасы остаются при герое)
+      let di = 0;
+      for (const [item, n] of Object.entries(p.inventory)) {
+        if (n <= 0) continue;
+        // оружие-предметы падают поштучно (подбор берёт по одному)
+        const stacks = item.startsWith('weapon:') ? Array(n).fill(1) : [n];
+        for (const cnt of stacks) {
+          const a = (di++ / 8) * Math.PI * 2;
+          const r = 14 + (di % 3) * 10;
+          this.spawnDrop(item, cnt, p.mapId, p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, 300);
+        }
+      }
+      p.inventory = {};
+      if (di > 0) this.toast(p, '💀 Сумка рассыпалась по земле — вернись за вещами (5 мин)');
       this.fx({ t: 'pdown', id: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
       this.events.push(this.world.day, `${p.name} пал в бою`);
     }
@@ -1684,7 +1724,8 @@ export class Game {
 
   onPoiCleared(poi) {
     for (const p of this.players.values()) {
-      if (p.quest && p.quest.type === 'clear' && p.quest.poi === poi.id) this.completeQuestObjective(p);
+      for (const q of p.quests)
+        if (q.type === 'clear' && q.poi === poi.id && !q.done) this.completeQuestObjective(p, q);
     }
   }
 
@@ -2359,16 +2400,17 @@ export class Game {
           }
         }
       }
-      if (p.quest && p.quest.type === 'supply' && !p.quest.done && p.quest.giver === npc.home) {
-        const have = p.inventory[p.quest.item] || 0;
-        choices.push({ id: 'supply', label: `Отдать припасы (${Math.min(have, p.quest.count)}/${p.quest.count})` });
-      } else if (p.quest && !p.quest.done && p.quest.giver === npc.home) {
-        lines.push('Как продвигается дело?');
-      } else if (p.quest && p.quest.done && p.quest.giver === npc.home) {
-        choices.push({ id: 'turnin', label: STR.questTurnIn });
-      } else if (!p.quest) {
-        choices.push({ id: 'quest', label: STR.questAccept });
+      const supQ = p.quests.find(q => q.type === 'supply' && !q.done && q.giver === npc.home);
+      if (supQ) {
+        const have = p.inventory[supQ.item] || 0;
+        choices.push({ id: 'supply', label: `Отдать припасы (${Math.min(have, supQ.count)}/${supQ.count})` });
       }
+      if (p.quests.some(q => q.done && q.giver === npc.home))
+        choices.push({ id: 'turnin', label: STR.questTurnIn });
+      if (p.quests.length < 3)
+        choices.push({ id: 'quest', label: STR.questAccept });
+      else if (p.quests.some(q => !q.done && q.giver === npc.home))
+        lines.push('Как продвигается дело?');
       if (s?.project && (p.inventory.wood || 0) >= 5)
         choices.push({ id: 'donate', label: 'Пожертвовать 5 древесины на стройку (+реп)' });
       // свой дом: жильё в деревне для героя с репутацией
@@ -2424,9 +2466,10 @@ export class Game {
       this.sendDialog(p, npc.id, `Трактирщик ${npc.name}`, [this.npcGreeting(p, npc), '«Присаживайся! Эль свежий, слухи свежее».'], choices);
     } else if (npc.role === 'hunter') {
       const choices = [];
-      if (!p.quest) choices.push({ id: 'huntquest', label: 'Взять заказ: 3 шкуры' });
-      else if (p.quest.type === 'supply' && p.quest.item === 'hide' && p.quest.giver === npc.home)
-        choices.push({ id: 'supply', label: `Отдать шкуры (${Math.min(p.inventory.hide || 0, p.quest.count)}/${p.quest.count})` });
+      const hideQ = p.quests.find(q => q.type === 'supply' && q.item === 'hide' && q.giver === npc.home && !q.done);
+      if (hideQ)
+        choices.push({ id: 'supply', label: `Отдать шкуры (${Math.min(p.inventory.hide || 0, hideQ.count)}/${hideQ.count})` });
+      else if (p.quests.length < 3) choices.push({ id: 'huntquest', label: 'Взять заказ: 3 шкуры' });
       choices.push({ id: 'buyarrows', label: 'Купить стрелы x20 (7 мон.)' });
       choices.push({ id: 'close', label: STR.bye });
       this.sendDialog(p, npc.id, `Охотник ${npc.name}`, [this.npcGreeting(p, npc), '«Волки нынче жирные. Шкуры нужны — платим честно».'], choices);
@@ -2588,9 +2631,9 @@ export class Game {
   // Доска заказов гильдии: три задания на выбор
   openBoard(p, s) {
     if (!s) return;
-    if (p.quest) {
+    if (p.quests.length >= 3) {
       this.sendDialog(p, 'board', '📜 Доска заказов',
-        [`У тебя уже есть дело: «${p.quest.title}»`], [{ id: 'close', label: STR.close }]);
+        ['Журнал полон (3 задания). Сперва заверши начатое (J — журнал).'], [{ id: 'close', label: STR.close }]);
       return;
     }
     const sx = s.x * TILE, sy = s.y * TILE;
@@ -2716,8 +2759,8 @@ export class Game {
     if (choice === 'supply') {
       const npc = this.entities.get(dialogId);
       const s = npc && this.world.settlements.find(x => x.id === npc.home);
-      const q = p.quest;
-      if (!s || !q || q.type !== 'supply' || q.giver !== s.id) return;
+      const q = s && p.quests.find(x => x.type === 'supply' && x.giver === s.id && !x.done);
+      if (!s || !q) return;
       const have = p.inventory[q.item] || 0;
       const give = Math.min(have, q.count - (q.given || 0));
       if (give <= 0) { this.toast(p, 'Нечего отдать — принеси ' + (ITEM_NAMES[q.item] || q.item)); return; }
@@ -2725,7 +2768,7 @@ export class Game {
       q.given = (q.given || 0) + give;
       if (q.item === 'meat' || q.item === 'bread') s.food = Math.min(140, s.food + give * 6);
       else s.prosperity = Math.min(100, s.prosperity + give * 2);
-      if (q.given >= q.count) { q.done = true; this.turnInQuest(p); }
+      if (q.given >= q.count) { q.done = true; this.turnInQuest(p, s.id); }
       else this.toast(p, `Отдано ${q.given}/${q.count}`);
       return;
     }
@@ -2785,23 +2828,19 @@ export class Game {
     }
     if (choice.startsWith('takeq:')) {
       const q = p.pendingBoard?.[+choice.split(':')[1]];
-      if (!q || p.quest) return;
-      p.quest = q;
-      p.pendingBoard = null;
-      this.toast(p, STR.questNew(q.title));
-      if (p.hintStage === 1) p.hintStage = 2;
+      if (!q) return;
+      if (this.addQuest(p, q)) p.pendingBoard = null;
       return;
     }
     if (choice === 'huntquest') {
       const npc = this.entities.get(dialogId);
       const s = npc && this.world.settlements.find(x => x.id === npc.home);
-      if (!s || p.quest) return;
-      p.quest = {
+      if (!s) return;
+      this.addQuest(p, {
         type: 'supply', item: 'hide', count: 3, given: 0, giver: s.id, done: false,
         title: `Принести 3 шкуры охотнику ${s.name}`, tx: s.x, ty: s.y,
         reward: { coins: 25, rep: 8, xp: 30 },
-      };
-      this.toast(p, STR.questNew(p.quest.title));
+      });
       return;
     }
     if (choice === 'buyarrows') {
@@ -2812,7 +2851,7 @@ export class Game {
       return;
     }
     if (choice === 'quest') { this.giveQuest(p, dialogId); if (p.hintStage === 1) p.hintStage = 2; return; }
-    if (choice === 'turnin') { this.turnInQuest(p); return; }
+    if (choice === 'turnin') { this.turnInQuest(p, this.entities.get(dialogId)?.home || null); return; }
     if (choice === 'rumor') {
       const rumors = this.events.rumors(3);
       const lines = rumors.length ? rumors.map(r => `День ${r.day}: ${r.text}`) : ['Пока всё спокойно.'];
@@ -2820,6 +2859,18 @@ export class Game {
       for (const r of rumors) if (r.x) this.fx({ t: 'marker', pid: p.id, x: r.x, y: r.y, text: r.text }, null);
       this.sendDialog(p, dialogId, 'Старейшина', lines, [{ id: 'close', label: STR.close }]);
     }
+  }
+
+  // журнал заданий: до 3 активных одновременно
+  addQuest(p, quest, extraToast = '') {
+    if (p.quests.length >= 3) {
+      this.toast(p, '📖 Журнал полон (3 задания). Заверши что-нибудь (J — журнал)');
+      return false;
+    }
+    p.quests.push(quest);
+    this.toast(p, STR.questNew(quest.title) + extraToast);
+    if (p.hintStage === 1) p.hintStage = 2;
+    return true;
   }
 
   giveQuest(p, npcId) {
@@ -2831,13 +2882,11 @@ export class Game {
     let quest = null;
     // голодающая деревня просит еду в первую очередь
     if (s.food < 35) {
-      quest = {
+      this.addQuest(p, {
         type: 'supply', item: 'meat', count: 6, given: 0, giver: s.id, done: false,
         title: `Принести 6 сырого мяса в ${s.name}`, tx: s.x, ty: s.y,
         reward: { coins: 30, rep: 15, xp: 35 },
-      };
-      p.quest = quest;
-      this.toast(p, STR.questNew(quest.title));
+      });
       return;
     }
     // караван этой деревни в пути — предложи сопровождение
@@ -2845,14 +2894,12 @@ export class Game {
       t.type === 'caravan' && !t.dead && t.from === s.id && t.cargo);
     if (caravan && roll < 0.5) {
       const to = this.world.settlements.find(x => x.id === caravan.target);
-      quest = {
+      this.addQuest(p, {
         type: 'escort', token: caravan.id, giver: s.id, done: false,
         title: `Сопроводить караван в ${to?.name || '…'}`,
         tx: to?.x, ty: to?.y,
         reward: { coins: 45, rep: 12, xp: 40 },
-      };
-      p.quest = quest;
-      this.toast(p, STR.questNew(quest.title) + ' (держись рядом с караваном!)');
+      }, ' (держись рядом с караваном!)');
       return;
     }
     if (roll < 0.45) {
@@ -2883,34 +2930,38 @@ export class Game {
       };
     }
     if (!quest) return;
-    p.quest = quest;
-    this.toast(p, STR.questNew(quest.title));
+    this.addQuest(p, quest);
   }
 
-  completeQuestObjective(p) {
-    if (!p.quest || p.quest.done) return;
-    p.quest.done = true;
-    this.toast(p, `${p.quest.title} — выполнено! Вернись за наградой.`);
+  completeQuestObjective(p, q) {
+    const quest = q || p.quests.find(x => !x.done);
+    if (!quest || quest.done) return;
+    quest.done = true;
+    this.toast(p, `${quest.title} — выполнено! Вернись за наградой.`);
   }
 
-  turnInQuest(p) {
-    const q = p.quest;
-    if (!q || !q.done) return;
-    p.coins += q.reward.coins;
-    const s = this.world.settlements.find(x => x.id === q.giver);
-    if (s) {
-      p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + q.reward.rep);
-      this.toast(p, STR.repUp(FACTIONS[s.faction]?.name || s.faction));
-      this.events.push(this.world.day, `${p.name} помог ${s.name}: ${lc(q.title)}`);
+  // сдать все выполненные задания (гиверу — только его, без гивера — любые)
+  turnInQuest(p, giverSid = null) {
+    const done = p.quests.filter(q => q.done && (!giverSid || q.giver === giverSid));
+    if (!done.length) return;
+    for (const q of done) {
+      p.coins += q.reward.coins;
+      if (q.reward.xp) this.addXp(p, q.reward.xp);
+      const s = this.world.settlements.find(x => x.id === q.giver);
+      if (s) {
+        p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + q.reward.rep);
+        this.toast(p, STR.repUp(FACTIONS[s.faction]?.name || s.faction));
+        this.events.push(this.world.day, `${p.name} помог ${s.name}: ${lc(q.title)}`);
+      }
+      this.toast(p, STR.questDone(q.title) + ` (+${q.reward.coins} мон.)`);
     }
-    this.toast(p, STR.questDone(q.title) + ` (+${q.reward.coins} мон.)`);
-    p.quest = null;
+    p.quests = p.quests.filter(q => !done.includes(q));
   }
 
   // доставка: пришёл к старейшине цели
   checkDeliver(p, npc) {
-    if (p.quest && p.quest.type === 'deliver' && !p.quest.done && npc.home === p.quest.to)
-      this.completeQuestObjective(p);
+    for (const q of p.quests)
+      if (q.type === 'deliver' && !q.done && npc.home === q.to) this.completeQuestObjective(p, q);
   }
 
   useItem(p, item) {
