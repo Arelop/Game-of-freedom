@@ -44,6 +44,7 @@ const particles = new Particles();
 const hud = new Hud(atlas);
 const tiles = new TileRenderer(atlas, net);
 const panels = new Panels(net, atlas);
+window.__panels = panels; // для отладки и автотестов UI
 
 // локальное косметическое состояние
 let fireCd = 0;
@@ -203,6 +204,7 @@ net.handlers.onFx = (kind, m) => {
       SFX.zap();
       break;
     case 'sellMode': panels.openSellMode(); break;
+    case 'shop': panels.showShop(m); break;
     case 'toast': panels.toast(m.text); break;
     case 'dialog': panels.showDialog(m); break;
     case 'marker': net.mapInfo.markers = net.mapInfo.markers || []; net.mapInfo.markers.push(m); break;

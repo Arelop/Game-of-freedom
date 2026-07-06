@@ -1521,32 +1521,25 @@ export class Game {
     const s = this.world.settlements.find(x => x.id === npc.home);
     const fname = s ? (FACTIONS[s.faction]?.name || '') : '';
     if (npc.role === 'merchant' || npc.role === 'trader') {
+      // структурированный прилавок: клиент рисует окно-сетку с иконками
       const mult = priceMultiplier(s ? p.rep[s.faction] : 0);
-      const choices = SHOP.map((it, i) => {
-        const name = this.itemName(it.item);
-        let note = '';
+      const items = SHOP.map((it, i) => {
+        const sc = scarcityMult(s, it.item, 'buy');
+        let need = null;
         if (it.item.startsWith('ammo_')) {
           const type = it.item.slice(5);
-          const users = ammoUsers(type);
           const hasWeapon = p.weapons.some(w => getWeapon(w)?.ammoType === type)
             || Object.keys(p.inventory).some(k => isWeaponItem(k) && getWeapon(weaponIdOf(k))?.ammoType === type);
-          note = hasWeapon ? '' : ` [нужен: ${users}]`;
-        } else if (ITEMS[it.item]?.slot) {
-          note = ` (${describeItem(it.item)})`;
-        } else if (isWeaponItem(it.item)) {
-          const w = getWeapon(weaponIdOf(it.item));
-          note = ` (${SCHOOL_NAMES[w.school]}, урон ${w.damage})`;
+          if (!hasWeapon) need = ammoUsers(type);
         }
-        const price = Math.ceil(it.price * mult * scarcityMult(s, it.item, 'buy'));
-        const trend = scarcityMult(s, it.item, 'buy') > 1 ? '▲' : scarcityMult(s, it.item, 'buy') < 1 ? '▼' : '';
         return {
-          id: 'buy:' + i,
-          label: `${name}${it.count ? ' x' + it.count : ''}${note} — ${price}${trend} мон.`,
+          i, item: it.item, count: it.count || 0,
+          price: Math.ceil(it.price * mult * sc),
+          trend: sc > 1.01 ? 1 : sc < 0.99 ? -1 : 0,
+          need,
         };
       });
-      choices.push({ id: 'sell', label: '💰 Продать вещи' });
-      choices.push({ id: 'close', label: STR.bye });
-      this.sendDialog(p, npc.id, `Торговец ${npc.name}`, [this.npcGreeting(p, npc), `Добро пожаловать! (у тебя ${p.coins} мон.)`], choices);
+      this.fx({ t: 'shop', pid: p.id, id: npc.id, name: npc.name, greet: this.npcGreeting(p, npc), items }, null);
     } else if (npc.role === 'elder') {
       this.checkDeliver(p, npc);
       const lines = [`Старейшина ${s ? s.name : ''} (${fname})`];

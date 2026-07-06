@@ -125,8 +125,123 @@ export class Panels {
     d.style.display = 'block';
   }
 
-  hideDialog() { this.dialogEl.style.display = 'none'; }
-  get dialogOpen() { return this.dialogEl.style.display === 'block'; }
+  hideDialog() {
+    this.dialogEl.style.display = 'none';
+    this.hideShop();
+  }
+  get dialogOpen() { return this.dialogEl.style.display === 'block' || this.shopOpen; }
+
+  // ---------- окно торговли: сетка товаров с иконками и карточками ----------
+  showShop(m) {
+    this.shopData = m;
+    this.shopOpen = true;
+    let el = document.getElementById('shop');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'shop';
+      document.body.appendChild(el);
+    }
+    el.style.display = 'block';
+    this.renderShop();
+  }
+
+  hideShop() {
+    this.shopOpen = false;
+    this.hideTip();
+    const el = document.getElementById('shop');
+    if (el) el.style.display = 'none';
+  }
+
+  renderShop() {
+    const el = document.getElementById('shop');
+    const m = this.shopData;
+    if (!el || !m || !this.shopOpen) return;
+    const coins = this.net.you?.coins ?? 0;
+    el.innerHTML = '';
+
+    const head = document.createElement('div');
+    head.className = 'shophead';
+    head.innerHTML = `<span>🛒 Торговец ${m.name}</span><span class="shopcoins">🪙 ${coins}</span>`;
+    el.appendChild(head);
+    const greet = document.createElement('div');
+    greet.className = 'shopgreet';
+    greet.textContent = m.greet || '';
+    el.appendChild(greet);
+
+    // товары по группам — легче искать глазами
+    const groupOf = it => it.item.startsWith('weapon:') ? 'Оружие'
+      : it.item.startsWith('ammo_') ? 'Боеприпасы'
+      : ITEMS[it.item]?.slot ? 'Экипировка'
+      : (ITEMS[it.item]?.use || USABLE_FOOD.has(it.item)) ? 'Расходники' : 'Материалы';
+    const groups = new Map();
+    for (const it of m.items) {
+      const g = groupOf(it);
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(it);
+    }
+    for (const gname of ['Оружие', 'Экипировка', 'Расходники', 'Боеприпасы', 'Материалы']) {
+      const list = groups.get(gname);
+      if (!list) continue;
+      const h = document.createElement('h3');
+      h.textContent = gname;
+      el.appendChild(h);
+      const grid = document.createElement('div');
+      grid.className = 'shopgrid';
+      for (const it of list) {
+        const cell = document.createElement('div');
+        cell.className = 'shopcell';
+        const isWpn = it.item.startsWith('weapon:');
+        cell.appendChild(this.freshIcon(this.itemIcon(it.item)));
+        const rc = this.rarColor(it.item);
+        if (rc) cell.style.borderColor = rc;
+        if (it.count > 1) {
+          const badge = document.createElement('span');
+          badge.className = 'count'; badge.textContent = 'x' + it.count;
+          cell.appendChild(badge);
+        }
+        const tag = document.createElement('span');
+        tag.className = 'shopprice';
+        tag.textContent = it.price + (it.trend > 0 ? '▲' : it.trend < 0 ? '▼' : '');
+        if (it.trend > 0) tag.style.color = '#d9574a';
+        if (it.trend < 0) tag.style.color = '#99e550';
+        cell.appendChild(tag);
+        const cantAfford = coins < it.price;
+        if (cantAfford) cell.classList.add('poor');
+        this.bindTip(cell, () => {
+          const base = isWpn
+            ? this.tipWeapon(it.item.slice(7), { action: cantAfford ? null : 'купить', price: false })
+            : this.tipItem(it.item, { action: cantAfford ? null : 'купить', price: false });
+          const extra = (it.need ? `<div class="tinfo" style="color:#d9a066">Нет оружия под боеприпас (${it.need})</div>` : '')
+            + `<div class="tprice">Цена: ${it.price} мон.${it.trend > 0 ? ' (дефицит ▲)' : it.trend < 0 ? ' (избыток ▼)' : ''}${cantAfford ? ' — не хватает монет' : ''}</div>`;
+          return base + extra;
+        });
+        cell.onclick = () => {
+          if (this.net.you?.coins < it.price) { SFX.ui(); return; }
+          SFX.pickup();
+          this.net.send({ t: MSG.DIALOG_CHOICE, id: m.id, choice: 'buy:' + it.i });
+          setTimeout(() => this.renderShop(), 200); // обновить монеты/доступность
+        };
+        grid.appendChild(cell);
+      }
+      el.appendChild(grid);
+    }
+
+    const btns = document.createElement('div');
+    btns.className = 'shopbtns';
+    const sellB = document.createElement('button');
+    sellB.textContent = '💰 Продать вещи';
+    sellB.onclick = () => {
+      SFX.ui();
+      this.hideShop();
+      this.net.send({ t: MSG.DIALOG_CHOICE, id: m.id, choice: 'sell' });
+    };
+    const closeB = document.createElement('button');
+    closeB.textContent = STR.bye + ' (Esc)';
+    closeB.onclick = () => { SFX.ui(); this.hideShop(); };
+    btns.appendChild(sellB);
+    btns.appendChild(closeB);
+    el.appendChild(btns);
+  }
 
   toggleInventory() {
     this.invOpen = !this.invOpen;
