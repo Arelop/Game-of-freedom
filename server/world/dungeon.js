@@ -6,10 +6,12 @@ import { enemiesOfTier } from '../../shared/enemies.js';
 
 const SIZE = 64;
 
-export function generateDungeon(seed, difficulty, withBoss) {
+export function generateDungeon(seed, difficulty, withBoss, depth = 1) {
   const rand = mulberry32(seed);
   const g = new Uint8Array(SIZE * SIZE).fill(T.DUNGEON_WALL);
   const rooms = [];
+  // проклятое подземелье: все враги — элита, добыча богаче (глубже — чаще)
+  const cursed = rand() < (depth > 1 ? 0.45 : 0.2) && difficulty >= 2;
 
   // цепочка комнат: вход -> 3-5 боевых -> (сокровищница) -> (босс)
   const count = randInt(rand, 3, 5) + (withBoss ? 1 : 0);
@@ -34,6 +36,21 @@ export function generateDungeon(seed, difficulty, withBoss) {
 
     carveRoom(g, nx, ny, rw, rh);
     const doors = carveCorridor(g, prev.x, prev.y, nx, ny);
+    // дверь босса заперта: весь проход вдоль нижней кромки комнаты
+    // перегорожен решёткой (комнаты могут сливаться — точечной двери мало)
+    let lockedTiles = null;
+    if (isBoss) {
+      lockedTiles = [];
+      const row = ny + rh + 1;
+      for (let cx = nx - rw - 1; cx <= nx + rw + 2; cx++) {
+        if (cx <= 0 || cx >= SIZE - 1) continue;
+        if (g[row * SIZE + cx] === T.DUNGEON_FLOOR) {
+          g[row * SIZE + cx] = T.LOCKED_DOOR;
+          lockedTiles.push({ x: cx, y: row });
+        }
+      }
+      if (!lockedTiles.length) lockedTiles = null;
+    }
 
     const room = {
       id: 'r' + i, x: nx, y: ny, w: rw, h: rh,
@@ -43,6 +60,7 @@ export function generateDungeon(seed, difficulty, withBoss) {
       isTreasure: false,
       spawns: [],
     };
+    if (lockedTiles) room.lockedTiles = lockedTiles;
     const n = isBoss ? 1 : randInt(rand, 3, 4 + difficulty);
     // спавн по таблице тиров: сложность данжа задаёт диапазон монстров
     const kinds = isBoss ? ['bossOgre'] : enemiesOfTier(1, Math.min(4, difficulty + 1));
@@ -57,6 +75,15 @@ export function generateDungeon(seed, difficulty, withBoss) {
     prev = { x: nx, y: ny };
   }
 
+  // мини-босс с ключом в средней комнате (только если дверь босса заперта)
+  if (withBoss && rooms.length >= 3) {
+    const midRoom = rooms[Math.floor((rooms.length - 1) / 2)];
+    midRoom.spawns.push({
+      kind: difficulty >= 3 ? 'minotaur' : 'orcWarlord',
+      x: midRoom.x, y: midRoom.y, keyBearer: true,
+    });
+  }
+
   // сокровищница: сундук в последней небоссовой комнате
   const treasureRoom = rooms[withBoss ? rooms.length - 2 : rooms.length - 1];
   if (treasureRoom) {
@@ -65,7 +92,7 @@ export function generateDungeon(seed, difficulty, withBoss) {
     treasureRoom.chest = { x: treasureRoom.x, y: treasureRoom.y, opened: false };
   }
 
-  // --- декор: кровь на полу, колонны, светящиеся кристаллы, статуи ---
+  // --- декор: кровь на полу, колонны, светящиеся кристаллы, статуи, ловушки ---
   for (let y = 1; y < SIZE - 1; y++) {
     for (let x = 1; x < SIZE - 1; x++) {
       const i = y * SIZE + x;
@@ -73,6 +100,7 @@ export function generateDungeon(seed, difficulty, withBoss) {
         const r = rand();
         if (r < 0.03) g[i] = T.BLOOD;                       // следы старых боёв
         else if (r < 0.045 && !nearTile(g, x, y, T.DUNGEON_EXIT)) g[i] = T.PILLAR; // обломки колонн
+        else if (r < 0.062 && y < SIZE - 14) g[i] = T.TRAP; // лезвия под ногами (не у входа)
       } else if (g[i] === T.DUNGEON_WALL && rand() < 0.02 && nearTile(g, x, y, T.DUNGEON_FLOOR)) {
         g[i] = T.CRYSTAL_WALL;                              // светящиеся жилы кристалла
       }
@@ -91,10 +119,19 @@ export function generateDungeon(seed, difficulty, withBoss) {
     if (g[fy2 * SIZE + fx2] === T.DUNGEON_FLOOR) g[fy2 * SIZE + fx2] = T.FOUNTAIN;
   }
 
+  // лестница на нижний этаж — в комнате босса (глубина ограничена)
+  if (withBoss && depth < 2) {
+    const br = rooms.find(r => r.isBoss);
+    if (br) {
+      const sx = br.x, sy = br.y - br.h + 1;
+      if (g[sy * SIZE + sx] === T.DUNGEON_FLOOR) g[sy * SIZE + sx] = T.STAIRS;
+    }
+  }
+
   // выход = вход (портал наружу)
   g[entrance.y * SIZE + entrance.x] = T.DUNGEON_EXIT;
 
-  return { size: SIZE, grid: g, rooms, entrance, seed, difficulty };
+  return { size: SIZE, grid: g, rooms, entrance, seed, difficulty, depth, cursed };
 }
 
 function nearTile(g, x, y, tile) {

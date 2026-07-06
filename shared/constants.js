@@ -47,6 +47,9 @@ export const T = {
   CRYSTAL_WALL: 39,  // светящийся кристалл — свет в данжах, добыча кристаллов
   PILLAR: 40,        // обломанная колонна — руины
   BLOOD: 41,         // засохшая кровь на полу данжа
+  TRAP: 42,          // ловушка с лезвиями — ранит наступившего
+  LOCKED_DOOR: 43,   // запертая дверь босса — нужен ключ мини-босса
+  STAIRS: 44,        // лестница на нижний этаж подземелья
 };
 
 // Разрушаемые тайлы: прочность, во что превращаются, дроп.
@@ -81,9 +84,10 @@ export const SOLID = new Set([
   T.DUNGEON_WALL, T.STALL, T.WELL, T.CHEST, T.TABLE, T.BED, T.TOWER,
   T.MINE, T.SHRINE, T.FENCE, T.ANVIL,
   T.OBELISK, T.STATUE, T.FOUNTAIN, T.DARK_ALTAR, T.CRYSTAL_WALL, T.PILLAR,
+  T.LOCKED_DOOR,
 ]);
 // Блокирует пули (стены — да, вода — нет)
 export const BULLET_SOLID = new Set([
   T.WALL, T.TREE, T.ROCK_SOLID, T.DUNGEON_WALL, T.STALL, T.WELL, T.TOWER,
-  T.MINE, T.OBELISK, T.STATUE, T.CRYSTAL_WALL, T.PILLAR,
+  T.MINE, T.OBELISK, T.STATUE, T.CRYSTAL_WALL, T.PILLAR, T.LOCKED_DOOR,
 ]);

@@ -199,6 +199,57 @@
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_crystal.png",
       "down": 2
     },
+    "enemy_goblin": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/goblin.png",
+      "down": 2
+    },
+    "enemy_hobgoblin": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/hobgoblin.png",
+      "down": 2
+    },
+    "enemy_gnoll": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/gnoll.png",
+      "down": 2
+    },
+    "enemy_orc_warrior": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/orc_warrior.png",
+      "down": 2
+    },
+    "enemy_ghoul": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/undead/ghoul.png",
+      "down": 2
+    },
+    "enemy_orc_knight": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/orc_knight.png",
+      "down": 2
+    },
+    "enemy_ogre": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/ogre.png",
+      "down": 2
+    },
+    "enemy_minotaur": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/minotaur.png",
+      "down": 2
+    },
+    "enemy_orc_warlord": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/orc_warlord.png",
+      "down": 2
+    },
+    "wpn_mace": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/mace1.png"
+    },
+    "wpn_flail": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/flail1.png"
+    },
+    "wpn_morningstar": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/morningstar1.png"
+    },
+    "wpn_greatsword": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/greatsword1.png"
+    },
+    "wpn_halberd": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/halberd1.png"
+    },
     "enemy_swamp_witch": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/naga_mage.png",
       "down": 2
@@ -242,6 +293,21 @@
     "tile_blood": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/cobble_blood3.png",
       "down": 2
+    },
+    "obj_trap": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/dngn_trap_blade.png",
+      "down": 2
+    },
+    "obj_door_locked": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/dngn_closed_door.png",
+      "down": 2
+    },
+    "obj_stairs": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/gateways/stone_stairs_down.png",
+      "down": 2
+    },
+    "item_key": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/UNUSED/other/key.png"
     },
     "item_amulet_eye": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/eye_cyan.png"

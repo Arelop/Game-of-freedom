@@ -63,6 +63,7 @@ const SHOP = [
   { item: 'wizard_hat', price: 90 }, { item: 'ring_str', price: 70 },
   { item: 'flame_tome', price: 145 }, { item: 'lucky_deck', price: 120 },
   { item: 'throwing_net', price: 95 }, { item: 'crystal_orb', price: 130 },
+  { item: 'weapon:mace', price: 75 }, { item: 'weapon:greatsword', price: 150 }, { item: 'weapon:halberd', price: 125 },
   { item: 'iron_helmet', price: 65 }, { item: 'wolf_amulet', price: 55 },
   { item: 'weapon:huntbow', price: 85 }, { item: 'weapon:firestaff', price: 100 },
   { item: 'weapon:axe', price: 90 }, { item: 'weapon:bombs', price: 140 },
@@ -188,6 +189,7 @@ export class Game {
       quest: null,
       // сюжетные цепочки именных NPC: стадии, счётчики, осколки
       story: { rado: 0, capt: 0, mira: 0, bandits: 0, banditsGoal: 0, shards: [], captCamp: null },
+      hintStage: 0, hintKills: 0, // онбординг: цепочка первых целей в HUD
       lastSeq: 0, inputs: [],
       fireHeld: false, fireLatch: false,
       hungerTickT: 0,
@@ -320,6 +322,7 @@ export class Game {
     p.statPts--;
     p.stats[stat] = (p.stats[stat] || 0) + 1;
     this.recomputeStats(p);
+    if (p.hintStage === 3) { p.hintStage = 4; this.toast(p, '✅ Очко вложено! Последний шаг подсказок в HUD'); }
   }
 
   learnTalent(p, id) {
@@ -433,6 +436,21 @@ export class Game {
     if (this.isNight() !== wasNight)
       this.toastAll(this.isNight() ? STR.night : STR.morning);
 
+    // мировые события: мир живёт и подбрасывает сюрпризы
+    if (this.world.event) {
+      this.world.event.t -= dt;
+      if (this.world.event.t <= 0) {
+        if (this.world.event.type === 'bloodMoon') this.toastAll('🌕 Кровавая луна погасла — твари успокаиваются');
+        this.world.event = null;
+      }
+    }
+    this.world.eventT = (this.world.eventT ?? 240) - dt;
+    if (this.world.eventT <= 0) {
+      // после финала войны события чаще — мир не должен скучать
+      this.world.eventT = ((this.world.war?.stage ?? 0) >= 10 ? 210 : 320) + this.rand() * 180;
+      this.rollWorldEvent();
+    }
+
     for (const p of this.players.values()) this.stepPlayerTick(p, dt);
 
     this.hydrateSettlements();
@@ -445,6 +463,71 @@ export class Game {
   }
 
   isNight() { return this.world.time < 0.22 || this.world.time > 0.85; }
+
+  // ---------- мировые события ----------
+  rollWorldEvent() {
+    if (!this.players.size || this.world.event) return; // пустой сервер / событие уже идёт
+    const pool = ['bloodMoon', 'rift', 'meteor', 'trader'];
+    if (this.world.citadel?.owned) pool.push('cult', 'cult'); // узурпатору мстит культ
+    const type = pick(this.rand, pool);
+    const alive = this.world.settlements.filter(s => !s.ruined && !s.captured);
+    switch (type) {
+      case 'bloodMoon': {
+        this.world.event = { type, t: 100 };
+        this.toastAll('🌕 КРОВАВАЯ ЛУНА! Твари свирепеют — элита повсюду (100 с)');
+        this.events.push(this.world.day, 'Кровавая луна взошла над Пограничьем');
+        break;
+      }
+      case 'rift': { // разлом: демоны маршируют на деревню
+        const s = pick(this.rand, alive.length ? alive : this.world.settlements);
+        if (!s) break;
+        for (let i = 0; i < 2; i++) {
+          this.abstract.tokens.push({
+            id: 'tok' + this.abstract.nextId++, type: 'pack', name: 'демоны разлома',
+            faction: 'monsters', units: ['demon', 'imp', 'imp'],
+            x: (s.x + 25 + i * 6) * TILE, y: (s.y + 20) * TILE, march: s.id, hydrated: null,
+          });
+        }
+        for (const q of this.players.values()) this.fx({ t: 'marker', pid: q.id, x: s.x + 25, y: s.y + 20 }, null);
+        this.toastAll(`⛧ РАЗЛОМ: демоны иного мира идут на ${s.name}!`);
+        this.events.push(this.world.day, `Разлом открылся у ${s.name} — демоны рвутся в мир`, { x: s.x, y: s.y });
+        break;
+      }
+      case 'meteor': { // метеорит: кристаллы под охраной големов
+        const mx = 60 + Math.floor(this.rand() * 390), my = 60 + Math.floor(this.rand() * 390);
+        for (let i = 0; i < 6; i++)
+          this.spawnDrop('crystal', 1, 'over', mx * TILE + (this.rand() - 0.5) * 50, my * TILE + (this.rand() - 0.5) * 50, 600);
+        for (let i = 0; i < 2; i++)
+          this.spawnEnemy('golem', 'over', mx * TILE + (this.rand() - 0.5) * 60, my * TILE + (this.rand() - 0.5) * 60, { forceElite: true });
+        for (const q of this.players.values()) this.fx({ t: 'marker', pid: q.id, x: mx, y: my }, null);
+        this.toastAll('☄ Метеорит упал в глуши! Кристаллы ждут смельчаков (метка на карте)');
+        this.events.push(this.world.day, 'С неба упал метеорит — искатели спешат к кратеру', { x: mx, y: my });
+        break;
+      }
+      case 'trader': { // странствующий торговец на площади
+        const s = alive[0] || this.world.settlements[0];
+        if (!s) break;
+        const id = this.spawnNpc('trader', s.id, 'over', s.x * TILE + 16, s.y * TILE - 16, { kind: 'npc_merchant' });
+        const n = this.entities.get(id);
+        n.name = 'Заезжий купец';
+        n.dieAtTick = this.tick + 200 * 30;
+        this.toastAll(`🧳 Странствующий торговец заглянул в ${s.name} (на ~3 мин)`);
+        break;
+      }
+      case 'cult': { // культ Тьмы мстит узурпатору Сердца
+        const s = pick(this.rand, alive.length ? alive : this.world.settlements);
+        if (!s) break;
+        this.abstract.tokens.push({
+          id: 'tok' + this.abstract.nextId++, type: 'pack', name: 'культ Тьмы',
+          faction: 'monsters', units: ['darkMage', 'darkSoldier', 'darkSoldier'],
+          x: (s.x - 28) * TILE, y: (s.y + 24) * TILE, march: s.id, hydrated: null,
+        });
+        this.toastAll(`⛧ Культ Тьмы восстал против узурпатора — идут на ${s.name}!`);
+        this.events.push(this.world.day, `Культ Тьмы объявился у ${s.name}`, { x: s.x, y: s.y });
+        break;
+      }
+    }
+  }
 
   // Погода нового дня: зимой — снегопады, весной/осенью — дожди
   rollWeather() {
@@ -518,6 +601,21 @@ export class Game {
       }
     } else if (p.hunger < 20 && Math.floor((p.hunger + HUNGER_RATE * dt) / 5) !== Math.floor(p.hunger / 5)) {
       this.toast(p, STR.hungry);
+    }
+
+    // ловушки подземелий: лезвия под ногами (перекат проскакивает)
+    if (p.mapId !== 'over' && p.rollT <= 0) {
+      const ttx = Math.floor(p.x / TILE), tty = Math.floor(p.y / TILE);
+      if (this.chunks.tileAt(p.mapId, ttx, tty) === T.TRAP) {
+        const key = p.mapId + ':' + ttx + ',' + tty;
+        this.trapCd = this.trapCd || new Map();
+        if ((this.trapCd.get(key) || 0) <= this.tick) {
+          this.trapCd.set(key, this.tick + 75); // ловушка взводится 2.5 с
+          this.damagePlayer(p, 1, null);
+          this.fx({ t: 'hit', kind: 'wall', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+          this.toast(p, '⚔ Лезвия из пола! Перекатом ловушки можно проскочить');
+        }
+      }
     }
 
     // применяем накопленные инпуты
@@ -663,8 +761,11 @@ export class Game {
       hp: def.hp, maxHp: def.hp, state: 'idle', stateT: 0, aggro: false,
       ...extra,
     };
-    // элитные аффиксы: редкие усиленные монстры с лучшей добычей
-    if (!extra.noElite && def.archetype !== 'boss' && def.faction !== 'darkness' && this.rand() < 0.07) {
+    // элитные аффиксы: редкие усиленные монстры с лучшей добычей;
+    // кровавая луна и проклятые данжи резко повышают шанс
+    const eliteChance = extra.forceElite ? 1
+      : this.world.event?.type === 'bloodMoon' ? 0.3 : 0.07;
+    if (!extra.noElite && def.archetype !== 'boss' && def.faction !== 'darkness' && this.rand() < eliteChance) {
       const affix = pick(this.rand, ['Свирепый', 'Живучий', 'Стремительный', 'Золотой']);
       e.elite = affix;
       e.hp = e.maxHp = Math.round(def.hp * (affix === 'Живучий' ? 2.4 : 1.7));
@@ -700,9 +801,9 @@ export class Game {
       { caravan: tok.id, kind: unit === 'guard' ? 'npc_guard' : 'npc_merchant' });
   }
 
-  spawnDrop(item, count, mapId, x, y) {
+  spawnDrop(item, count, mapId, x, y, ttl = 120) {
     const id = 'd' + this.nextId++;
-    this.entities.set(id, { id, entType: 'drop', item, count, mapId, x, y, hp: 1, ttl: 120 });
+    this.entities.set(id, { id, entType: 'drop', item, count, mapId, x, y, hp: 1, ttl });
   }
 
   // гидратация поселений: NPC существуют только рядом с игроками
@@ -1290,6 +1391,13 @@ export class Game {
     // сюжет: счётчик бандитов для Ярославы — всем участникам боя
     if (['bandit', 'banditHeavy', 'archer'].includes(e.kind))
       for (const q of gainers) if (q.story) q.story.bandits++;
+    // онбординг: первые победы
+    for (const q of gainers) {
+      if (q.hintStage === 2 && ++q.hintKills >= 3) {
+        q.hintStage = 3;
+        this.toast(q, '✅ Три победы! Открой лист персонажа (C)');
+      }
+    }
     // Тень отшельника повержена: сила достаётся победителям
     if (e.hermitShade) {
       this.spawnDrop('crystal_orb@e', 1, e.mapId, e.x, e.y);
@@ -1309,6 +1417,11 @@ export class Game {
     }
     // элита: щедрый дроп экипировки
     if (e.elite && this.rand() < 0.45) this.dropRandomGear(e.mapId, e.x, e.y, false, luck + 4);
+    // мини-босс данжа: роняет ключ от двери босса
+    if (e.dropKey) {
+      this.spawnDrop('dungeon_key', 1, e.mapId, e.x, e.y);
+      this.toastMap(e.mapId, '🗝 Хранитель ключа пал! Дверь босса ждёт');
+    }
     // Война с Тьмой: реликвии
     if (e.kind === 'heartKeeper') {
       this.spawnDrop('shadow_heart', 1, e.mapId, e.x, e.y);
@@ -1416,13 +1529,18 @@ export class Game {
   }
 
   respawn(p) {
-    const s = this.world.settlements[0];
     p.dead = false;
     p.hp = p.maxHp;
     p.hunger = Math.max(p.hunger, 40);
     p.mapId = 'over';
-    p.x = (s ? s.x : 256) * TILE + 40;
-    p.y = (s ? s.y : 256) * TILE + 40;
+    if (p.home) { // возрождение в своей кровати
+      p.x = p.home.x * TILE + 8;
+      p.y = p.home.y * TILE + 8;
+    } else {
+      const s = this.world.settlements[0];
+      p.x = (s ? s.x : 256) * TILE + 40;
+      p.y = (s ? s.y : 256) * TILE + 40;
+    }
     p.aggroFactions.clear();
   }
 
@@ -1451,7 +1569,8 @@ export class Game {
   // Дроп оружия: редкость зависит от удачи убийцы и источника (boost)
   dropRandomWeapon(mapId, x, y, luck = 0, boost = 0) {
     const pool = ['axe', 'huntbow', 'crossbow', 'knives', 'firestaff', 'froststaff',
-      'fireball', 'stormstaff', 'spear', 'warhammer', 'dagger', 'taxes', 'venomstaff', 'bombs'];
+      'fireball', 'stormstaff', 'spear', 'warhammer', 'dagger', 'taxes', 'venomstaff', 'bombs',
+      'mace', 'flail', 'morningstar', 'greatsword', 'halberd'];
     const rar = rollRarity(this.rand, luck, boost);
     this.spawnDrop('weapon:' + withRarity(pick(this.rand, pool), rar), 1, mapId, x, y);
   }
@@ -1484,7 +1603,28 @@ export class Game {
     p.mapId = mapId;
     p.x = dungeon.entrance.x * TILE + 8;
     p.y = (dungeon.entrance.y - 1) * TILE + 8;
-    this.sendMapChange(p, poi.name);
+    this.sendMapChange(p, poi.name + (dungeon.cursed ? ' [ПРОКЛЯТО]' : ''));
+    if (dungeon.cursed) this.toast(p, '⚠ Проклятое подземелье: все враги — элита, но добыча щедрее');
+  }
+
+  // лестница вниз: второй этаж — сложнее, мрачнее, богаче
+  descendDungeon(p) {
+    const inst = this.dungeons.get(p.mapId);
+    if (!inst || inst.dungeon.depth >= 2) return;
+    const poi = inst.poi;
+    const mapId = 'dg:' + poi.id + ':d2';
+    if (!this.dungeons.has(mapId)) {
+      const d = generateDungeon(hash2(this.world.seed, poi.x, poi.y) + 7, poi.difficulty + 1, true, 2);
+      this.dungeons.set(mapId, { dungeon: d, poi });
+      this.chunks.dungeons.set(mapId, d);
+    }
+    const { dungeon } = this.dungeons.get(mapId);
+    p.mapId = mapId;
+    p.x = dungeon.entrance.x * TILE + 8;
+    p.y = (dungeon.entrance.y - 1) * TILE + 8;
+    this.sendMapChange(p, poi.name + ' — нижний этаж' + (dungeon.cursed ? ' [ПРОКЛЯТО]' : ''));
+    this.toast(p, '⬇ Ты спускаешься глубже. Здесь темнее и опаснее…');
+    if (dungeon.cursed) this.toast(p, '⚠ Проклятый этаж: все враги — элита, но добыча щедрее');
   }
 
   exitDungeon(p) {
@@ -1514,7 +1654,8 @@ export class Game {
         if (inside && !room.sealed && room.spawns.length) {
           room.sealed = true;
           room.enemyIds = room.spawns.map(sp =>
-            this.spawnEnemy(sp.kind, mapId, sp.x * TILE + 8, sp.y * TILE + 8, { room: room.id }));
+            this.spawnEnemy(sp.kind, mapId, sp.x * TILE + 8, sp.y * TILE + 8,
+              { room: room.id, dropKey: sp.keyBearer, forceElite: dungeon.cursed }));
           for (const d of room.doors) this.setDungeonDoor(mapId, d, true);
           this.toastMap(mapId, STR.roomSealed);
         }
@@ -1590,9 +1731,41 @@ export class Game {
       if (t === T.CAMPFIRE) { this.openCrafting(p); return; }
       if (t === T.ANVIL) { this.openAnvilCrafting(p); return; }
       if (t === T.BOARD) { this.openBoard(p, homeTown()); return; }
+      if (t === T.CHEST && this.isAtHome(p, tx + dx, ty + dy)) { this.openStash(p, 'home'); return; }
       if (t === T.CHEST) { this.openChest(p, tx + dx, ty + dy); return; }
       if (t === T.DUNGEON_EXIT && p.mapId !== 'over') { this.exitDungeon(p); return; }
+      if (t === T.LOCKED_DOOR && p.mapId !== 'over') {
+        if ((p.inventory.dungeon_key || 0) < 1) {
+          this.toast(p, '🔒 Заперто. Ключ носит хранитель — сильнейший страж этих залов');
+          return;
+        }
+        p.inventory.dungeon_key--;
+        if (p.inventory.dungeon_key <= 0) delete p.inventory.dungeon_key;
+        const inst = this.dungeons.get(p.mapId);
+        const room = inst?.dungeon.rooms.find(r => r.lockedTiles);
+        for (const lt of room?.lockedTiles || [{ x: tx + dx, y: ty + dy }]) {
+          this.chunks.setTile(p.mapId, lt.x, lt.y, T.DUNGEON_FLOOR);
+          this.fx({ t: 'tile', mapId: p.mapId, x: lt.x, y: lt.y, tile: T.DUNGEON_FLOOR }, null);
+        }
+        if (room) room.lockedTiles = null;
+        this.fx({ t: 'chest', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        this.toastMap(p.mapId, '🗝 Дверь босса отперта!');
+        return;
+      }
+      if (t === T.STAIRS && p.mapId !== 'over') { this.descendDungeon(p); return; }
       if (t === T.BED) {
+        // своя кровать: полный сон и бодрость
+        if (this.isAtHome(p, tx + dx, ty + dy)) {
+          if (p.hp >= p.maxHp && (p.buffs.speed?.t || 0) > 5) { this.toast(p, 'Ты свеж, как утренняя роса'); return; }
+          if (!cdReady('homebed', 120)) return;
+          p.hp = p.maxHp;
+          p.hunger = Math.min(HUNGER_MAX, p.hunger + 20);
+          p.buffs.speed = { mult: 0.1, t: 90 };
+          this.recomputeStats(p);
+          this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+          this.toast(p, '🏠 Дома и стены лечат: полное здоровье и +10% скорости на 90 с');
+          return;
+        }
         if (p.hp >= p.maxHp) { this.toast(p, 'Ты не устал'); return; }
         if (!cdReady('bed', 90)) return;
         p.hp = Math.min(p.maxHp, p.hp + 2);
@@ -2164,6 +2337,7 @@ export class Game {
       });
       this.fx({ t: 'shop', pid: p.id, id: npc.id, name: npc.name, greet: this.npcGreeting(p, npc), items }, null);
     } else if (npc.role === 'elder') {
+      if (p.hintStage === 0) p.hintStage = 1; // онбординг: познакомились со старейшиной
       this.checkDeliver(p, npc);
       const lines = [`Старейшина ${s ? s.name : ''} (${fname})`];
       if (s) {
@@ -2197,6 +2371,11 @@ export class Game {
       }
       if (s?.project && (p.inventory.wood || 0) >= 5)
         choices.push({ id: 'donate', label: 'Пожертвовать 5 древесины на стройку (+реп)' });
+      // свой дом: жильё в деревне для героя с репутацией
+      if (s && !p.home) {
+        if ((p.rep[s.faction] || 0) >= 20) choices.push({ id: 'buyhouse', label: `🏠 Купить дом в ${s.name} (150 мон.)` });
+        else choices.push({ id: 'nohouse', label: '🏠 Спросить о жилье (нужна репутация 20)' });
+      }
       // Война с Тьмой: общемировая кампания до самой Цитадели
       const war = this.world.war;
       if (war && this.world.citadel && !this.world.citadel.dead) {
@@ -2258,17 +2437,43 @@ export class Game {
     }
   }
 
-  // ---------- кооп: общий сундук отряда и передача вещей ----------
-  openStash(p) {
-    this.fx({ t: 'stash', pid: p.id, items: { ...this.world.stash } }, null);
+  // ---------- свой дом: жильё, личный сундук, респаун в кровати ----------
+  buyHouse(p, dialogId) {
+    const npc = this.entities.get(dialogId);
+    const s = npc && this.world.settlements.find(x => x.id === npc.home);
+    if (!s || p.home) return;
+    if ((p.rep[s.faction] || 0) < 20) { this.toast(p, 'Тебе не доверяют настолько'); return; }
+    if (p.coins < 150) { this.toast(p, STR.notEnoughCoins); return; }
+    const bed = s.anchors?.beds?.[p.id % Math.max(1, s.anchors.beds.length)];
+    if (!bed) { this.toast(p, 'В деревне нет свободных домов — пусть отстроятся'); return; }
+    p.coins -= 150;
+    p.home = { sid: s.id, x: bed.x, y: bed.y };
+    p.homeStash = p.homeStash || {};
+    // личный сундук у кровати
+    this.chunks.setTile('over', bed.x + 1, bed.y, T.CHEST);
+    this.fx({ t: 'tile', mapId: 'over', x: bed.x + 1, y: bed.y, tile: T.CHEST }, null);
+    this.fx({ t: 'marker', pid: p.id, x: bed.x, y: bed.y }, null);
+    this.addXp(p, 30);
+    this.toast(p, `🏠 Дом в ${s.name} твой! Кровать — точка возрождения, рядом личный сундук`);
+    this.events.push(this.world.day, `${p.name} купил дом в ${s.name}`);
   }
 
-  stashOp(p, op, item) {
+  isAtHome(p, tx, ty) {
+    return p.home && Math.abs(tx - p.home.x) <= 3 && Math.abs(ty - p.home.y) <= 3;
+  }
+
+  // ---------- кооп: общий сундук отряда и передача вещей ----------
+  openStash(p, box = 'team') {
+    const items = box === 'home' ? (p.homeStash || {}) : this.world.stash;
+    this.fx({ t: 'stash', pid: p.id, box, items: { ...items } }, null);
+  }
+
+  stashOp(p, op, item, box = 'team') {
     if (p.dead || !item) return;
-    const stash = this.world.stash;
+    const stash = box === 'home' ? (p.homeStash = p.homeStash || {}) : this.world.stash;
     if (op === 'put') {
       if ((p.inventory[item] | 0) <= 0) return;
-      if (!stash[item] && Object.keys(stash).length >= 40) { this.toast(p, 'Сундук отряда полон'); return; }
+      if (!stash[item] && Object.keys(stash).length >= 40) { this.toast(p, 'Сундук полон'); return; }
       p.inventory[item]--;
       if (p.inventory[item] <= 0) delete p.inventory[item];
       stash[item] = (stash[item] || 0) + 1;
@@ -2278,7 +2483,7 @@ export class Game {
       if (stash[item] <= 0) delete stash[item];
       p.inventory[item] = (p.inventory[item] || 0) + 1;
     }
-    this.openStash(p);
+    this.openStash(p, box);
   }
 
   giveItem(p, item) {
@@ -2444,6 +2649,8 @@ export class Game {
     if (choice === 'war_destroy') { this.warFinale(p, true); return; }
     if (choice === 'war_claim') { this.warFinale(p, false); return; }
     if (choice === 'stash') { this.openStash(p); return; }
+    if (choice === 'nohouse') { this.toast(p, '«Чужакам домов не продаём. Заслужи доверие деревни (репутация 20)»'); return; }
+    if (choice === 'buyhouse') { this.buyHouse(p, dialogId); return; }
     if (choice === 'smithup') { this.openSmithUpgrade(p, dialogId); return; }
     if (choice === 'smithbrk') { this.openSmithBreak(p, dialogId); return; }
     if (choice.startsWith('smithup:')) { this.smithUpgrade(p, choice.slice(8), dialogId); return; }
@@ -2460,6 +2667,7 @@ export class Game {
       else p.inventory[it.item] = (p.inventory[it.item] || 0) + 1;
       this.toast(p, STR.pickup(this.itemName(it.item)));
       if (s) { p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + 1); }
+      if (p.hintStage === 4) { p.hintStage = 5; this.toast(p, '🎓 Азы освоены — Пограничье твоё! (M — карта, P — дипломатия)'); }
       return;
     }
     if (choice.startsWith('craft:')) {
@@ -2581,6 +2789,7 @@ export class Game {
       p.quest = q;
       p.pendingBoard = null;
       this.toast(p, STR.questNew(q.title));
+      if (p.hintStage === 1) p.hintStage = 2;
       return;
     }
     if (choice === 'huntquest') {
@@ -2602,7 +2811,7 @@ export class Game {
       this.toast(p, STR.pickup(ITEM_NAMES.ammo_arrow));
       return;
     }
-    if (choice === 'quest') { this.giveQuest(p, dialogId); return; }
+    if (choice === 'quest') { this.giveQuest(p, dialogId); if (p.hintStage === 1) p.hintStage = 2; return; }
     if (choice === 'turnin') { this.turnInQuest(p); return; }
     if (choice === 'rumor') {
       const rumors = this.events.rumors(3);

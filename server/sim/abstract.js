@@ -17,10 +17,14 @@ const PACK_KINDS = [
   { name: 'крысиное гнездо', units: ['rat', 'rat', 'rat', 'rat'], faction: 'monsters' },
   { name: 'стая волков', units: ['wolf', 'wolf', 'wolf'], faction: 'monsters' },
   { name: 'слизни', units: ['slime', 'slime', 'slime', 'slime'], faction: 'monsters' },
-  { name: 'банда разбойников', units: ['bandit', 'bandit', 'banditHeavy'], faction: 'bandits' },
-  { name: 'лесные стрелки', units: ['archer', 'archer', 'bandit'], faction: 'bandits' },
-  { name: 'нежить', units: ['skeleton', 'skeleton', 'imp'], faction: 'monsters' },
-  { name: 'проклятый отряд', units: ['darkKnight', 'skeleton', 'skeleton'], faction: 'monsters' },
+  { name: 'банда разбойников', units: ['bandit', 'gnollRaider', 'banditHeavy'], faction: 'bandits' },
+  { name: 'лесные стрелки', units: ['archer', 'archer', 'gnollRaider'], faction: 'bandits' },
+  { name: 'нежить', units: ['skeleton', 'ghoul', 'ghoul'], faction: 'monsters' },
+  // средневековая рубка: орды идут врукопашную
+  { name: 'гоблинья ватага', units: ['goblin', 'goblin', 'goblin', 'hobgoblin'], faction: 'monsters' },
+  { name: 'орочий отряд', units: ['orcWarrior', 'orcWarrior', 'orcKnight'], faction: 'monsters' },
+  { name: 'упыриная стая', units: ['ghoul', 'ghoul', 'ghoul'], faction: 'monsters' },
+  { name: 'огр с прихвостнями', units: ['ogre', 'goblin', 'goblin'], faction: 'monsters' },
 ];
 
 export class AbstractSim {

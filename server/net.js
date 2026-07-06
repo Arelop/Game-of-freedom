@@ -99,7 +99,7 @@ export class Net {
       case MSG.SELL_ITEM: game.sellItem(p, String(m.item || '')); break;
       case MSG.ABILITY: game.useAbility(p, Math.max(0, Math.min(2, m.slot | 0))); break;
       case MSG.OFFHAND: game.useOffhand(p); break;
-      case MSG.STASH: game.stashOp(p, m.op === 'take' ? 'take' : 'put', String(m.item || '')); break;
+      case MSG.STASH: game.stashOp(p, m.op === 'take' ? 'take' : 'put', String(m.item || ''), m.box === 'home' ? 'home' : 'team'); break;
       case MSG.GIVE: game.giveItem(p, String(m.item || '')); break;
     }
   }
@@ -191,6 +191,7 @@ export class Net {
         rep: p.rep,
         ab: (p.abCd || []).map(v => r1(v)), blk: p.blocking ? 1 : 0, inv2: r1(p.invisT || 0),
         oc: r1(p.offCd || 0), sh: p.shieldHp || 0, cb: p.canBlock ? 1 : 0,
+        hnt: p.hintStage < 5 ? p.hintStage : undefined,
       },
       ents,
     };

@@ -47,6 +47,9 @@ const TILE_SPRITES = {
   [T.CRYSTAL_WALL]: ['tile_crystal_wall'],
   [T.PILLAR]: ['tile_dungeon_floor', 'obj_column'],
   [T.BLOOD]: ['tile_blood'],
+  [T.TRAP]: ['tile_dungeon_floor', 'obj_trap'],
+  [T.LOCKED_DOOR]: ['tile_dungeon_floor', 'obj_door_locked'],
+  [T.STAIRS]: ['tile_dungeon_floor', 'obj_stairs'],
 };
 
 export class TileRenderer {

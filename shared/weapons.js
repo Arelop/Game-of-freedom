@@ -110,6 +110,33 @@ export const WEAPONS = {
     explode: { radius: 34 },              // сносит стены пачками
   },
 
+  // --- средневековый арсенал ближнего боя ---
+  mace: {
+    id: 'mace', structDmg: 4, name: 'Булава', melee: true, school: 'melee', damage: 7, fireRate: 1.2,
+    range: 28, arcDeg: 100, knockback: 130, recoilShake: 0.3, infiniteAmmo: true,
+    sprite: 'wpn_mace', sound: 'swing_heavy', swingColor: '#9badb7', price: 75,
+  },
+  flail: {
+    id: 'flail', structDmg: 3, name: 'Кистень', melee: true, school: 'melee', damage: 6, fireRate: 1.5,
+    range: 34, arcDeg: 140, knockback: 100, recoilShake: 0.25, infiniteAmmo: true,
+    sprite: 'wpn_flail', sound: 'swing', swingColor: '#9badb7', price: 85,
+  },
+  morningstar: {
+    id: 'morningstar', structDmg: 6, name: 'Моргенштерн', melee: true, school: 'melee', damage: 10, fireRate: 0.85,
+    range: 30, arcDeg: 110, knockback: 180, recoilShake: 0.45, infiniteAmmo: true,
+    sprite: 'wpn_morningstar', sound: 'swing_heavy', swingColor: '#847e87', price: 115,
+  },
+  greatsword: {
+    id: 'greatsword', structDmg: 5, name: 'Двуручный меч', melee: true, school: 'melee', damage: 12, fireRate: 0.75,
+    range: 38, arcDeg: 150, knockback: 160, recoilShake: 0.5, infiniteAmmo: true,
+    sprite: 'wpn_greatsword', sound: 'swing_heavy', swingColor: '#eeeeee', price: 150,
+  },
+  halberd: {
+    id: 'halberd', structDmg: 4, name: 'Алебарда', melee: true, school: 'melee', damage: 9, fireRate: 0.95,
+    range: 48, arcDeg: 60, knockback: 140, recoilShake: 0.35, infiniteAmmo: true,
+    sprite: 'wpn_halberd', sound: 'swing', swingColor: '#d9a066', price: 125,
+  },
+
   // --- ЛЕГЕНДАРНОЕ оружие: не выпадает в мире — только награда за
   // финал «Войны с Тьмой». Выдаётся с суффиксом @l. У каждого — уникальное свойство.
   sunblade: {

@@ -77,6 +77,21 @@ export class Hud {
       ctx.fillText((you.q.done ? '✓ ' : '• ') + you.q.title, 5, 26);
     }
 
+    // онбординг: цепочка первых целей для новичка
+    if (you.hnt !== undefined) {
+      const HINTS = [
+        'Найди старейшину в деревне и поговори (E)',
+        'Возьми задание на доске у столба с «!» (E)',
+        'Сразись: одолей 3 монстров (ЛКМ — атака, Пробел — перекат)',
+        'Открой лист персонажа (C) и вложи очко характеристики',
+        'Загляни к торговцу и купи что-нибудь полезное (E)',
+      ];
+      if (HINTS[you.hnt]) {
+        ctx.fillStyle = '#63c5ff';
+        ctx.fillText('➤ ' + HINTS[you.hnt], 5, you.q ? 35 : 26);
+      }
+    }
+
     this.renderAbilities(ctx, you);
     this.renderMinimap(ctx, net);
 

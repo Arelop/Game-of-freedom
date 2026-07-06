@@ -40,6 +40,7 @@ export function saveWorld(game) {
         statPts: p.statPts, talentPts: p.talentPts, stats: p.stats, talents: p.talents,
         weaponUp: p.weaponUp || {},
         story: p.story,
+        home: p.home || null, homeStash: p.homeStash || {}, hintStage: p.hintStage,
       })),
       banditsWeakT: w.banditsWeakT || 0,
     };
@@ -117,6 +118,8 @@ export function applySavedPlayer(game, p) {
     if (rec.talents) p.talents = rec.talents;
     if (rec.weaponUp) p.weaponUp = rec.weaponUp;
     if (rec.story) p.story = { ...p.story, ...rec.story };
+    if (rec.home) { p.home = rec.home; p.homeStash = rec.homeStash || {}; }
+    if (rec.hintStage !== undefined) p.hintStage = rec.hintStage;
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);

@@ -136,6 +136,7 @@ export class Panels {
   // ---------- общий сундук отряда (таверна) ----------
   showStash(m) {
     this.stashData = m.items || {};
+    this.stashBox = m.box || 'team';
     this.stashOpen = true;
     let el = document.getElementById('stash');
     if (!el) {
@@ -157,7 +158,9 @@ export class Panels {
   renderStash() {
     const el = document.getElementById('stash');
     if (!el || !this.stashOpen) return;
-    el.innerHTML = '<div class="shophead"><span>📦 Сундук отряда</span><span class="shopgreet">общее добро — бери и клади</span></div>';
+    el.innerHTML = this.stashBox === 'home'
+      ? '<div class="shophead"><span>🏠 Личный сундук</span><span class="shopgreet">твоё добро в целости</span></div>'
+      : '<div class="shophead"><span>📦 Сундук отряда</span><span class="shopgreet">общее добро — бери и клади</span></div>';
     const mkGrid = (items, take) => {
       const grid = document.createElement('div');
       grid.className = 'shopgrid';
@@ -186,7 +189,7 @@ export class Panels {
         cell.onclick = () => {
           SFX.ui();
           this.hideTip();
-          this.net.send({ t: MSG.STASH, op: take ? 'take' : 'put', item });
+          this.net.send({ t: MSG.STASH, op: take ? 'take' : 'put', item, box: this.stashBox });
         };
         grid.appendChild(cell);
       }

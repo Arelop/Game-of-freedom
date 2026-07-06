@@ -141,6 +141,53 @@ export const ENEMIES = {
     ],
   },
 
+  // --- средневековая рубка: ближнебойные враги всех тиров ---
+  goblin: {
+    id: 'goblin', name: 'Гоблин', archetype: 'chaser', hp: 4, speed: 75, tier: 1,
+    radius: 4, touchDamage: 1, lungeSpeed: 200, lungeWindup: 0.25, lungeRange: 35,
+    sprite: 'enemy_goblin', xp: 2, drops: { coin: [1, 3] },
+  },
+  hobgoblin: {
+    id: 'hobgoblin', name: 'Хобгоблин', archetype: 'chaser', hp: 10, speed: 62, tier: 2,
+    radius: 5, touchDamage: 1, lungeSpeed: 220, lungeWindup: 0.3, lungeRange: 45,
+    sprite: 'enemy_hobgoblin', xp: 4, drops: { coin: [2, 4] },
+  },
+  gnollRaider: {
+    id: 'gnollRaider', name: 'Гнолл-налётчик', archetype: 'chaser', hp: 12, speed: 66, tier: 2,
+    radius: 5, touchDamage: 1, lungeSpeed: 240, lungeWindup: 0.3, lungeRange: 50,
+    sprite: 'enemy_gnoll', xp: 5, drops: { coin: [2, 5], hide: [0, 1] },
+  },
+  orcWarrior: {
+    id: 'orcWarrior', name: 'Орк-рубака', archetype: 'chaser', hp: 18, speed: 55, tier: 3,
+    radius: 5, touchDamage: 2, lungeSpeed: 230, lungeWindup: 0.35, lungeRange: 50,
+    sprite: 'enemy_orc_warrior', xp: 8, drops: { coin: [4, 8], metal: [0, 1] },
+  },
+  ghoul: {
+    id: 'ghoul', name: 'Упырь', archetype: 'chaser', hp: 15, speed: 58, tier: 3,
+    radius: 5, touchDamage: 2, lungeSpeed: 260, lungeWindup: 0.28, lungeRange: 45,
+    sprite: 'enemy_ghoul', xp: 7, drops: { coin: [2, 6] },
+  },
+  orcKnight: {
+    id: 'orcKnight', name: 'Орк-рыцарь', archetype: 'chaser', hp: 30, speed: 46, tier: 4,
+    radius: 6, touchDamage: 2, lungeSpeed: 210, lungeWindup: 0.45, lungeRange: 55,
+    sprite: 'enemy_orc_knight', xp: 13, drops: { coin: [7, 13], metal: [1, 2] },
+  },
+  ogre: {
+    id: 'ogre', name: 'Огр', archetype: 'chaser', hp: 42, speed: 36, tier: 4,
+    radius: 8, touchDamage: 3, lungeSpeed: 190, lungeWindup: 0.55, lungeRange: 60,
+    sprite: 'enemy_ogre', xp: 16, drops: { coin: [8, 16], meat: [1, 2] },
+  },
+  minotaur: {
+    id: 'minotaur', name: 'Минотавр', archetype: 'dasher', hp: 60, speed: 50, tier: 5,
+    radius: 7, touchDamage: 3, dashSpeed: 340, dashWindup: 0.55, dashTime: 0.55,
+    sprite: 'enemy_minotaur', xp: 28, drops: { coin: [15, 25], metal: [1, 3] },
+  },
+  orcWarlord: {
+    id: 'orcWarlord', name: 'Орк-вождь', archetype: 'chaser', hp: 75, speed: 50, tier: 5,
+    radius: 7, touchDamage: 3, lungeSpeed: 250, lungeWindup: 0.4, lungeRange: 60,
+    sprite: 'enemy_orc_warlord', xp: 35, drops: { coin: [18, 30], weapon: 1 },
+  },
+
   // --- боссы биомов: живут в логовах на карте ---
   swampWitch: {
     id: 'swampWitch', name: 'Болотная колдунья', archetype: 'boss', hp: 130, speed: 38, tier: 5,

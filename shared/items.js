@@ -228,6 +228,11 @@ export const ITEMS = {
     stats: { lck: 2 }, price: 105, icon: 'item_ring_fortune',
   },
 
+  dungeon_key: {
+    id: 'dungeon_key', name: 'Ключ подземелья',
+    price: 40, icon: 'item_key', // отпирает дверь босса; падает с мини-босса
+  },
+
   // --- реликвии Войны с Тьмой ---
   shadow_heart: {
     id: 'shadow_heart', name: 'Сердце Тени',
