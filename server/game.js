@@ -60,6 +60,8 @@ const SHOP = [
   { item: 'ammo_mana', price: 18, count: 15 }, { item: 'ammo_knife', price: 14, count: 8 },
   { item: 'leather_armor', price: 40 }, { item: 'wood_shield', price: 25 },
   { item: 'leather_boots', price: 30 }, { item: 'iron_greaves', price: 70 },
+  { item: 'wizard_hat', price: 90 }, { item: 'ring_str', price: 70 },
+  { item: 'flame_tome', price: 145 }, { item: 'lucky_deck', price: 120 },
   { item: 'iron_helmet', price: 65 }, { item: 'wolf_amulet', price: 55 },
   { item: 'weapon:huntbow', price: 85 }, { item: 'weapon:firestaff', price: 100 },
   { item: 'weapon:axe', price: 90 }, { item: 'weapon:bombs', price: 140 },
@@ -244,6 +246,7 @@ export class Game {
       rollCd -= it.stats.rollCd || 0;
       d.dodge += it.stats.dodge || 0;
       d.manaRegen += it.stats.manaRegen || 0;
+      d.coinMult += it.stats.coinMult || 0;
     }
     for (const id of p.talents) {
       const t = findTalent(p.cls, id);
@@ -1303,10 +1306,14 @@ export class Game {
     const pool = elite
       ? ['chain_armor', 'plate_armor', 'scale_armor', 'bear_amulet', 'owl_amulet', 'swift_ring',
          'iron_shield', 'tower_shield', 'berserk_armor', 'mage_robe', 'shadow_cloak',
-         'crown', 'rune_amulet', 'totem_amulet', 'gladiator_shield']
+         'crown', 'rune_amulet', 'totem_amulet', 'gladiator_shield',
+         'ring_mail', 'elven_armor', 'crystal_robe', 'troll_hide', 'spiked_shield',
+         'flame_tome', 'crystal_orb', 'rage_amulet', 'lucky_deck', 'ring_fortune', 'iron_greaves', 'swift_boots']
       : ['leather_armor', 'padded_armor', 'hunter_hood', 'leather_cap', 'iron_helmet',
          'wolf_amulet', 'fox_amulet', 'iron_ring', 'wood_shield', 'swift_ring',
-         'sage_helmet', 'war_helm', 'lucky_charm'];
+         'sage_helmet', 'war_helm', 'lucky_charm',
+         'wizard_hat', 'elven_helm', 'etched_helm', 'shadow_leggings', 'leather_boots',
+         'eye_amulet', 'ring_str', 'ring_dex', 'ring_mind'];
     const rar = rollRarity(this.rand, luck, elite ? 2 : 1);
     this.spawnDrop(withRarity(pick(this.rand, pool), rar), 1, mapId, x, y);
   }

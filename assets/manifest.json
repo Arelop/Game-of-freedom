@@ -137,6 +137,60 @@
     "item_boots_swift": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/boots4_green.png"
     },
+    "item_leggings_shadow": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/boots3_stripe.png"
+    },
+    "item_wizard_hat": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/headgear/wizard_hat1.png"
+    },
+    "item_helm_elven": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/headgear/elven_leather_helm.png"
+    },
+    "item_helm_etched": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/headgear/helmet2_etched.png"
+    },
+    "item_armor_ringmail": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/ring_mail1.png"
+    },
+    "item_armor_elven": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/elven_leather_armor.png"
+    },
+    "item_robe_crystal": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/robe3.png"
+    },
+    "item_armor_troll": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/troll_leather_armour.png"
+    },
+    "item_shield_spiked": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/shields/buckler3.png"
+    },
+    "item_tome_flame": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/book/glittering.png"
+    },
+    "item_orb_crystal": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_orb.png"
+    },
+    "item_amulet_eye": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/eye_cyan.png"
+    },
+    "item_amulet_rage": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/i-rage.png"
+    },
+    "item_deck": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_deck_rare.png"
+    },
+    "item_ring_str": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/ring/i-str.png"
+    },
+    "item_ring_dex": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/ring/i-dex.png"
+    },
+    "item_ring_mind": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/ring/i-int.png"
+    },
+    "item_ring_fortune": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/ring/moonstone.png"
+    },
     "ab_power_strike": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/earth/maxwells_silver_hammer.png"
     },

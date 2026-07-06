@@ -40,7 +40,18 @@ export function getWeapon(id) {
 }
 
 const iCache = new Map();
-// Экипировка/зелья по id: статы умножены на редкость
+const ATTRS = ['str', 'agi', 'int', 'lck'];
+// очки атрибутов от редкости и профиль по слоту (если у предмета нет своих атрибутов)
+const RAR_ATTR_PTS = { c: 0, r: 1, e: 3, l: 5 };
+const SLOT_AFFINITY = {
+  chest: ['str'], head: ['int'], legs: ['agi'],
+  offhand: ['str'], acc: ['lck'], ring: ['lck'],
+};
+
+// Экипировка/зелья по id: обычные статы умножены на редкость,
+// а атрибуты (СИЛ/ЛОВ/ИНТ/УДЧ) редкость даёт плоскими очками по профилю:
+// редкое +1, эпическое +3, легендарное +5 — в «родные» атрибуты предмета
+// (или по слоту: грудь — сила, голова — интеллект, ноги — ловкость...)
 export function getItem(id) {
   if (!id) return null;
   let it = iCache.get(id);
@@ -52,11 +63,22 @@ export function getItem(id) {
   it = { ...it0, id, baseId: base, rarity: rar, name: R.name ? `${it0.name} [${R.name}]` : it0.name };
   if (it0.stats) {
     it.stats = {};
-    const INT_STATS = new Set(['maxHp', 'str', 'agi', 'int', 'lck', 'manaRegen']);
+    const INT_STATS = new Set(['maxHp', 'manaRegen']);
     for (const [k, v] of Object.entries(it0.stats)) {
-      it.stats[k] = INT_STATS.has(k)
+      if (ATTRS.includes(k)) it.stats[k] = v; // атрибуты не умножаем — редкость добавит очки
+      else it.stats[k] = INT_STATS.has(k)
         ? Math.round(v * R.statMult)
         : Math.round(v * R.statMult * 100) / 100;
+    }
+  }
+  const pts = RAR_ATTR_PTS[rar] || 0;
+  if (pts && it0.slot) {
+    it.stats = it.stats || {};
+    const own = it0.stats ? ATTRS.filter(k => it0.stats[k]) : [];
+    const aff = own.length ? own : (SLOT_AFFINITY[it0.slot] || ['str']);
+    for (let i = 0; i < pts; i++) {
+      const k = aff[i % aff.length];
+      it.stats[k] = (it.stats[k] || 0) + 1;
     }
   }
   it.price = Math.round((it0.price || 10) * R.priceMult);
@@ -66,8 +88,9 @@ export function getItem(id) {
 
 // Бросок редкости для дропа. luck — очки удачи убийцы (повышают шансы).
 // boost: 0 обычный враг, 1 сундук/элита, 2 босс (минимум редкое).
+// Эпики — редкие трофеи: без удачи и с обычного врага ~1.5%
 export function rollRarity(rand, luck = 0, boost = 0) {
-  const eChance = 0.04 + boost * 0.10 + luck * 0.006;
+  const eChance = 0.015 + boost * 0.04 + luck * 0.003;
   const rChance = 0.20 + boost * 0.20 + luck * 0.012;
   const roll = rand();
   if (roll < eChance) return 'e';

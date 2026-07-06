@@ -138,6 +138,88 @@ export const ITEMS = {
     id: 'swift_boots', name: 'Сапоги ветра', slot: 'legs',
     stats: { agi: 1, speed: 0.08 }, price: 110, icon: 'item_boots_swift',
   },
+  shadow_leggings: {
+    id: 'shadow_leggings', name: 'Теневые поножи', slot: 'legs',
+    stats: { agi: 1, dodge: 0.03 }, price: 95, icon: 'item_leggings_shadow',
+  },
+
+  // --- ещё головные уборы ---
+  wizard_hat: {
+    id: 'wizard_hat', name: 'Шляпа волшебника', slot: 'head',
+    stats: { int: 1, manaRegen: 1 }, price: 90, icon: 'item_wizard_hat',
+  },
+  elven_helm: {
+    id: 'elven_helm', name: 'Эльфийский шлем', slot: 'head',
+    stats: { agi: 1, dodge: 0.02 }, price: 85, icon: 'item_helm_elven',
+  },
+  etched_helm: {
+    id: 'etched_helm', name: 'Гравированный шлем', slot: 'head',
+    stats: { str: 1, maxHp: 1 }, price: 90, icon: 'item_helm_etched',
+  },
+
+  // --- ещё доспехи ---
+  ring_mail: {
+    id: 'ring_mail', name: 'Кольчатый доспех', slot: 'chest',
+    stats: { str: 1, maxHp: 3, speed: -0.05 }, price: 115, icon: 'item_armor_ringmail',
+  },
+  elven_armor: {
+    id: 'elven_armor', name: 'Эльфийский доспех', slot: 'chest',
+    stats: { agi: 2, speed: 0.03 }, price: 150, icon: 'item_armor_elven',
+  },
+  crystal_robe: {
+    id: 'crystal_robe', name: 'Кристальная мантия', slot: 'chest',
+    stats: { int: 2, manaRegen: 1 }, price: 155, icon: 'item_robe_crystal',
+  },
+  troll_hide: {
+    id: 'troll_hide', name: 'Тролья шкура', slot: 'chest',
+    stats: { str: 1, maxHp: 4, speed: -0.07 }, price: 140, icon: 'item_armor_troll',
+  },
+
+  // --- левая рука: не только щиты ---
+  spiked_shield: {
+    id: 'spiked_shield', name: 'Шипастый щит', slot: 'offhand', block: true,
+    stats: { str: 1, maxHp: 2 }, price: 105, icon: 'item_shield_spiked',
+  },
+  flame_tome: {
+    id: 'flame_tome', name: 'Гримуар пламени', slot: 'offhand',
+    stats: { int: 2, damage: 0.06 }, price: 145, icon: 'item_tome_flame',
+  },
+  crystal_orb: {
+    id: 'crystal_orb', name: 'Хрустальная сфера', slot: 'offhand',
+    stats: { int: 1, lck: 1, manaRegen: 1 }, price: 130, icon: 'item_orb_crystal',
+  },
+
+  // --- ещё аксессуары ---
+  eye_amulet: {
+    id: 'eye_amulet', name: 'Око провидца', slot: 'acc',
+    stats: { int: 1, lck: 1 }, price: 105, icon: 'item_amulet_eye',
+  },
+  rage_amulet: {
+    id: 'rage_amulet', name: 'Амулет ярости', slot: 'acc',
+    stats: { str: 2 }, price: 110, icon: 'item_amulet_rage',
+  },
+  lucky_deck: {
+    id: 'lucky_deck', name: 'Колода фортуны', slot: 'acc',
+    stats: { lck: 2, coinMult: 0.1 }, price: 120, icon: 'item_deck',
+  },
+
+  // --- ещё кольца ---
+  ring_str: {
+    id: 'ring_str', name: 'Кольцо силы', slot: 'ring',
+    stats: { str: 1 }, price: 70, icon: 'item_ring_str',
+  },
+  ring_dex: {
+    id: 'ring_dex', name: 'Кольцо проворства', slot: 'ring',
+    stats: { agi: 1 }, price: 70, icon: 'item_ring_dex',
+  },
+  ring_mind: {
+    id: 'ring_mind', name: 'Кольцо разума', slot: 'ring',
+    stats: { int: 1 }, price: 70, icon: 'item_ring_mind',
+  },
+  ring_fortune: {
+    id: 'ring_fortune', name: 'Кольцо фортуны', slot: 'ring',
+    stats: { lck: 2 }, price: 105, icon: 'item_ring_fortune',
+  },
 
   // --- зелья ---
   heal_potion: {
@@ -196,6 +278,7 @@ export function describeItem(itemId, resolvedItem) {
     if (s.rollCd) parts.push(`−${Math.round(s.rollCd * 100)}% кулдаун переката`);
     if (s.dodge) parts.push(`+${Math.round(s.dodge * 100)}% уворот`);
     if (s.manaRegen) parts.push(`+${s.manaRegen} к регену маны`);
+    if (s.coinMult) parts.push(`+${Math.round(s.coinMult * 100)}% монет с добычи`);
     if (s.str) parts.push(`+${s.str} Сила`);
     if (s.agi) parts.push(`+${s.agi} Ловкость`);
     if (s.int) parts.push(`+${s.int} Интеллект`);
