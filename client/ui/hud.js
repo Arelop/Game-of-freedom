@@ -94,7 +94,7 @@ export class Hud {
   renderAbilities(ctx, you) {
     const abs = abilitiesOf(you.cls);
     if (!abs.length) return;
-    const KEYS = ['Q', 'E', 'R'];
+    const KEYS = ['Q', 'X', 'R'];
     const S = 18, GAP = 3;
     const x0 = Math.round(VIEW_W / 2 - (S * 3 + GAP * 2) / 2), y0 = VIEW_H - S - 5;
     ctx.textAlign = 'left';

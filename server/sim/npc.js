@@ -84,7 +84,37 @@ export function updateNpc(npc, dt, map, game) {
   npc.fleeing = false;
 
   const anchor = scheduleAnchor(npc, s, game.world.time);
-  if (anchor) walkTo(npc, anchor.x * TILE + 8, anchor.y * TILE + 8, NPC_SPEED, dt, map);
+  if (!anchor) return;
+  // личное место у якоря: жители не сбиваются в одну точку
+  if (npc.spotA === undefined) {
+    npc.spotA = game.rand() * Math.PI * 2;
+    npc.spotR = 12 + game.rand() * 22;
+  }
+  const tx = anchor.x * TILE + 8 + Math.cos(npc.spotA) * npc.spotR;
+  const ty = anchor.y * TILE + 8 + Math.sin(npc.spotA) * npc.spotR;
+  if (dist2(npc.x, npc.y, tx, ty) > 18 * 18) {
+    npc.strollX = null;
+    walkTo(npc, tx, ty, NPC_SPEED, dt, map);
+    return;
+  }
+  // на месте: постоять за делом, прогуляться по округе, сменить занятие
+  npc.idleT = (npc.idleT ?? 0) - dt;
+  if (npc.idleT <= 0) {
+    npc.idleT = 2.5 + game.rand() * 4;
+    const roll = game.rand();
+    if (roll < 0.45) { // короткая прогулка рядом
+      npc.strollX = tx + (game.rand() - 0.5) * 60;
+      npc.strollY = ty + (game.rand() - 0.5) * 60;
+    } else if (roll < 0.60) { // новое дело: другое рабочее место или прилавок
+      const spots = [...(s.anchors.works || []), ...(s.anchors.stalls || [])];
+      if (spots.length) npc.work = spots[Math.floor(game.rand() * spots.length)];
+      npc.spotA = game.rand() * Math.PI * 2;
+      npc.strollX = null;
+    } else {
+      npc.strollX = null; // просто постоять
+    }
+  }
+  if (npc.strollX != null) walkTo(npc, npc.strollX, npc.strollY, NPC_SPEED * 0.5, dt, map);
 }
 
 function walkTo(npc, tx, ty, speed, dt, map) {

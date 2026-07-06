@@ -223,10 +223,10 @@ net.handlers.onFx = (kind, m) => {
 // разовые клавиши
 input.onKey = k => {
   if (menu.style.display !== 'none') return;
-  if (k === 'KeyF') { net.send({ t: MSG.INTERACT }); SFX.ui(); }
+  if (k === 'KeyE') { net.send({ t: MSG.INTERACT }); SFX.ui(); }
   if (k === 'KeyT') net.send({ t: MSG.RELOAD });
   if (k === 'KeyQ') useAbility(0);
-  if (k === 'KeyE') useAbility(1);
+  if (k === 'KeyX') useAbility(1);
   if (k === 'KeyR') useAbility(2);
   if (k === 'Tab') panels.toggleInventory();
   if (k === 'KeyC') panels.toggleChar();

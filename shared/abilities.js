@@ -1,4 +1,4 @@
-// Активные способности классов на Q / E / R. Открываются с уровнем.
+// Активные способности классов на Q / X / R. Открываются с уровнем.
 // Механика — на сервере (game.useAbility), клиент показывает кулдауны и эффекты.
 export const ABILITIES = {
   warrior: [
@@ -8,7 +8,7 @@ export const ABILITIES = {
       desc: 'Сокрушительный удар по всем врагам вокруг: ×2.5 урона и мощный отброс',
     },
     {
-      id: 'war_cry', key: 'E', lvl: 5, cd: 14, mana: 5,
+      id: 'war_cry', key: 'X', lvl: 5, cd: 14, mana: 5,
       name: 'Боевой клич', icon: 'ab_war_cry',
       desc: 'Оглушает врагов в радиусе на 1.5 с',
     },
@@ -25,7 +25,7 @@ export const ABILITIES = {
       desc: 'Конус пламени перед собой: ×1.5 урона магии',
     },
     {
-      id: 'frost_nova', key: 'E', lvl: 5, cd: 12, mana: 10,
+      id: 'frost_nova', key: 'X', lvl: 5, cd: 12, mana: 10,
       name: 'Ледяная нова', icon: 'ab_frost_nova',
       desc: 'Кольцо мороза: урон и сильное замедление вокруг',
     },
@@ -42,7 +42,7 @@ export const ABILITIES = {
       desc: 'Проносишься сквозь врагов, раня всех на пути',
     },
     {
-      id: 'smoke_bomb', key: 'E', lvl: 5, cd: 15, mana: 6,
+      id: 'smoke_bomb', key: 'X', lvl: 5, cd: 15, mana: 6,
       name: 'Дымовая завеса', icon: 'ab_smoke_bomb',
       desc: 'Невидимость: враги теряют тебя из виду на 3 с',
     },

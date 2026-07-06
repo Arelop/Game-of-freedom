@@ -730,7 +730,8 @@ export class Game {
           spirit.hp = spirit.maxHp = 24;
           ids.push(id);
         }
-        const villagers = Math.max(2, s.population - 4);
+        // на экране не всё население: остальные «по домам» (иначе толпа)
+        const villagers = Math.min(9, Math.max(2, s.population - 4));
         for (let i = 0; i < villagers; i++) {
           const bed = a.beds[i % a.beds.length];
           const npc = this.spawnNpc('villager', s.id, 'over', sx + (this.rand() - 0.5) * 120, sy + (this.rand() - 0.5) * 120);
