@@ -97,6 +97,7 @@ export class Net {
       case MSG.LEARN_TALENT: game.learnTalent(p, String(m.id || '')); break;
       case MSG.SELL_ITEM: game.sellItem(p, String(m.item || '')); break;
       case MSG.ABILITY: game.useAbility(p, Math.max(0, Math.min(2, m.slot | 0))); break;
+      case MSG.OFFHAND: game.useOffhand(p); break;
     }
   }
 
@@ -185,6 +186,7 @@ export class Net {
         q: p.quest ? { title: p.quest.title, done: p.quest.done, tx: p.quest.tx, ty: p.quest.ty } : null,
         rep: p.rep,
         ab: (p.abCd || []).map(v => r1(v)), blk: p.blocking ? 1 : 0, inv2: r1(p.invisT || 0),
+        oc: r1(p.offCd || 0), sh: p.shieldHp || 0, cb: p.canBlock ? 1 : 0,
       },
       ents,
     };

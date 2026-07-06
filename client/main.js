@@ -212,6 +212,28 @@ net.handlers.onFx = (kind, m) => {
       particles.burst(m.x, m.y, '#9badb7', 6, 60, 0.2);
       if (m.pid === net.myId) { addFloatText(m.x, m.y - 8, 'БЛОК', '#9badb7'); SFX.hit(); }
       break;
+    case 'summon':
+      particles.burst(m.x, m.y, '#df7126', 16, 80, 0.5, 2);
+      particles.sparkle(m.x, m.y);
+      ringFx.push({ x: m.x, y: m.y, r0: 20, r1: 6, t: 0, dur: 0.35, color: '#df7126' });
+      SFX.boom();
+      break;
+    case 'poof':
+      particles.burst(m.x, m.y, '#847e87', 10, 50, 0.4);
+      break;
+    case 'barrier':
+      ringFx.push({ x: m.x, y: m.y, r0: 4, r1: 14, t: 0, dur: 0.35, color: '#63c5ff' });
+      if (m.pid === net.myId) SFX.heal();
+      break;
+    case 'barrierHit':
+      particles.burst(m.x, m.y, '#63c5ff', 8, 60, 0.25);
+      if (m.pid === net.myId) { addFloatText(m.x, m.y - 8, 'БАРЬЕР', '#63c5ff'); SFX.hit(); }
+      break;
+    case 'net':
+      ringFx.push({ x: m.x, y: m.y, r0: 55, r1: 40, t: 0, dur: 0.5, color: '#9badb7', fill: true });
+      particles.burst(m.x, m.y, '#847e87', 12, 60, 0.35);
+      SFX.roll();
+      break;
     case 'ability': spawnAbilityFx(m); break;
     case 'dodge':
       if (m.pid === net.myId) addFloatText(m.x, m.y - 6, 'УВОРОТ', '#63c5ff');
@@ -336,6 +358,16 @@ function simStep() {
   const roll = panels.dialogOpen ? false : input.takeRoll();
   const fire = !panels.dialogOpen && input.fire;
   const blk = !panels.dialogOpen && input.block;
+
+  // разовое нажатие ПКМ: активный предмет левой руки (гримуар/сфера/сеть)
+  const rmb = input.takeRmb();
+  if (rmb && !panels.dialogOpen && net.you) {
+    const off = getItem(net.you.eq?.offhand);
+    if (off?.active) {
+      if ((net.you.oc || 0) > 0.2) panels.toast(`${off.name}: ещё ${Math.ceil(net.you.oc)} с`);
+      else net.send({ t: MSG.OFFHAND });
+    }
+  }
 
   net.simStep({ mx: mv.mx, my: mv.my, aim, fire, roll, blk });
 
@@ -562,6 +594,15 @@ function drawMe(timeSec) {
     atlas.draw(ctx, sprite, s.x, s.y - bob, { flipX, alpha });
     if (you.blk && input.block) drawShield(you, s.x, s.y - 2 - bob, p.aim);
     else drawWeapon(getWeapon(you.w), s.x, s.y - 2 - bob, p.aim, flipX, swingAnim);
+  }
+  // барьер хрустальной сферы: мерцающее кольцо
+  if ((you.sh || 0) > 0) {
+    ctx.strokeStyle = '#63c5ff';
+    ctx.globalAlpha = 0.5 + Math.sin(timeSec * 8) * 0.25;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y - 2, 11, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 }
 

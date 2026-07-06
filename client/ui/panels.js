@@ -63,9 +63,10 @@ export class Panels {
     const stats = describeItem(itemId, it);
     const lines = stats ? stats.split(', ').map(s => `<div class="tstat">${s}</div>`).join('') : '';
     const blockLine = it?.block ? '<div class="tinfo">Блок на ПКМ: гасит удары спереди</div>' : '';
+    const activeLine = it?.activeDesc ? `<div class="tinfo" style="color:#df7126">${it.activeDesc}</div>` : '';
     return `<div class="tname" style="color:${r.color}">${name}</div>`
       + `<div class="ttype">${type}${rarLabel}</div>`
-      + lines + blockLine
+      + lines + blockLine + activeLine
       + (price ? `<div class="tprice">Цена продажи: ${sellPriceR(itemId)} мон.</div>` : '')
       + (action ? `<div class="tact">клик — ${action}</div>` : '');
   }

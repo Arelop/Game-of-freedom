@@ -6,6 +6,7 @@ export class Input {
     this.fire = false;
     this.rollQueued = false;
     this.block = false;                  // ПКМ зажата — блок щитом
+    this.rmbQueued = false;              // разовое нажатие ПКМ — активный офхенд
     this.canvas = canvas;
     this.onKey = null;                   // колбэк для разовых клавиш (E, Tab, цифры...)
 
@@ -27,7 +28,7 @@ export class Input {
     });
     canvas.addEventListener('mousedown', e => {
       if (e.button === 0) this.fire = true;
-      if (e.button === 2) this.block = true; // держим щит, пока зажата ПКМ
+      if (e.button === 2) { this.block = true; this.rmbQueued = true; } // щит держим, активку — по нажатию
     });
     window.addEventListener('mouseup', e => {
       if (e.button === 0) this.fire = false;
@@ -47,4 +48,5 @@ export class Input {
   }
 
   takeRoll() { const r = this.rollQueued; this.rollQueued = false; return r; }
+  takeRmb() { const r = this.rmbQueued; this.rmbQueued = false; return r; }
 }

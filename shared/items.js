@@ -183,10 +183,17 @@ export const ITEMS = {
   flame_tome: {
     id: 'flame_tome', name: 'Гримуар пламени', slot: 'offhand',
     stats: { int: 2, damage: 0.06 }, price: 145, icon: 'item_tome_flame',
+    active: 'summon_fire', activeDesc: 'ПКМ: призывает огненного элементаля на 25 с (кд 60 с)',
   },
   crystal_orb: {
     id: 'crystal_orb', name: 'Хрустальная сфера', slot: 'offhand',
     stats: { int: 1, lck: 1, manaRegen: 1 }, price: 130, icon: 'item_orb_crystal',
+    active: 'barrier', activeDesc: 'ПКМ: барьер на 2 сердца, 6 с (кд 30 с)',
+  },
+  throwing_net: {
+    id: 'throwing_net', name: 'Боевая сеть', slot: 'offhand',
+    stats: { agi: 1 }, price: 95, icon: 'item_net',
+    active: 'net', activeDesc: 'ПКМ: бросок сети — враги в зоне скованы на 2.5 с (кд 15 с)',
   },
 
   // --- ещё аксессуары ---

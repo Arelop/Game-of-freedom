@@ -170,6 +170,13 @@
     "item_orb_crystal": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_orb.png"
     },
+    "item_net": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/ranged/throwing_net.png"
+    },
+    "npc_elemental": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/nonliving/fire_elemental.png",
+      "down": 2
+    },
     "item_amulet_eye": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/eye_cyan.png"
     },

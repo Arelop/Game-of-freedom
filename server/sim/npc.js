@@ -20,8 +20,9 @@ function scheduleAnchor(npc, s, t) {
 }
 
 export function updateNpc(npc, dt, map, game) {
-  // наёмник: следует за нанимателем и бьёт врагов поблизости
-  if (npc.role === 'mercenary') {
+  // наёмник и призванный элементаль: следуют за хозяином, бьют врагов поблизости
+  if (npc.role === 'mercenary' || npc.role === 'elemental') {
+    const fiery = npc.role === 'elemental';
     const owner = game.players.get(npc.owner);
     if (!owner || owner.mapId !== npc.mapId) return; // ждёт хозяина
     let target = null, bd = 200 * 200;
@@ -35,7 +36,10 @@ export function updateNpc(npc, dt, map, game) {
       npc.aim = ang;
       if (bd > 60 * 60) walkTo(npc, target.x, target.y, GUARD_SPEED, dt, map);
       npc.fireT = (npc.fireT ?? 0.4) - dt;
-      if (npc.fireT <= 0) { npc.fireT = 1.0; game.npcShoot(npc, ang); }
+      if (npc.fireT <= 0) {
+        npc.fireT = fiery ? 0.9 : 1.0;
+        game.npcShoot(npc, ang, fiery ? { dmg: 3, weapon: 'firestaff', speed: 240 } : {});
+      }
       return;
     }
     const od = dist2(npc.x, npc.y, owner.x, owner.y);

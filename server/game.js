@@ -62,6 +62,7 @@ const SHOP = [
   { item: 'leather_boots', price: 30 }, { item: 'iron_greaves', price: 70 },
   { item: 'wizard_hat', price: 90 }, { item: 'ring_str', price: 70 },
   { item: 'flame_tome', price: 145 }, { item: 'lucky_deck', price: 120 },
+  { item: 'throwing_net', price: 95 }, { item: 'crystal_orb', price: 130 },
   { item: 'iron_helmet', price: 65 }, { item: 'wolf_amulet', price: 55 },
   { item: 'weapon:huntbow', price: 85 }, { item: 'weapon:firestaff', price: 100 },
   { item: 'weapon:axe', price: 90 }, { item: 'weapon:bombs', price: 140 },
@@ -180,7 +181,7 @@ export class Game {
       equipment: { head: null, chest: null, legs: null, offhand: null, acc1: null, acc2: null, ring: null },
       buffs: {},                 // { speed: { mult, t } }
       dmgMult: 1, shadowT: 0, prevRollT: 0, manaRegenT: 0,
-      abCd: [0, 0, 0], invisT: 0,
+      abCd: [0, 0, 0], invisT: 0, offCd: 0, shieldHp: 0, shieldT: 0,
       coins: 20, hunger: HUNGER_MAX,
       rep: makeReputation(), aggroFactions: new Set(),
       dead: false, downT: 0,
@@ -281,6 +282,8 @@ export class Game {
     p.hp = Math.min(p.hp, maxHp);
     p.speedMult = Math.max(0.4, speed);
     p.rollCdMult = Math.max(0.2, rollCd);
+    // блок на ПКМ возможен только со щитом в левой руке
+    p.canBlock = !!getItem(p.equipment.offhand)?.block;
   }
 
   // Урон атаки с учётом школы, талантов, ковки и крита
@@ -463,6 +466,8 @@ export class Game {
     p.shadowT = Math.max(0, p.shadowT - dt);
     p.invisT = Math.max(0, (p.invisT || 0) - dt);
     if (p.abCd) for (let i = 0; i < 3; i++) p.abCd[i] = Math.max(0, (p.abCd[i] || 0) - dt);
+    p.offCd = Math.max(0, (p.offCd || 0) - dt);
+    if (p.shieldT > 0) { p.shieldT -= dt; if (p.shieldT <= 0) { p.shieldT = 0; p.shieldHp = 0; } }
 
     // Начало переката: Таран и Барьер
     if (p.rollT > p.prevRollT) {
@@ -621,13 +626,13 @@ export class Game {
     }
   }
 
-  npcShoot(npc, ang) {
+  npcShoot(npc, ang, opts = {}) {
     this.projectiles.push({
-      x: npc.x, y: npc.y - 4, vx: Math.cos(ang) * 280, vy: Math.sin(ang) * 280,
-      life: 1.2, radius: 2, dmg: 2, knockback: 20,
+      x: npc.x, y: npc.y - 4, vx: Math.cos(ang) * (opts.speed || 280), vy: Math.sin(ang) * (opts.speed || 280),
+      life: 1.2, radius: 2, dmg: opts.dmg || 2, knockback: 20,
       owner: npc.id, friendly: true, guard: true, mapId: npc.mapId,
     });
-    this.fx({ t: 'shot', pid: npc.id, weapon: 'bow', x: npc.x, y: npc.y, aim: ang, seed: 1, tick: this.tick }, npc.mapId, npc.x, npc.y);
+    this.fx({ t: 'shot', pid: npc.id, weapon: opts.weapon || 'bow', x: npc.x, y: npc.y, aim: ang, seed: 1, tick: this.tick }, npc.mapId, npc.x, npc.y);
   }
 
   // ---------- сущности ----------
@@ -813,7 +818,55 @@ export class Game {
           }
         }
       } else if (e.entType === 'npc') {
+        // временные союзники (элементаль) развеиваются по сроку службы
+        if (e.dieAtTick && this.tick >= e.dieAtTick) {
+          this.entities.delete(e.id);
+          this.fx({ t: 'poof', x: e.x, y: e.y }, e.mapId, e.x, e.y);
+          continue;
+        }
         updateNpc(e, dt, map, this);
+      }
+    }
+  }
+
+  // ---------- активный предмет левой руки (ПКМ) ----------
+  useOffhand(p) {
+    if (p.dead || p.rollT > 0) return;
+    const it = getItem(p.equipment.offhand);
+    if (!it?.active) return;
+    if ((p.offCd || 0) > 0) return;
+    switch (it.active) {
+      case 'summon_fire': { // гримуар: огненный элементаль-союзник
+        for (const e of [...this.entities.values()])
+          if (e.entType === 'npc' && e.role === 'elemental' && e.owner === p.id) this.entities.delete(e.id);
+        p.offCd = 60;
+        const id = this.spawnNpc('elemental', null, p.mapId, p.x + 14, p.y - 6, { kind: 'npc_elemental' });
+        const el = this.entities.get(id);
+        el.owner = p.id;
+        el.name = 'Элементаль';
+        el.hp = el.maxHp = 10;
+        el.dieAtTick = this.tick + 25 * 30;
+        this.fx({ t: 'summon', x: el.x, y: el.y }, p.mapId, el.x, el.y);
+        this.toast(p, '🔥 Огненный элементаль служит тебе (25 с)');
+        break;
+      }
+      case 'barrier': { // сфера: поглощающий щит
+        p.offCd = 30;
+        p.shieldHp = 4;
+        p.shieldT = 6;
+        this.fx({ t: 'barrier', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'net': { // сеть: сковывает врагов в зоне у прицела
+        p.offCd = 15;
+        const aim = p.aim || 0;
+        const tx = p.x + Math.cos(aim) * 70, ty = p.y + Math.sin(aim) * 70;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(tx, ty, e.x, e.y) < 55 * 55) { e.slowT = 2.5; e.slowMult = 0.05; e.aggro = true; }
+        }
+        this.fx({ t: 'net', x: tx, y: ty }, p.mapId, tx, ty);
+        break;
       }
     }
   }
@@ -1224,6 +1277,14 @@ export class Game {
       this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
       return;
     }
+    // барьер хрустальной сферы: поглощает урон до пробития
+    if (p.shieldT > 0 && (p.shieldHp || 0) > 0) {
+      p.shieldHp -= dmg;
+      p.hurtT = PLAYER_HURT_INVULN * 0.6;
+      this.fx({ t: 'barrierHit', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      if (p.shieldHp <= 0) { p.shieldHp = 0; p.shieldT = 0; }
+      return;
+    }
     // блок щитом в левой руке (ПКМ): режет урон, гасит полностью удары спереди
     if (p.blocking) {
       const off = getItem(p.equipment.offhand);
@@ -1313,7 +1374,7 @@ export class Game {
          'wolf_amulet', 'fox_amulet', 'iron_ring', 'wood_shield', 'swift_ring',
          'sage_helmet', 'war_helm', 'lucky_charm',
          'wizard_hat', 'elven_helm', 'etched_helm', 'shadow_leggings', 'leather_boots',
-         'eye_amulet', 'ring_str', 'ring_dex', 'ring_mind'];
+         'eye_amulet', 'ring_str', 'ring_dex', 'ring_mind', 'throwing_net'];
     const rar = rollRarity(this.rand, luck, elite ? 2 : 1);
     this.spawnDrop(withRarity(pick(this.rand, pool), rar), 1, mapId, x, y);
   }

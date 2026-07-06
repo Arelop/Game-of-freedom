@@ -15,7 +15,8 @@ export const MSG = {
   SPEND_STAT: 'spendStat',     // { stat } потратить очко характеристики
   LEARN_TALENT: 'learnTalent', // { id } изучить талант
   SELL_ITEM: 'sellItem',       // { item } продать торговцу рядом
-  ABILITY: 'ability',          // { slot: 0..2 } применить способность Q/E/R
+  ABILITY: 'ability',          // { slot: 0..2 } применить способность Q/X/R
+  OFFHAND: 'offhand',          // активировать предмет в левой руке (ПКМ)
 
   // сервер -> клиент
   WELCOME: 'welcome',     // { id, worldSeed, worldMeta, tick }

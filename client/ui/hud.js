@@ -4,6 +4,7 @@ import { VIEW_W, VIEW_H, WORLD_TILES, TILE, PLAYER_MAX_HP, SEASONS, seasonOf } f
 import { getWeapon } from '../../shared/rarity.js';
 import { STR } from '../../shared/strings.js';
 import { abilitiesOf } from '../../shared/abilities.js';
+import { getItem } from '../../shared/rarity.js';
 
 export class Hud {
   constructor(atlas) { this.atlas = atlas; this.debug = false; }
@@ -122,6 +123,28 @@ export class Hud {
       }
       ctx.fillStyle = locked ? '#696a6a' : '#fbf236';
       ctx.fillText(KEYS[i], x + 1, y0 + S - 8);
+    }
+    // активный офхенд (ПКМ): иконка с кулдауном справа от способностей
+    const off = getItem(you.eq?.offhand);
+    if (off?.active) {
+      const x = x0 + 3 * (S + GAP) + 4;
+      const cd = you.oc || 0;
+      ctx.fillStyle = 'rgba(20,18,26,.85)';
+      ctx.fillRect(x - 1, y0 - 1, S + 2, S + 2);
+      this.atlas.draw(ctx, off.icon, x + S / 2, y0 + S / 2, {
+        alpha: cd > 0 ? 0.5 : 1,
+        scale: (this.atlas.map[off.icon]?.w || 16) > 20 ? 0.5 : 1,
+      });
+      if (cd > 0) {
+        ctx.fillStyle = 'rgba(10,10,16,.75)';
+        ctx.fillRect(x, y0, S, S);
+        ctx.fillStyle = '#eee';
+        ctx.fillText(Math.ceil(cd) + '', x + S / 2 - 2, y0 + S / 2 - 4);
+      }
+      ctx.fillStyle = '#fbf236';
+      ctx.font = '7px monospace';
+      ctx.fillText('ПКМ', x + 1, y0 + S - 7);
+      ctx.font = '8px monospace';
     }
   }
 
