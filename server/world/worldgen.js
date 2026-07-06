@@ -71,6 +71,7 @@ export function makeWorld(seed) {
     edits: new Map(),           // "x,y" -> тайл
     settlements: [],
     pois: [],
+    roads: [],                  // точки дорог для карты мира
     time: 0.3,                  // доля суток (0.3 = утро)
     day: 1,
   };
@@ -177,5 +178,20 @@ function stampRoad(world, a, b, rand) {
     const base = baseTile(world.seed, x, y);
     if (base === T.WATER || base === T.DEEP_WATER) continue;
     if (!world.edits.has(key)) world.edits.set(key, T.ROAD);
+    if (guard % 4 === 0) world.roads.push([x, y]);
   }
+}
+
+// Карта биомов для клиентской карты мира: 128x128 (шаг 4 тайла), коды 0..6
+export function buildBiomeMap(world) {
+  const N = 128;
+  const out = new Uint8Array(N * N);
+  const CODE = {
+    [T.DEEP_WATER]: 0, [T.WATER]: 1, [T.SAND]: 2, [T.GRASS]: 3,
+    [T.FOREST_FLOOR]: 4, [T.ROCK]: 5, [T.SWAMP]: 6,
+  };
+  for (let my = 0; my < N; my++)
+    for (let mx = 0; mx < N; mx++)
+      out[my * N + mx] = CODE[baseTile(world.seed, mx * 4 + 2, my * 4 + 2)] ?? 3;
+  return out;
 }

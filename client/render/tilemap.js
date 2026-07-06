@@ -37,6 +37,8 @@ const TILE_SPRITES = {
   [T.MINE]: ['tile_rock_solid'],
   [T.SHRINE]: ['tile_grass', 'obj_shrine'],
   [T.RUBBLE]: ['tile_rubble'],
+  [T.FENCE]: ['tile_grass', 'tile_fence'],
+  [T.ANVIL]: ['tile_floor_wood', 'obj_anvil'],
 };
 
 export class TileRenderer {
@@ -88,8 +90,13 @@ export class TileRenderer {
     for (let cy = y0; cy <= y1; cy++) {
       for (let cx = x0; cx <= x1; cx++) {
         const entry = this.getChunkCanvas(mapId, cx, cy);
-        if (!entry) continue;
         const s = cam.toScreen(cx * px, cy * px);
+        if (!entry) {
+          // чанк ещё не пришёл — приглушённый тон земли вместо чёрного
+          ctx.fillStyle = mapId === 'over' ? '#2e4423' : '#1c1a24';
+          ctx.fillRect(s.x, s.y, px, px);
+          continue;
+        }
         ctx.drawImage(entry.canvas, s.x, s.y);
         anims.push(...entry.animated);
       }

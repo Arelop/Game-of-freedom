@@ -32,6 +32,7 @@ export function saveWorld(game) {
         equipment: p.equipment,
         cls: p.cls, level: p.level, xp: p.xp,
         statPts: p.statPts, talentPts: p.talentPts, stats: p.stats, talents: p.talents,
+        weaponUp: p.weaponUp || {},
       })),
     };
     writeFileSync(FILE, JSON.stringify(data));
@@ -79,6 +80,7 @@ export function applySavedPlayer(game, p) {
     p.statPts = rec.statPts ?? 0; p.talentPts = rec.talentPts ?? 0;
     if (rec.stats) p.stats = rec.stats;
     if (rec.talents) p.talents = rec.talents;
+    if (rec.weaponUp) p.weaponUp = rec.weaponUp;
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);

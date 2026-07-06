@@ -5,6 +5,7 @@ import { AOI_RADIUS, CHUNK, MAX_PLAYERS, SNAPSHOT_EVERY, TICK_RATE } from '../sh
 import { ENEMIES } from '../shared/enemies.js';
 import { dist2 } from '../shared/simCore.js';
 import { xpNeed } from '../shared/classes.js';
+import { buildBiomeMap } from './world/worldgen.js';
 
 export class Net {
   constructor(game, httpServer) {
@@ -47,6 +48,8 @@ export class Net {
         mapInfo: {
           settlements: game.world.settlements.map(s => ({ x: s.x, y: s.y, name: s.name, faction: s.faction })),
           pois: game.world.pois.map(o => ({ x: o.x, y: o.y, name: o.name, type: o.type, cleared: o.cleared })),
+          biomes: rleEncode(Array.from(this.biomeMap ??= buildBiomeMap(game.world))),
+          roads: game.world.roads,
         },
       }));
       return;

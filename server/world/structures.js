@@ -80,44 +80,80 @@ export function stampHouse(world, x0, y0, w, h, anchors) {
   if (w >= 5) set(world, x0 + w - 2, y0 + 1, T.TABLE);
 }
 
+// Деревня v2: мощёная площадь с колодцем, таверна, кузница, рынок,
+// дома по кольцу, огороды и палисад с воротами по四 сторонам.
 export function stampSettlement(world, s, rand) {
-  const anchors = { beds: [], works: [], stalls: [], fire: null, well: null, tavern: null };
+  const anchors = {
+    beds: [], works: [], stalls: [], fire: null, well: null,
+    tavern: null, smithy: null,
+  };
   const cx = s.x, cy = s.y;
+  const R = 18;
 
-  // расчистка площадки под деревню (перекрываем декор травой)
-  const R = 16;
+  // расчистка площадки (перекрываем декор травой)
   for (let y = cy - R; y <= cy + R; y++)
     for (let x = cx - R; x <= cx + R; x++)
       if ((x - cx) ** 2 + (y - cy) ** 2 <= R * R) set(world, x, y, T.GRASS);
 
-  // центр: колодец + костёр рядом
+  // центральная площадь: мощёный круг с колодцем и костром
+  for (let y = cy - 3; y <= cy + 3; y++)
+    for (let x = cx - 3; x <= cx + 3; x++)
+      if ((x - cx) ** 2 + (y - cy) ** 2 <= 11) set(world, x, y, T.ROAD);
   set(world, cx, cy, T.WELL);
   anchors.well = { x: cx, y: cy };
-  set(world, cx + 2, cy + 1, T.CAMPFIRE);
-  anchors.fire = { x: cx + 2, y: cy + 1 };
+  set(world, cx + 2, cy + 2, T.CAMPFIRE);
+  anchors.fire = { x: cx + 2, y: cy + 2 };
 
-  // дома по кругу
-  const houseCount = randInt(rand, 4, 6);
-  const slots = [
-    [-12, -12], [2, -12], [-12, 2], [8, 4], [-14, -2], [6, -4],
+  // дорожки от площади к воротам
+  for (let d = 4; d <= R; d++) {
+    set(world, cx + d, cy, T.ROAD); set(world, cx - d, cy, T.ROAD);
+    set(world, cx, cy + d, T.ROAD); set(world, cx, cy - d, T.ROAD);
+  }
+
+  // таверна — большой дом на севере площади (кровати «для постояльцев»)
+  stampHouse(world, cx - 4, cy - 12, 8, 6, anchors);
+  set(world, cx - 2, cy - 9, T.TABLE);
+  set(world, cx + 1, cy - 9, T.TABLE);
+  anchors.tavern = { x: cx - 1, y: cy - 8 };
+
+  // кузница — дом с наковальней на востоке
+  stampHouse(world, cx + 6, cy - 6, 5, 5, anchors);
+  set(world, cx + 7, cy - 5, T.ANVIL);
+  anchors.smithy = { x: cx + 8, y: cy - 3 };
+
+  // жилые дома по кольцу (юг и запад)
+  const homeSlots = [
+    [-14, -6, 5, 4], [-15, 3, 5, 5], [-8, 8, 5, 4],
+    [3, 8, 6, 5], [10, 2, 5, 4],
   ];
-  for (let i = 0; i < houseCount && i < slots.length; i++) {
-    const [ox, oy] = slots[i];
-    const w = randInt(rand, 4, 6), h = randInt(rand, 4, 5);
+  const houses = randInt(rand, 3, homeSlots.length);
+  for (let i = 0; i < houses; i++) {
+    const [ox, oy, w, h] = homeSlots[i];
     stampHouse(world, cx + ox, cy + oy, w, h, anchors);
   }
-  // таверна — первый (самый большой) дом
-  if (anchors.beds.length) anchors.tavern = { x: cx - 10, y: cy - 10 };
 
-  // рынок: прилавки
-  set(world, cx - 3, cy + 3, T.STALL);
-  anchors.stalls.push({ x: cx - 3, y: cy + 4 });
+  // рынок: ряд прилавков у западного входа площади
+  for (let i = 0; i < 2 + (rand() < 0.5 ? 1 : 0); i++) {
+    set(world, cx - 5, cy - 2 + i * 2, T.STALL);
+    anchors.stalls.push({ x: cx - 5, y: cy - 1 + i * 2 });
+  }
 
-  // поле — рабочее место
-  for (let y = cy + 7; y < cy + 11; y++)
-    for (let x = cx - 8; x < cx - 2; x++) set(world, x, y, T.FIELD);
-  anchors.works.push({ x: cx - 5, y: cy + 9 });
+  // огороды
+  for (let y = cy + 9; y < cy + 12; y++)
+    for (let x = cx - 3; x < cx + 2; x++) set(world, x, y, T.FIELD);
+  anchors.works.push({ x: cx - 1, y: cy + 10 });
   anchors.works.push({ x: cx, y: cy + 1 }); // у колодца
+
+  // палисад по кругу с воротами по осям
+  for (let a = 0; a < 360; a += 2) {
+    const rad = a * Math.PI / 180;
+    const fx = cx + Math.round(Math.cos(rad) * R);
+    const fy = cy + Math.round(Math.sin(rad) * R);
+    // ворота: пропуски у осей
+    if (Math.abs(fx - cx) <= 1 || Math.abs(fy - cy) <= 1) continue;
+    const key = fx + ',' + fy;
+    if (world.edits.get(key) === T.GRASS) set(world, fx, fy, T.FENCE);
+  }
 
   s.anchors = anchors;
 }

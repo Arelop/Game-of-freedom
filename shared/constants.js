@@ -38,7 +38,7 @@ export const T = {
   DUNGEON_FLOOR: 15, DUNGEON_WALL: 16, DOOR: 17, WATER_EDGE: 18,
   CAMPFIRE: 19, STALL: 20, BED: 21, TABLE: 22, WELL: 23, CHEST: 24,
   DUNGEON_DOOR: 25, DUNGEON_EXIT: 26, FIELD: 27, TOWER: 28,
-  MINE: 29, SHRINE: 30, RUBBLE: 31,
+  MINE: 29, SHRINE: 30, RUBBLE: 31, FENCE: 32, ANVIL: 33,
 };
 
 // Разрушаемые тайлы: прочность, во что превращаются, дроп.
@@ -54,6 +54,8 @@ export const DESTRUCTIBLE = {
   [T.TABLE]: { hp: 5, becomes: T.FLOOR_WOOD, drops: { wood: 0.5 } },
   [T.BED]: { hp: 5, becomes: T.FLOOR_WOOD, drops: { wood: 0.3 } },
   [T.WELL]: { hp: 20, becomes: T.RUBBLE, drops: {} },
+  [T.FENCE]: { hp: 4, becomes: T.GRASS, drops: { wood: 0.6 } },
+  [T.ANVIL]: { hp: 15, becomes: T.FLOOR_WOOD, drops: { metal: 0.6 } },
 };
 
 // Сезоны: 3 игровых дня каждый. Влияют на урожай и агрессию монстров.
@@ -66,7 +68,7 @@ export const SEASON_HARVEST = [1.0, 1.5, 1.2, 0.3];
 export const SOLID = new Set([
   T.DEEP_WATER, T.WATER, T.WALL, T.TREE, T.ROCK_SOLID,
   T.DUNGEON_WALL, T.STALL, T.WELL, T.CHEST, T.TABLE, T.BED, T.TOWER,
-  T.MINE, T.SHRINE,
+  T.MINE, T.SHRINE, T.FENCE, T.ANVIL,
 ]);
 // Блокирует пули (стены — да, вода — нет)
 export const BULLET_SOLID = new Set([

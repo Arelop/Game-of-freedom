@@ -435,6 +435,15 @@ const GEN = {
     px(s, 7, 6, C.lgray); px(s, 3, 13, C.gray); px(s, 13, 13, C.lbrown);
     return s;
   },
+  anvil() {
+    const s = make(16, 16);
+    rect(s, 3, 5, 10, 3, C.dgray);        // рог и тело
+    rect(s, 2, 5, 2, 2, C.gray);
+    rect(s, 6, 8, 4, 3, C.gray);          // ножка
+    rect(s, 4, 11, 8, 2, C.dgray);        // основание
+    px(s, 4, 5, C.lgray); px(s, 5, 5, C.lgray); px(s, 6, 5, C.white);
+    return s;
+  },
   shrine() {
     const s = make(16, 16);
     // менгир с кристаллом

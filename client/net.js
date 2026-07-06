@@ -118,12 +118,13 @@ export class Net {
         break;
       }
       case 'remap': {
-        // цивилизация что-то построила — сбрасываем чанки, перезапросим
+        // цивилизация что-то построила — тихо перезапрашиваем чанки,
+        // СТАРАЯ картинка остаётся на экране до прихода новой (без чёрных миганий)
         for (const [cx, cy] of m.chunks || []) {
           const key = m.mapId + ':' + cx + ',' + cy;
-          this.chunks.delete(key);
-          this.chunkPending.delete(key);
-          this.handlers.onChunk?.(key);
+          if (!this.chunks.has(key)) continue; // не видели — придёт по мере надобности
+          this.chunkPending.set(key, performance.now());
+          this.send({ t: MSG.CHUNK_REQ, cx, cy });
         }
         break;
       }

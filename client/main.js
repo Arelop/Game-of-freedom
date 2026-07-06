@@ -3,7 +3,7 @@ import { VIEW_W, VIEW_H, SIM_DT, TILE, PLAYER_RADIUS } from '../shared/constants
 import { WEAPONS } from '../shared/weapons.js';
 import { ITEMS } from '../shared/items.js';
 import { STR } from '../shared/strings.js';
-import { MSG } from '../shared/protocol.js';
+import { MSG, rleDecode } from '../shared/protocol.js';
 import { Net } from './net.js';
 import { Input } from './input.js';
 import { Atlas } from './render/atlas.js';
@@ -102,7 +102,35 @@ function join() {
   net.connect(name, pickedClass);
 }
 
-net.handlers.onWelcome = () => { menu.style.display = 'none'; SFX.quest(); };
+net.handlers.onWelcome = () => {
+  menu.style.display = 'none';
+  SFX.quest();
+  buildBiomeCanvas();
+};
+
+// ---------- карта мира: биомная подложка ----------
+const BIOME_COLORS = ['#1d2b53', '#2e5d9e', '#d9c27e', '#4e7c3a', '#33552b', '#6d6a60', '#4b5d3a'];
+let biomeCanvas = null;
+function buildBiomeCanvas() {
+  const b = net.mapInfo.biomes;
+  if (!b) return;
+  const data = rleDecode(b, 128 * 128);
+  biomeCanvas = document.createElement('canvas');
+  biomeCanvas.width = 128; biomeCanvas.height = 128;
+  const bctx = biomeCanvas.getContext('2d');
+  const img = bctx.createImageData(128, 128);
+  for (let i = 0; i < data.length; i++) {
+    const c = BIOME_COLORS[data[i]] || '#4e7c3a';
+    img.data[i * 4] = parseInt(c.slice(1, 3), 16);
+    img.data[i * 4 + 1] = parseInt(c.slice(3, 5), 16);
+    img.data[i * 4 + 2] = parseInt(c.slice(5, 7), 16);
+    img.data[i * 4 + 3] = 255;
+  }
+  bctx.putImageData(img, 0, 0);
+  // дороги — светлый пунктир
+  bctx.fillStyle = '#b8a988';
+  for (const [rx, ry] of net.mapInfo.roads || []) bctx.fillRect(Math.floor(rx / 4), Math.floor(ry / 4), 1, 1);
+}
 net.handlers.onFull = () => { document.getElementById('menuHint').textContent = 'Сервер полон (макс. 4).'; };
 net.handlers.onDisconnect = () => {
   menu.style.display = 'flex';
@@ -536,6 +564,13 @@ function renderBigMap() {
   ctx.fillRect(x0 - 6, y0 - 6, S + 12, S + 12);
   ctx.strokeStyle = '#5b6ee1';
   ctx.strokeRect(x0 - 5.5, y0 - 5.5, S + 11, S + 11);
+  // биомная подложка: настоящий рельеф мира
+  if (biomeCanvas) {
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(biomeCanvas, x0, y0, S, S);
+    ctx.globalAlpha = 1;
+  }
   const k = S / (512 * TILE);
   ctx.font = '8px monospace';
   for (const s of net.mapInfo.settlements) {
@@ -561,8 +596,19 @@ function renderBigMap() {
     ctx.fillRect(qx - 2, qy, 5, 1); ctx.fillRect(qx, qy - 2, 1, 5);
     ctx.fillText(net.you.q.title, qx - 30, qy + 6);
   }
+  // союзники на карте
+  for (const [, r] of net.remotes) {
+    if (r.data.tp !== 'p') continue;
+    const pos = net.lerpEnt(r);
+    ctx.fillStyle = '#639bff';
+    ctx.fillRect(x0 + pos.x * k - 1, y0 + pos.y * k - 1, 3, 3);
+    ctx.fillText(r.data.nm || '', x0 + pos.x * k - 10, y0 + pos.y * k - 6);
+  }
   ctx.fillStyle = '#fff';
   ctx.fillRect(x0 + net.pred.x * k - 1, y0 + net.pred.y * k - 1, 3, 3);
+  // легенда
+  ctx.fillStyle = '#847e87';
+  ctx.fillText('■ деревня  ■ данж  ■ лагерь  ⚔ захвачена  ☠ руины  ● ты', x0 + 4, y0 + S - 8);
 }
 
 function blit() {

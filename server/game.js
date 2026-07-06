@@ -232,6 +232,10 @@ export class Game {
     }
     if (this.hasTalent(p, 'deadly')) d.critMult = 3;
     if (p.buffs.speed) speed += p.buffs.speed.mult;
+    if (p.buffs.blessed) { // благословение жреца: весь урон
+      const b = 1 + p.buffs.blessed.mult;
+      d.dmgMelee *= b; d.dmgRanged *= b; d.dmgMagic *= b;
+    }
 
     // амулеты с общим уроном (медвежий) усиливают все школы
     d.dmgMelee *= gearDmg; d.dmgRanged *= gearDmg; d.dmgMagic *= gearDmg;
@@ -243,11 +247,11 @@ export class Game {
     p.rollCdMult = Math.max(0.2, rollCd);
   }
 
-  // Урон атаки с учётом школы, талантов и крита
+  // Урон атаки с учётом школы, талантов, ковки и крита
   rollAttack(p, w) {
     const d = p.derived;
     const schoolMult = w.school === 'melee' ? d.dmgMelee : w.school === 'magic' ? d.dmgMagic : d.dmgRanged;
-    let mult = schoolMult;
+    let mult = schoolMult * (1 + 0.1 * (p.weaponUp?.[w.id] || 0));
     if (this.hasTalent(p, 'rage') && p.hp <= p.maxHp * 0.3) mult *= 1.4;
     if (p.shadowT > 0 && this.hasTalent(p, 'shadow')) { mult *= 1.5; p.shadowT = 0; }
     const crit = this.rand() < d.critChance;
@@ -604,9 +608,11 @@ export class Game {
     this.entities.set(id, {
       id, entType: 'npc', role, home, mapId, x, y, aim: 0,
       hp: role === 'guard' ? 12 : 6, maxHp: role === 'guard' ? 12 : 6,
-      kind: extra.kind || (role === 'guard' ? 'npc_guard' : role === 'merchant' ? 'npc_merchant'
-        : role === 'elder' ? 'npc_elder' : role === 'wizard' ? 'npc_wizard'
-        : this.rand() < 0.5 ? 'npc_villager' : 'npc_villager2'),
+      kind: extra.kind || ({
+        guard: 'npc_guard', merchant: 'npc_merchant', elder: 'npc_elder',
+        wizard: 'npc_wizard', priest: 'npc_wizard', blacksmith: 'npc_smith',
+        innkeeper: 'npc_innkeeper', hunter: 'npc_hunter',
+      }[role] || (this.rand() < 0.5 ? 'npc_villager' : 'npc_villager2')),
       ...extra,
     });
     return id;
@@ -666,6 +672,11 @@ export class Game {
         const a = s.anchors;
         ids.push(this.spawnNpc('elder', s.id, 'over', sx + 20, sy - 10));
         ids.push(this.spawnNpc('merchant', s.id, 'over', (a.stalls[0]?.x ?? s.x) * TILE + 8, (a.stalls[0]?.y ?? s.y) * TILE + 8));
+        // ремесленники и служители — если деревня их «выучила»
+        if (a.smithy) ids.push(this.spawnNpc('blacksmith', s.id, 'over', a.smithy.x * TILE + 8, a.smithy.y * TILE + 8));
+        if (a.tavern) ids.push(this.spawnNpc('innkeeper', s.id, 'over', a.tavern.x * TILE + 8, a.tavern.y * TILE + 8));
+        if (s.shrines > 0) ids.push(this.spawnNpc('priest', s.id, 'over', sx - 20, sy - 24));
+        if (s.forestRich >= 2) ids.push(this.spawnNpc('hunter', s.id, 'over', sx - 40, sy + 30));
         for (let gi = 0; gi < (s.guards || 2); gi++) {
           const ga = gi / Math.max(1, s.guards) * Math.PI * 2;
           ids.push(this.spawnNpc('guard', s.id, 'over', sx + Math.cos(ga) * 34, sy + Math.sin(ga) * 34));
@@ -1123,8 +1134,8 @@ export class Game {
         return;
       }
     }
-    // NPC рядом: приоритет старейшине/торговцу над стражей/жителями
-    const ROLE_PRIO = { elder: 3, merchant: 2, trader: 2 };
+    // NPC рядом: приоритет «полезным» ролям над стражей/жителями
+    const ROLE_PRIO = { elder: 3, merchant: 2, trader: 2, blacksmith: 2, priest: 2, innkeeper: 2, hunter: 2 };
     let npc = null, bestScore = -Infinity;
     const R2 = 40 * 40;
     for (const e of this.entities.values()) {
@@ -1233,6 +1244,41 @@ export class Game {
       choices.push({ id: 'rumor', label: STR.rumor });
       choices.push({ id: 'close', label: STR.bye });
       this.sendDialog(p, npc.id, 'Старейшина', lines, choices);
+    } else if (npc.role === 'blacksmith') {
+      const w = this.weapon(p);
+      const lvl = p.weaponUp?.[w.id] || 0;
+      const lines = [`Кузнец: «Покажи, что у тебя в руках…»`];
+      const choices = [];
+      if (lvl >= 3) lines.push(`${w.name} +${lvl} — лучше уже не выковать.`);
+      else {
+        const costM = 3 * (lvl + 1), costC = 30 * (lvl + 1);
+        lines.push(`${w.name}${lvl ? ' +' + lvl : ''} → +${(lvl + 1) * 10}% урона`);
+        choices.push({ id: 'forge', label: `Улучшить (${costM} металла, ${costC} мон.)` });
+      }
+      choices.push({ id: 'close', label: STR.bye });
+      this.sendDialog(p, npc.id, 'Кузнец', lines, choices);
+    } else if (npc.role === 'priest') {
+      const choices = [
+        { id: 'healme', label: 'Исцеление (12 мон.)' },
+        { id: 'bless', label: 'Благословение: +15% урона на 3 мин (30 мон.)' },
+        { id: 'close', label: STR.bye },
+      ];
+      this.sendDialog(p, npc.id, 'Жрец', ['«Духи иного мира благосклонны к тебе».'], choices);
+    } else if (npc.role === 'innkeeper') {
+      const choices = [
+        { id: 'rest', label: 'Отдых: полное восстановление (15 мон.)' },
+        { id: 'rumor', label: STR.rumor },
+        { id: 'close', label: STR.bye },
+      ];
+      this.sendDialog(p, npc.id, 'Трактирщик', ['«Присаживайся, путник. Эль свежий, слухи свежее».'], choices);
+    } else if (npc.role === 'hunter') {
+      const choices = [];
+      if (!p.quest) choices.push({ id: 'huntquest', label: 'Взять заказ: 3 шкуры' });
+      else if (p.quest.type === 'supply' && p.quest.item === 'hide' && p.quest.giver === npc.home)
+        choices.push({ id: 'supply', label: `Отдать шкуры (${Math.min(p.inventory.hide || 0, p.quest.count)}/${p.quest.count})` });
+      choices.push({ id: 'buyarrows', label: 'Купить стрелы x20 (7 мон.)' });
+      choices.push({ id: 'close', label: STR.bye });
+      this.sendDialog(p, npc.id, 'Охотник', ['«Волки нынче жирные. Шкуры нужны — платим честно».'], choices);
     } else {
       const rumors = this.events.rumors(1);
       const line = rumors.length ? `Говорят, ${lc(rumors[0].text)}…` : 'Тихо у нас, и слава богам.';
@@ -1318,9 +1364,72 @@ export class Game {
       if (give <= 0) { this.toast(p, 'Нечего отдать — принеси ' + (ITEM_NAMES[q.item] || q.item)); return; }
       p.inventory[q.item] -= give;
       q.given = (q.given || 0) + give;
-      s.food = Math.min(140, s.food + give * 6);
+      if (q.item === 'meat' || q.item === 'bread') s.food = Math.min(140, s.food + give * 6);
+      else s.prosperity = Math.min(100, s.prosperity + give * 2);
       if (q.given >= q.count) { q.done = true; this.turnInQuest(p); }
       else this.toast(p, `Отдано ${q.given}/${q.count}`);
+      return;
+    }
+    if (choice === 'forge') {
+      const npc = this.entities.get(dialogId);
+      const w = this.weapon(p);
+      p.weaponUp = p.weaponUp || {};
+      const lvl = p.weaponUp[w.id] || 0;
+      if (!npc || lvl >= 3) return;
+      const costM = 3 * (lvl + 1), costC = 30 * (lvl + 1);
+      if ((p.inventory.metal || 0) < costM || p.coins < costC) {
+        this.toast(p, `Нужно: ${costM} металла и ${costC} мон.`);
+        return;
+      }
+      p.inventory.metal -= costM;
+      p.coins -= costC;
+      p.weaponUp[w.id] = lvl + 1;
+      this.toast(p, `⚒ ${w.name} +${lvl + 1}: урон +${(lvl + 1) * 10}%`);
+      this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      return;
+    }
+    if (choice === 'healme') {
+      if (p.coins < 12) { this.toast(p, STR.notEnoughCoins); return; }
+      if (p.hp >= p.maxHp) { this.toast(p, 'Ты и так здоров'); return; }
+      p.coins -= 12;
+      p.hp = p.maxHp;
+      this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      return;
+    }
+    if (choice === 'bless') {
+      if (p.coins < 30) { this.toast(p, STR.notEnoughCoins); return; }
+      p.coins -= 30;
+      p.buffs.blessed = { mult: 0.15, t: 180 };
+      this.recomputeStats(p);
+      this.toast(p, '✦ Благословение: +15% урона на 3 минуты');
+      return;
+    }
+    if (choice === 'rest') {
+      if (p.coins < 15) { this.toast(p, STR.notEnoughCoins); return; }
+      p.coins -= 15;
+      p.hp = p.maxHp;
+      p.hunger = HUNGER_MAX;
+      this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      this.toast(p, '☘ Выспался и наелся — как новенький');
+      return;
+    }
+    if (choice === 'huntquest') {
+      const npc = this.entities.get(dialogId);
+      const s = npc && this.world.settlements.find(x => x.id === npc.home);
+      if (!s || p.quest) return;
+      p.quest = {
+        type: 'supply', item: 'hide', count: 3, given: 0, giver: s.id, done: false,
+        title: `Принести 3 шкуры охотнику ${s.name}`, tx: s.x, ty: s.y,
+        reward: { coins: 25, rep: 8, xp: 30 },
+      };
+      this.toast(p, STR.questNew(p.quest.title));
+      return;
+    }
+    if (choice === 'buyarrows') {
+      if (p.coins < 7) { this.toast(p, STR.notEnoughCoins); return; }
+      p.coins -= 7;
+      p.ammo.arrow = (p.ammo.arrow || 0) + 20;
+      this.toast(p, STR.pickup(ITEM_NAMES.ammo_arrow));
       return;
     }
     if (choice === 'quest') { this.giveQuest(p, dialogId); return; }
