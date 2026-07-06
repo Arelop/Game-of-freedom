@@ -353,6 +353,98 @@ const GEN = {
     px(s, 3, 10, dark); px(s, 8, 10, dark); rect(s, 4, 11, 4, 1, dark);
     return s;
   },
+  berserkArmor() {
+    const s = make(12, 12);
+    rect(s, 3, 2, 6, 8, C.dred); rect(s, 1, 2, 2, 3, C.dred); rect(s, 9, 2, 2, 3, C.dred);
+    frame(s, 3, 2, 6, 8, C.red);
+    px(s, 5, 4, C.orange); px(s, 6, 4, C.orange); rect(s, 4, 6, 4, 1, C.black);
+    return s;
+  },
+  robeIcon() {
+    const s = make(12, 13);
+    rect(s, 3, 2, 6, 9, C.purple); rect(s, 2, 9, 8, 2, C.purple);
+    frame(s, 3, 2, 6, 9, C.navy);
+    px(s, 5, 4, C.cyan); px(s, 6, 6, C.cyan); px(s, 4, 8, C.cyan);
+    return s;
+  },
+  cloakIcon() {
+    const s = make(12, 13);
+    rect(s, 3, 2, 6, 9, C.dblue); rect(s, 2, 8, 8, 3, C.dblue);
+    frame(s, 3, 2, 6, 9, C.navy);
+    px(s, 5, 3, C.gray); px(s, 6, 3, C.gray);
+    return s;
+  },
+  sageHat() {
+    const s = make(12, 11);
+    for (let i = 0; i < 6; i++) rect(s, 5 - Math.floor(i / 2), 1 + i, 2 + i, 1, C.blue);
+    rect(s, 2, 7, 8, 2, C.navy);
+    px(s, 6, 2, C.yellow);
+    return s;
+  },
+  warHelm() {
+    const s = make(12, 11);
+    disc(s, 6, 5, 4, C.steel);
+    rect(s, 2, 5, 8, 3, C.gray);
+    px(s, 1, 2, C.tan); px(s, 1, 3, C.tan); px(s, 10, 2, C.tan); px(s, 10, 3, C.tan); // рога
+    rect(s, 4, 6, 4, 1, C.dgray);
+    return s;
+  },
+  crownIcon() {
+    const s = make(12, 9);
+    rect(s, 2, 4, 8, 4, C.yellow);
+    px(s, 2, 2, C.yellow); px(s, 5, 1, C.yellow); px(s, 6, 1, C.yellow); px(s, 9, 2, C.yellow);
+    px(s, 4, 5, C.red); px(s, 7, 5, C.blue);
+    rect(s, 2, 7, 8, 1, C.orange);
+    return s;
+  },
+  runeAmulet() {
+    const s = make(11, 12);
+    for (let i = 0; i < 4; i++) { px(s, 5 - i, 1 + i, C.brown); px(s, 5 + i, 1 + i, C.brown); }
+    rect(s, 3, 5, 5, 6, C.gray); frame(s, 3, 5, 5, 6, C.dgray);
+    px(s, 5, 6, C.cyan); px(s, 4, 8, C.cyan); px(s, 6, 8, C.cyan); px(s, 5, 9, C.cyan);
+    return s;
+  },
+  totemIcon() {
+    const s = make(10, 12);
+    for (let i = 0; i < 3; i++) { px(s, 4 - i, 1 + i, C.brown); px(s, 4 + i, 1 + i, C.brown); }
+    rect(s, 2, 4, 5, 7, C.lbrown); frame(s, 2, 4, 5, 7, C.brown);
+    px(s, 3, 5, C.red); px(s, 5, 5, C.red); rect(s, 3, 8, 3, 1, C.dbrown);
+    return s;
+  },
+  gladShield() {
+    const s = make(10, 12);
+    disc(s, 5, 4, 4, C.orange); rect(s, 1, 4, 8, 5, C.orange);
+    px(s, 4, 9, C.orange); rect(s, 2, 9, 6, 1, C.brown);
+    disc(s, 5, 5, 1, C.yellow);
+    frame(s, 1, 1, 8, 9, C.brown);
+    return s;
+  },
+  charmIcon() {
+    const s = make(9, 11);
+    rect(s, 3, 3, 3, 6, C.tan);
+    px(s, 2, 4, C.tan); px(s, 6, 4, C.tan);
+    px(s, 3, 9, C.lbrown); px(s, 5, 9, C.lbrown);
+    px(s, 4, 1, C.yellow); px(s, 4, 2, C.brown);
+    return s;
+  },
+  golem() {
+    const s = make(18, 18);
+    // каменное тело
+    rect(s, 4, 4, 10, 10, C.gray);
+    rect(s, 5, 5, 8, 8, C.steel);
+    // голова-глыба с горящим глазом
+    rect(s, 6, 1, 6, 5, C.gray); frame(s, 6, 1, 6, 5, C.dgray);
+    px(s, 8, 3, C.orange); px(s, 9, 3, C.orange);
+    // руки-валуны
+    rect(s, 1, 6, 3, 6, C.gray); rect(s, 14, 6, 3, 6, C.gray);
+    px(s, 2, 7, C.lgray); px(s, 15, 7, C.lgray);
+    // ноги
+    rect(s, 5, 14, 3, 3, C.dgray); rect(s, 10, 14, 3, 3, C.dgray);
+    // трещины и мох
+    px(s, 6, 8, C.dgray); px(s, 7, 9, C.dgray); px(s, 11, 6, C.dgray);
+    px(s, 12, 11, C.swamp); px(s, 5, 11, C.swamp);
+    return s;
+  },
   ogre() {
     const s = make(24, 24);
     rect(s, 5, 6, 14, 13, C.dgreen);

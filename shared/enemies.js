@@ -1,62 +1,90 @@
 // Архетипы врагов — данные. Мозги в server/sim/ai.js.
 // РПГ-баланс: враги живучее, темп их атак ниже — бой тактичнее.
+// tier — таблица сложности 1..5: где и когда монстр может появляться.
 export const ENEMIES = {
+  rat: {
+    id: 'rat', name: 'Гигантская крыса', archetype: 'chaser', hp: 3, speed: 65, tier: 1,
+    radius: 4, touchDamage: 1, lungeSpeed: 170, lungeWindup: 0.3, lungeRange: 30,
+    sprite: 'enemy_rat', xp: 1, drops: { coin: [0, 2] },
+  },
   slime: {
-    id: 'slime', name: 'Слизень', archetype: 'chaser', hp: 6, speed: 40,
+    id: 'slime', name: 'Слизень', archetype: 'chaser', hp: 6, speed: 40, tier: 1,
     radius: 5, touchDamage: 1, lungeSpeed: 150, lungeWindup: 0.45, lungeRange: 40,
     sprite: 'enemy_slime', xp: 2, drops: { coin: [1, 3] },
   },
   wolf: {
-    id: 'wolf', name: 'Дикий волк', archetype: 'chaser', hp: 9, speed: 70,
+    id: 'wolf', name: 'Дикий волк', archetype: 'chaser', hp: 9, speed: 70, tier: 2,
     radius: 5, touchDamage: 1, lungeSpeed: 210, lungeWindup: 0.35, lungeRange: 55,
     sprite: 'enemy_wolf', xp: 3, drops: { coin: [0, 2], meat: [1, 2] },
   },
   bandit: {
-    id: 'bandit', name: 'Бандит', archetype: 'shooter', hp: 11, speed: 52,
+    id: 'bandit', name: 'Бандит', archetype: 'shooter', hp: 11, speed: 52, tier: 2,
     radius: 5, touchDamage: 1, preferRange: [90, 150], fireInterval: 1.9,
     pattern: 'aimedSingle', sprite: 'enemy_bandit', xp: 4,
     drops: { coin: [2, 5], ammo_arrow: [0, 1] },
   },
   banditHeavy: {
-    id: 'banditHeavy', name: 'Громила', archetype: 'shooter', hp: 22, speed: 38,
+    id: 'banditHeavy', name: 'Громила', archetype: 'shooter', hp: 22, speed: 38, tier: 3,
     radius: 6, touchDamage: 2, preferRange: [70, 120], fireInterval: 2.5,
     pattern: 'fan5', sprite: 'enemy_bandit_heavy', xp: 8,
     drops: { coin: [4, 8], ammo_bolt: [0, 2] },
   },
   skeleton: {
-    id: 'skeleton', name: 'Скелет', archetype: 'shooter', hp: 9, speed: 45,
+    id: 'skeleton', name: 'Скелет', archetype: 'shooter', hp: 9, speed: 45, tier: 2,
     radius: 5, touchDamage: 1, preferRange: [80, 140], fireInterval: 2.1,
     pattern: 'burst3aimed', sprite: 'enemy_skeleton', xp: 4,
     drops: { coin: [1, 4] },
   },
   turret: {
-    id: 'turret', name: 'Тотем', archetype: 'turret', hp: 16, speed: 0,
+    id: 'turret', name: 'Тотем', archetype: 'turret', hp: 16, speed: 0, tier: 3,
     radius: 6, touchDamage: 0, fireInterval: 1.6, pattern: 'ring8',
     sprite: 'enemy_turret', xp: 5, drops: { coin: [3, 6] },
   },
   spiralTurret: {
-    id: 'spiralTurret', name: 'Вихревой тотем', archetype: 'turret', hp: 19, speed: 0,
+    id: 'spiralTurret', name: 'Вихревой тотем', archetype: 'turret', hp: 19, speed: 0, tier: 4,
     radius: 6, touchDamage: 0, fireInterval: 0.26, pattern: 'spiral',
     sprite: 'enemy_turret2', xp: 7, drops: { coin: [4, 7] },
   },
   dasher: {
-    id: 'dasher', name: 'Прыгун', archetype: 'dasher', hp: 10, speed: 48,
+    id: 'dasher', name: 'Прыгун', archetype: 'dasher', hp: 10, speed: 48, tier: 3,
     radius: 5, touchDamage: 2, dashSpeed: 280, dashWindup: 0.6, dashTime: 0.5,
     sprite: 'enemy_dasher', xp: 5, drops: { coin: [2, 5] },
   },
   demon: {
-    id: 'demon', name: 'Демон', archetype: 'shooter', hp: 30, speed: 58,
+    id: 'demon', name: 'Демон', archetype: 'shooter', hp: 30, speed: 58, tier: 4,
     radius: 6, touchDamage: 2, preferRange: [60, 110], fireInterval: 1.7,
     pattern: 'fan5', sprite: 'enemy_demon', xp: 12,
     drops: { coin: [6, 12] },
   },
   imp: {
-    id: 'imp', name: 'Бес', archetype: 'chaser', hp: 8, speed: 92,
+    id: 'imp', name: 'Бес', archetype: 'chaser', hp: 8, speed: 92, tier: 2,
     radius: 4, touchDamage: 1, lungeSpeed: 260, lungeWindup: 0.25, lungeRange: 45,
     sprite: 'enemy_imp', xp: 4, drops: { coin: [2, 4] },
   },
+  archer: {
+    id: 'archer', name: 'Лесной стрелок', archetype: 'shooter', hp: 8, speed: 55, tier: 2,
+    radius: 5, touchDamage: 1, preferRange: [100, 170], fireInterval: 1.7,
+    pattern: 'aimedSingle', sprite: 'enemy_archer', xp: 4,
+    drops: { coin: [2, 4], ammo_arrow: [1, 2] },
+  },
+  mimic: {
+    id: 'mimic', name: 'Мимик', archetype: 'chaser', hp: 18, speed: 30, tier: 3,
+    radius: 6, touchDamage: 3, lungeSpeed: 240, lungeWindup: 0.3, lungeRange: 50,
+    sprite: 'enemy_mimic', xp: 9, drops: { coin: [8, 16] },
+  },
+  darkKnight: {
+    id: 'darkKnight', name: 'Проклятый рыцарь', archetype: 'chaser', hp: 34, speed: 44, tier: 4,
+    radius: 6, touchDamage: 2, lungeSpeed: 200, lungeWindup: 0.5, lungeRange: 55,
+    sprite: 'enemy_dark_knight', xp: 14, drops: { coin: [8, 14] },
+  },
+  golem: {
+    id: 'golem', name: 'Каменный голем', archetype: 'shooter', hp: 45, speed: 26, tier: 4,
+    radius: 7, touchDamage: 2, preferRange: [50, 100], fireInterval: 2.6,
+    pattern: 'ring8', sprite: 'enemy_golem', xp: 18,
+    drops: { coin: [10, 18], metal: [1, 3] },
+  },
   bossOgre: {
-    id: 'bossOgre', name: 'Огр-вожак', archetype: 'boss', hp: 170, speed: 34,
+    id: 'bossOgre', name: 'Огр-вожак', archetype: 'boss', hp: 170, speed: 34, tier: 5,
     radius: 10, touchDamage: 2, sprite: 'enemy_boss', xp: 60,
     drops: { coin: [30, 50], weapon: 1 },
     phases: [
@@ -76,3 +104,8 @@ export const ENEMIES = {
     ],
   },
 };
+
+// Монстры тира min..max — для спавна по сложности
+export function enemiesOfTier(min, max) {
+  return Object.values(ENEMIES).filter(e => e.tier >= min && e.tier <= max && e.id !== 'bossOgre').map(e => e.id);
+}

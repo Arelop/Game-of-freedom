@@ -515,7 +515,6 @@ function drawEntity(id, r, p, nowMs, timeSec) {
     ctx.fillStyle = '#d9574a';
     ctx.fillRect(s.x - 7, s.y - 12, Math.max(1, Math.round(14 * e.h / e.hm)), 2);
   }
-  if (e.tp === 'n' && e.ro === 'elder') atlas.draw(ctx, 'ui_quest_mark', s.x, s.y - 13);
 }
 
 // ---------- свет / день-ночь ----------

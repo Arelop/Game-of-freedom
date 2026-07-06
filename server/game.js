@@ -8,6 +8,7 @@ import { ENEMIES } from '../shared/enemies.js';
 import { PATTERNS, emitDirections } from '../shared/patterns.js';
 import {
   makePlayerState, stepPlayer, stepProjectile, hasIFrames, circlesOverlap, dist2,
+  moveWithCollision,
 } from '../shared/simCore.js';
 import { mulberry32, hash2, randInt, pick } from '../shared/rng.js';
 import { makeWorld } from './world/worldgen.js';
@@ -210,7 +211,15 @@ export class Game {
 
   recomputeStats(p) {
     const C = CLASSES[p.cls] || CLASSES.warrior;
-    const sb = statBonuses(p.stats);
+    // 1-й проход: экипировка может давать сами атрибуты (СИЛ/ЛОВ/ИНТ/УДЧ)
+    const eff = { ...p.stats };
+    for (const slot of GEAR_SLOTS) {
+      const it = getItem(p.equipment[slot]);
+      if (!it?.stats) continue;
+      for (const k of STAT_KEYS) eff[k] = (eff[k] || 0) + (it.stats[k] || 0);
+    }
+    p.effStats = eff;
+    const sb = statBonuses(eff);
     const d = {
       dmgMelee: 1 + sb.dmgMelee, dmgRanged: 1, dmgMagic: 1 + sb.dmgMagic,
       critChance: 0.03, critMult: 2, coinMult: 1 + sb.coinMult,
@@ -410,6 +419,7 @@ export class Game {
 
     this.hydrateSettlements();
     this.stepEntities(dt);
+    this.separateEntities();
     this.stepProjectiles(dt);
     this.abstract.update(dt);
     this.civ.update(dt);
@@ -793,6 +803,38 @@ export class Game {
     }
   }
 
+  // Сепарация тел: модели не наслаиваются; игрок в перекате проскальзывает
+  separateEntities() {
+    const bodies = [];
+    for (const p of this.players.values()) {
+      if (p.dead) continue;
+      bodies.push({ e: p, r: PLAYER_RADIUS, rolling: p.rollT > 0 });
+    }
+    for (const e of this.entities.values()) {
+      if (e.entType === 'enemy') bodies.push({ e, r: ENEMIES[e.kind].radius });
+      else if (e.entType === 'npc') bodies.push({ e, r: 5 });
+    }
+    for (let i = 0; i < bodies.length; i++) {
+      const A = bodies[i];
+      for (let j = i + 1; j < bodies.length; j++) {
+        const B = bodies[j];
+        if (A.e.mapId !== B.e.mapId) continue;
+        if (A.rolling || B.rolling) continue; // перекат проходит сквозь
+        const minD = A.r + B.r;
+        let dx = B.e.x - A.e.x, dy = B.e.y - A.e.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= minD * minD) continue;
+        if (d2 < 1e-6) { dx = 1; dy = 0; }
+        const d = Math.sqrt(d2) || 1;
+        const push = Math.min(3, (minD - d) / 2); // мягкое расталкивание
+        const nx = dx / d, ny = dy / d;
+        const map = this.mapFor(A.e.mapId);
+        moveWithCollision(A.e, -nx * push, -ny * push, A.r, map);
+        moveWithCollision(B.e, nx * push, ny * push, B.r, map);
+      }
+    }
+  }
+
   enemyFire(e, shot) {
     const pat = PATTERNS[shot.pattern];
     if (!pat) return;
@@ -972,7 +1014,7 @@ export class Game {
     if (killer && pr.school === 'melee' && this.hasTalent(killer, 'bloodlust'))
       killer.hp = Math.min(killer.maxHp, killer.hp + 1);
     // дроп: удача повышает количество, шанс и редкость добычи
-    const luck = killer?.stats?.lck || 0;
+    const luck = killer?.effStats?.lck ?? killer?.stats?.lck ?? 0;
     const dropBonus = killer?.derived?.dropBonus || 0;
     for (const [item, range] of Object.entries(def.drops || {})) {
       if (item === 'weapon') { this.dropRandomWeapon(e.mapId, e.x, e.y, luck, 2); continue; }
@@ -1033,6 +1075,16 @@ export class Game {
     }
     p.hp -= dmg;
     p.hurtT = PLAYER_HURT_INVULN;
+    // урон вблизи: обоих отбрасывает друг от друга — не залипаем в тушке
+    if (source && source.x !== undefined && dist2(p.x, p.y, source.x, source.y) < 40 * 40) {
+      const a = Math.atan2(p.y - source.y, p.x - source.x);
+      const map = this.mapFor(p.mapId);
+      moveWithCollision(p, Math.cos(a) * 22, Math.sin(a) * 22, PLAYER_RADIUS, map);
+      if (source.entType === 'enemy') {
+        const def = ENEMIES[source.kind];
+        moveWithCollision(source, -Math.cos(a) * 10, -Math.sin(a) * 10, def?.radius || 5, map);
+      }
+    }
     this.fx({ t: 'phurt', id: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
     if (p.hp <= 0) {
       p.dead = true;
@@ -1086,9 +1138,12 @@ export class Game {
 
   dropRandomGear(mapId, x, y, elite = false, luck = 0) {
     const pool = elite
-      ? ['chain_armor', 'plate_armor', 'scale_armor', 'bear_amulet', 'owl_amulet', 'swift_ring', 'iron_shield', 'tower_shield']
+      ? ['chain_armor', 'plate_armor', 'scale_armor', 'bear_amulet', 'owl_amulet', 'swift_ring',
+         'iron_shield', 'tower_shield', 'berserk_armor', 'mage_robe', 'shadow_cloak',
+         'crown', 'rune_amulet', 'totem_amulet', 'gladiator_shield']
       : ['leather_armor', 'padded_armor', 'hunter_hood', 'leather_cap', 'iron_helmet',
-         'wolf_amulet', 'fox_amulet', 'iron_ring', 'wood_shield', 'swift_ring'];
+         'wolf_amulet', 'fox_amulet', 'iron_ring', 'wood_shield', 'swift_ring',
+         'sage_helmet', 'war_helm', 'lucky_charm'];
     const rar = rollRarity(this.rand, luck, elite ? 2 : 1);
     this.spawnDrop(withRarity(pick(this.rand, pool), rar), 1, mapId, x, y);
   }
@@ -1279,7 +1334,7 @@ export class Game {
   openChest(p, tx, ty) {
     this.chunks.setTile(p.mapId, tx, ty, p.mapId === 'over' ? T.GRASS : T.DUNGEON_FLOOR);
     this.fx({ t: 'tile', mapId: p.mapId, x: tx, y: ty, tile: p.mapId === 'over' ? T.GRASS : T.DUNGEON_FLOOR }, p.mapId, tx * TILE, ty * TILE);
-    const luck = p.stats?.lck || 0;
+    const luck = p.effStats?.lck ?? p.stats?.lck ?? 0;
     this.dropRandomWeapon(p.mapId, tx * TILE + 8, ty * TILE + 20, luck, 1);
     this.spawnDrop('coin', randInt(this.rand, 10, 25), p.mapId, tx * TILE - 4, ty * TILE + 20);
     if (this.rand() < 0.6 + (p.derived?.dropBonus || 0)) this.dropRandomGear(p.mapId, tx * TILE + 20, ty * TILE + 20, false, luck);

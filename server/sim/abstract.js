@@ -14,10 +14,13 @@ const HYDRATE_R = 340;        // px
 const DEHYDRATE_R = 520;
 
 const PACK_KINDS = [
+  { name: 'крысиное гнездо', units: ['rat', 'rat', 'rat', 'rat'], faction: 'monsters' },
   { name: 'стая волков', units: ['wolf', 'wolf', 'wolf'], faction: 'monsters' },
   { name: 'слизни', units: ['slime', 'slime', 'slime', 'slime'], faction: 'monsters' },
   { name: 'банда разбойников', units: ['bandit', 'bandit', 'banditHeavy'], faction: 'bandits' },
-  { name: 'нежить', units: ['skeleton', 'skeleton', 'bat'], faction: 'monsters' },
+  { name: 'лесные стрелки', units: ['archer', 'archer', 'bandit'], faction: 'bandits' },
+  { name: 'нежить', units: ['skeleton', 'skeleton', 'imp'], faction: 'monsters' },
+  { name: 'проклятый отряд', units: ['darkKnight', 'skeleton', 'skeleton'], faction: 'monsters' },
 ];
 
 export class AbstractSim {

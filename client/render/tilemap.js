@@ -74,7 +74,7 @@ export class TileRenderer {
         }
         this.atlas.blit(ctx, spec[0], x * TILE, y * TILE);
         if (spec[1]) this.atlas.blit(ctx, spec[1], x * TILE, y * TILE);
-        if (t === T.CAMPFIRE || t === T.DUNGEON_EXIT)
+        if (t === T.CAMPFIRE || t === T.DUNGEON_EXIT || t === T.BOARD)
           animated.push({ x: cx * CHUNK + x, y: cy * CHUNK + y, tile: t });
       }
     }
@@ -111,6 +111,10 @@ export class TileRenderer {
       } else if (a.tile === T.DUNGEON_EXIT) {
         const sc = 1 + Math.sin(timeSec * 4) * 0.08;
         this.atlas.draw(ctx, 'obj_exit_portal', s.x, s.y, { scale: sc });
+      } else if (a.tile === T.BOARD) {
+        // доска заказов гильдии зовёт героев
+        const bob = Math.sin(timeSec * 3) * 1.5;
+        this.atlas.draw(ctx, 'ui_quest_mark', s.x, s.y - 14 + bob);
       }
     }
   }

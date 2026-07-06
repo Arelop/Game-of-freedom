@@ -79,6 +79,48 @@ export const ITEMS = {
     stats: { maxHp: 4, speed: -0.1 }, price: 120, icon: 'item_shield_tower',
   },
 
+  // --- броня с бонусами к атрибутам (чистые и смешанные) ---
+  berserk_armor: {
+    id: 'berserk_armor', name: 'Доспех берсерка', slot: 'armor',
+    stats: { maxHp: 2, str: 2 }, price: 140, icon: 'item_armor_berserk',
+  },
+  mage_robe: {
+    id: 'mage_robe', name: 'Мантия чародея', slot: 'armor',
+    stats: { int: 2, speed: 0.04 }, price: 130, icon: 'item_robe',
+  },
+  shadow_cloak: {
+    id: 'shadow_cloak', name: 'Плащ ловкача', slot: 'armor',
+    stats: { agi: 2, speed: 0.05 }, price: 135, icon: 'item_cloak',
+  },
+  sage_helmet: {
+    id: 'sage_helmet', name: 'Колпак мудреца', slot: 'helmet',
+    stats: { int: 1, manaRegen: 1 }, price: 80, icon: 'item_sage_hat',
+  },
+  war_helm: {
+    id: 'war_helm', name: 'Шлем вождя', slot: 'helmet',
+    stats: { str: 1, maxHp: 1 }, price: 85, icon: 'item_war_helm',
+  },
+  crown: {
+    id: 'crown', name: 'Корона предводителя', slot: 'helmet',
+    stats: { str: 1, agi: 1, int: 1, lck: 1 }, price: 220, icon: 'item_crown',
+  },
+  rune_amulet: {
+    id: 'rune_amulet', name: 'Рунный амулет', slot: 'amulet',
+    stats: { int: 1, lck: 1 }, price: 110, icon: 'item_amulet_rune',
+  },
+  totem_amulet: {
+    id: 'totem_amulet', name: 'Боевой тотем', slot: 'amulet',
+    stats: { str: 1, agi: 1 }, price: 110, icon: 'item_totem',
+  },
+  gladiator_shield: {
+    id: 'gladiator_shield', name: 'Щит гладиатора', slot: 'shield',
+    stats: { maxHp: 2, str: 1 }, price: 115, icon: 'item_shield_glad',
+  },
+  lucky_charm: {
+    id: 'lucky_charm', name: 'Кроличья лапка', slot: 'amulet',
+    stats: { lck: 2 }, price: 90, icon: 'item_charm',
+  },
+
   // --- зелья ---
   heal_potion: {
     id: 'heal_potion', name: 'Зелье лечения', use: { heal: 3 },
@@ -136,6 +178,10 @@ export function describeItem(itemId, resolvedItem) {
     if (s.rollCd) parts.push(`−${Math.round(s.rollCd * 100)}% кулдаун переката`);
     if (s.dodge) parts.push(`+${Math.round(s.dodge * 100)}% уворот`);
     if (s.manaRegen) parts.push(`+${s.manaRegen} к регену маны`);
+    if (s.str) parts.push(`+${s.str} Сила`);
+    if (s.agi) parts.push(`+${s.agi} Ловкость`);
+    if (s.int) parts.push(`+${s.int} Интеллект`);
+    if (s.lck) parts.push(`+${s.lck} Удача`);
   }
   if (it.use) {
     const u = it.use;

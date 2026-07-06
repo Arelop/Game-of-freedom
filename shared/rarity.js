@@ -52,8 +52,9 @@ export function getItem(id) {
   it = { ...it0, id, baseId: base, rarity: rar, name: R.name ? `${it0.name} [${R.name}]` : it0.name };
   if (it0.stats) {
     it.stats = {};
+    const INT_STATS = new Set(['maxHp', 'str', 'agi', 'int', 'lck', 'manaRegen']);
     for (const [k, v] of Object.entries(it0.stats)) {
-      it.stats[k] = k === 'maxHp'
+      it.stats[k] = INT_STATS.has(k)
         ? Math.round(v * R.statMult)
         : Math.round(v * R.statMult * 100) / 100;
     }

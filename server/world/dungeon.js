@@ -2,6 +2,7 @@
 // боевые комнаты запечатываются до зачистки, сокровищница, комната босса.
 import { T } from '../../shared/constants.js';
 import { mulberry32, randInt, pick } from '../../shared/rng.js';
+import { enemiesOfTier } from '../../shared/enemies.js';
 
 const SIZE = 64;
 
@@ -43,9 +44,8 @@ export function generateDungeon(seed, difficulty, withBoss) {
       spawns: [],
     };
     const n = isBoss ? 1 : randInt(rand, 3, 4 + difficulty);
-    const kinds = isBoss ? ['bossOgre']
-      : difficulty >= 2 ? ['skeleton', 'slime', 'dasher', 'turret', 'spiralTurret', 'banditHeavy']
-      : ['slime', 'skeleton', 'bandit', 'turret'];
+    // спавн по таблице тиров: сложность данжа задаёт диапазон монстров
+    const kinds = isBoss ? ['bossOgre'] : enemiesOfTier(1, Math.min(4, difficulty + 1));
     for (let k = 0; k < n; k++) {
       room.spawns.push({
         kind: isBoss ? 'bossOgre' : pick(rand, kinds),
