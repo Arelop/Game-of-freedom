@@ -49,6 +49,36 @@ export const ITEMS = {
     id: 'iron_shield', name: 'Железный щит', slot: 'shield',
     stats: { maxHp: 2, speed: -0.04 }, price: 70, icon: 'item_shield_iron',
   },
+  // --- расширение арсенала брони ---
+  padded_armor: {
+    id: 'padded_armor', name: 'Стёганка', slot: 'armor',
+    stats: { maxHp: 1, speed: 0.03 }, price: 25, icon: 'item_armor_padded',
+  },
+  scale_armor: {
+    id: 'scale_armor', name: 'Чешуйчатый доспех', slot: 'armor',
+    stats: { maxHp: 5, speed: -0.08 }, price: 130, icon: 'item_armor_scale',
+  },
+  leather_cap: {
+    id: 'leather_cap', name: 'Кожаный шлем', slot: 'helmet',
+    stats: { maxHp: 1 }, price: 30, icon: 'item_cap',
+  },
+  owl_amulet: {
+    id: 'owl_amulet', name: 'Совиный амулет', slot: 'amulet',
+    stats: { manaRegen: 1, damage: 0.08 }, price: 70, icon: 'item_amulet_owl',
+  },
+  fox_amulet: {
+    id: 'fox_amulet', name: 'Лисий амулет', slot: 'amulet',
+    stats: { dodge: 0.04, speed: 0.05 }, price: 75, icon: 'item_amulet_fox',
+  },
+  iron_ring: {
+    id: 'iron_ring', name: 'Железное кольцо', slot: 'amulet',
+    stats: { maxHp: 2 }, price: 45, icon: 'item_ring_iron',
+  },
+  tower_shield: {
+    id: 'tower_shield', name: 'Ростовой щит', slot: 'shield',
+    stats: { maxHp: 4, speed: -0.1 }, price: 120, icon: 'item_shield_tower',
+  },
+
   // --- зелья ---
   heal_potion: {
     id: 'heal_potion', name: 'Зелье лечения', use: { heal: 3 },
@@ -68,9 +98,10 @@ export const ITEMS = {
   },
 };
 
-export function isGear(itemId) { return !!ITEMS[itemId]?.slot; }
-export function isPotion(itemId) { return !!ITEMS[itemId]?.use; }
-export function isWeaponItem(itemId) { return itemId.startsWith('weapon:'); }
+function baseOf(id) { const i = (id || '').indexOf('@'); return i < 0 ? id : id.slice(0, i); }
+export function isGear(itemId) { return !!ITEMS[baseOf(itemId)]?.slot; }
+export function isPotion(itemId) { return !!ITEMS[baseOf(itemId)]?.use; }
+export function isWeaponItem(itemId) { return (itemId || '').startsWith('weapon:'); }
 export function weaponIdOf(itemId) { return itemId.slice(7); }
 
 // Базовые цены материалов/еды (для продажи торговцу)
@@ -91,9 +122,10 @@ export function sellPrice(itemId, WEAPONS) {
   return 1;
 }
 
-// Русское описание статов: «+1 сердце, +12% скорость»
-export function describeItem(itemId) {
-  const it = ITEMS[itemId];
+// Русское описание статов: «+1 сердце, +12% скорость».
+// resolvedItem — объект из rarity.getItem() для предметов с редкостью.
+export function describeItem(itemId, resolvedItem) {
+  const it = resolvedItem || ITEMS[itemId];
   if (!it) return '';
   const parts = [];
   if (it.stats) {
@@ -102,6 +134,8 @@ export function describeItem(itemId) {
     if (s.speed) parts.push(`${s.speed > 0 ? '+' : ''}${Math.round(s.speed * 100)}% скорость`);
     if (s.damage) parts.push(`+${Math.round(s.damage * 100)}% урон`);
     if (s.rollCd) parts.push(`−${Math.round(s.rollCd * 100)}% кулдаун переката`);
+    if (s.dodge) parts.push(`+${Math.round(s.dodge * 100)}% уворот`);
+    if (s.manaRegen) parts.push(`+${s.manaRegen} к регену маны`);
   }
   if (it.use) {
     const u = it.use;

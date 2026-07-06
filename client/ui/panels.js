@@ -3,6 +3,7 @@ import { STR, ITEM_NAMES } from '../../shared/strings.js';
 import { MSG } from '../../shared/protocol.js';
 import { ITEMS, GEAR_SLOTS, SLOT_NAMES, isGear, isPotion, describeItem, isWeaponItem, weaponIdOf, sellPrice } from '../../shared/items.js';
 import { AMMO_NAMES, WEAPONS } from '../../shared/weapons.js';
+import { getWeapon, getItem, rarityOf, sellPriceR } from '../../shared/rarity.js';
 import { CLASSES, STAT_KEYS, STAT_NAMES, STAT_DESC, xpNeed, MAX_LEVEL } from '../../shared/classes.js';
 import { TALENTS, TIER_REQ } from '../../shared/talents.js';
 import { SFX } from '../sfx.js';
@@ -98,16 +99,22 @@ export class Panels {
   }
 
   itemName(id) {
-    if (isWeaponItem(id)) return WEAPONS[weaponIdOf(id)]?.name || id;
-    return ITEMS[id]?.name || ITEM_NAMES[id] || id;
+    if (isWeaponItem(id)) return getWeapon(weaponIdOf(id))?.name || id;
+    return getItem(id)?.name || ITEM_NAMES[id] || id;
   }
   itemIcon(id) {
-    if (isWeaponItem(id)) return WEAPONS[weaponIdOf(id)]?.sprite || 'item_coin';
-    return ITEMS[id]?.icon || 'item_' + id;
+    if (isWeaponItem(id)) return getWeapon(weaponIdOf(id))?.sprite || 'item_coin';
+    return getItem(id)?.icon || 'item_' + id;
+  }
+  // цвет рамки по редкости (для оружия учитываем weapon:xxx@r)
+  rarColor(id) {
+    const rid = isWeaponItem(id) ? weaponIdOf(id) : id;
+    const r = rarityOf(rid);
+    return r.key === 'c' ? null : r.color;
   }
 
   weaponTooltip(wid) {
-    const w = WEAPONS[wid];
+    const w = getWeapon(wid);
     if (!w) return wid;
     const school = { melee: 'ближний бой', ranged: 'дальний бой', magic: 'магия' }[w.school];
     const parts = [`${w.name} — ${school}`, `урон ${w.damage}, темп ${w.fireRate}/с`];
@@ -140,9 +147,11 @@ export class Panels {
       cell.className = 'eqslot wslot';
       const wid = you.ws?.[i];
       if (wid) {
-        cell.appendChild(this.freshIcon(WEAPONS[wid]?.sprite));
+        cell.appendChild(this.freshIcon(getWeapon(wid)?.sprite));
         cell.title = this.weaponTooltip(wid) + '\n(клик — убрать в сумку)';
         cell.classList.add('filled');
+        const rcW = this.rarColor('weapon:' + wid);
+        if (rcW) cell.style.borderColor = rcW;
         if (i === you.wi) cell.classList.add('active');
         const num = document.createElement('span');
         num.className = 'slotnum'; num.textContent = i + 1;
@@ -168,8 +177,10 @@ export class Panels {
       const itemId = you.eq?.[slot];
       if (itemId) {
         cell.appendChild(this.freshIcon(this.itemIcon(itemId)));
-        cell.title = `${this.itemName(itemId)} — ${describeItem(itemId)}\n(клик — снять)`;
+        cell.title = `${this.itemName(itemId)} — ${describeItem(itemId, getItem(itemId))}\n(клик — снять)`;
         cell.classList.add('filled');
+        const rcE = this.rarColor(itemId);
+        if (rcE) cell.style.borderColor = rcE;
         cell.onclick = () => { SFX.ui(); this.net.send({ t: MSG.UNEQUIP, slot }); setTimeout(() => this.renderInventory(), 150); };
       } else {
         cell.title = SLOT_NAMES[slot];
@@ -211,8 +222,10 @@ export class Panels {
         cell.appendChild(badge);
       }
       const isWpn = isWeaponItem(item);
-      const desc = isWpn ? this.weaponTooltip(weaponIdOf(item)) : describeItem(item);
-      const price = sellPrice(item, WEAPONS);
+      const rc = this.rarColor(item);
+      if (rc) cell.style.borderColor = rc;
+      const desc = isWpn ? this.weaponTooltip(weaponIdOf(item)) : describeItem(item, getItem(item));
+      const price = sellPriceR(item);
 
       if (this.sellMode) {
         cell.classList.add('sellable');

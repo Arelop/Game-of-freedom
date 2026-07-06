@@ -1,6 +1,7 @@
 // Точка входа клиента: цикл с фиксированным шагом, рендер, эффекты.
 import { VIEW_W, VIEW_H, SIM_DT, TILE, PLAYER_RADIUS } from '../shared/constants.js';
 import { WEAPONS } from '../shared/weapons.js';
+import { getWeapon, getItem, rarityOf } from '../shared/rarity.js';
 import { ITEMS } from '../shared/items.js';
 import { STR } from '../shared/strings.js';
 import { MSG, rleDecode } from '../shared/protocol.js';
@@ -145,9 +146,9 @@ net.handlers.onMapChange = m => {
 
 net.handlers.onFx = (kind, m) => {
   switch (kind) {
-    case 'shot': particles.muzzle(m.x, m.y, m.aim); if (m.pid !== net.myId) playWeaponSound(WEAPONS[m.weapon]?.sound); break;
+    case 'shot': particles.muzzle(m.x, m.y, m.aim); if (m.pid !== net.myId) playWeaponSound(getWeapon(m.weapon)?.sound); break;
     case 'swing':
-      if (m.pid !== net.myId) { spawnSwing(m.x, m.y, m.aim, m.range, m.arc, WEAPONS[m.weapon]); playWeaponSound(WEAPONS[m.weapon]?.sound); }
+      if (m.pid !== net.myId) { spawnSwing(m.x, m.y, m.aim, m.range, m.arc, getWeapon(m.weapon)); playWeaponSound(getWeapon(m.weapon)?.sound); }
       break;
     case 'eshot': SFX.enemy_shot(); break;
     case 'hit':
@@ -197,6 +198,10 @@ net.handlers.onFx = (kind, m) => {
     case 'toast': panels.toast(m.text); break;
     case 'dialog': panels.showDialog(m); break;
     case 'marker': net.mapInfo.markers = net.mapInfo.markers || []; net.mapInfo.markers.push(m); break;
+    case 'dodge':
+      if (m.pid === net.myId) addFloatText(m.x, m.y - 6, 'УВОРОТ', '#63c5ff');
+      particles.dust(m.x, m.y);
+      break;
     case 'eat': SFX.heal(); break;
     case 'heal': particles.heal(m.x, m.y); SFX.heal(); break;
   }
@@ -254,7 +259,7 @@ function simStep() {
   // локальная атака (косметика; авторитет — сервер)
   const you = net.you;
   if (you) {
-    const w = WEAPONS[you.w];
+    const w = getWeapon(you.w);
     if (you.w !== localWeapon) { localWeapon = you.w; fireCd = 0; }
     fireCd = Math.max(0, fireCd - SIM_DT);
     const canAct = fire && w && fireCd <= 0 && net.pred.rollT <= 0 && !you.dead;
@@ -445,7 +450,7 @@ function drawMe(timeSec) {
     atlas.draw(ctx, sprite, s.x, s.y - 2, { rot: prog * Math.PI * 2 * (flipX ? -1 : 1) });
   } else {
     atlas.draw(ctx, sprite, s.x, s.y - bob, { flipX });
-    drawWeapon(WEAPONS[you.w], s.x, s.y - 2 - bob, p.aim, flipX, swingAnim);
+    drawWeapon(getWeapon(you.w), s.x, s.y - 2 - bob, p.aim, flipX, swingAnim);
   }
 }
 
@@ -476,7 +481,7 @@ function drawEntity(id, r, p, nowMs, timeSec) {
 
   if (e.tp === 'd') {
     const bob = Math.sin(timeSec * 4 + p.x) * 1.5;
-    const spriteName = e.k.startsWith('weapon:') ? WEAPONS[e.k.slice(7)]?.sprite
+    const spriteName = e.k.startsWith('weapon:') ? getWeapon(e.k.slice(7))?.sprite
       : (ITEMS[e.k]?.icon || 'item_' + e.k);
     atlas.draw(ctx, 'fx_shadow', s.x, s.y + 4, { alpha: 0.6 });
     atlas.draw(ctx, spriteName || 'item_coin', s.x, s.y - 3 + bob);
@@ -490,7 +495,7 @@ function drawEntity(id, r, p, nowMs, timeSec) {
     if (e.dn) { atlas.draw(ctx, e.k, s.x, s.y, { rot: Math.PI / 2, alpha: 0.7 }); return; }
     if (flash) atlas.drawTinted(ctx, e.k, s.x, s.y, '#fff', { flipX });
     else atlas.draw(ctx, e.k, s.x, s.y, { flipX });
-    drawWeapon(WEAPONS[e.w], s.x, s.y - 2, p.a || 0, flipX, 0);
+    drawWeapon(getWeapon(e.w), s.x, s.y - 2, p.a || 0, flipX, 0);
     ctx.font = '8px monospace';
     ctx.fillStyle = '#99e550';
     ctx.textAlign = 'center';

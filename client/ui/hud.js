@@ -1,7 +1,7 @@
 // HUD на низкоразрешённом канвасе: сердца, голод, патроны, монеты,
 // миникарта, квест, день/время, F3-отладка.
 import { VIEW_W, VIEW_H, WORLD_TILES, TILE, PLAYER_MAX_HP, SEASONS, seasonOf } from '../../shared/constants.js';
-import { WEAPONS } from '../../shared/weapons.js';
+import { getWeapon } from '../../shared/rarity.js';
 import { STR } from '../../shared/strings.js';
 
 export class Hud {
@@ -38,7 +38,7 @@ export class Hud {
     }
 
     // оружие и патроны (справа снизу)
-    const w = WEAPONS[you.w];
+    const w = getWeapon(you.w);
     if (w) {
       const gx = VIEW_W - 78, gy = VIEW_H - 26;
       this.atlas.draw(ctx, w.sprite, gx, gy + 6);

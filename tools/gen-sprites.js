@@ -435,6 +435,72 @@ const GEN = {
     px(s, 7, 6, C.lgray); px(s, 3, 13, C.gray); px(s, 13, 13, C.lbrown);
     return s;
   },
+  spearWeapon() {
+    const s = make(16, 16);
+    for (let i = 0; i < 11; i++) px(s, 2 + i, 13 - i, C.brown);
+    px(s, 13, 2, C.lgray); px(s, 14, 1, C.white); px(s, 12, 1, C.lgray); px(s, 13, 0, C.lgray);
+    return s;
+  },
+  hammerWeapon() {
+    const s = make(14, 14);
+    for (let y = 5; y < 13; y++) px(s, 6, y, C.brown);
+    rect(s, 3, 1, 8, 5, C.steel); frame(s, 3, 1, 8, 5, C.dgray);
+    px(s, 4, 2, C.white); px(s, 5, 2, C.lgray);
+    return s;
+  },
+  taxeWeapon() {
+    const s = make(12, 12);
+    for (let i = 0; i < 7; i++) px(s, 2 + i, 10 - i, C.brown);
+    disc(s, 8, 3, 3, C.steel); px(s, 10, 2, C.white);
+    rect(s, 6, 1, 2, 2, C.dgray);
+    return s;
+  },
+  taxeProj() {
+    const s = make(8, 8);
+    px(s, 3, 4, C.brown); px(s, 4, 5, C.brown);
+    disc(s, 4, 3, 2, C.steel); px(s, 5, 2, C.white);
+    return s;
+  },
+  venomProj() {
+    const s = make(7, 7);
+    disc(s, 3, 3, 3, C.dgreen); disc(s, 3, 3, 2, C.green); px(s, 2, 2, C.lgreen);
+    return s;
+  },
+  paddedArmor() {
+    const s = make(12, 12);
+    rect(s, 3, 2, 6, 8, C.tan); rect(s, 1, 2, 2, 3, C.tan); rect(s, 9, 2, 2, 3, C.tan);
+    frame(s, 3, 2, 6, 8, C.lbrown);
+    for (let y = 3; y < 9; y += 2) rect(s, 4, y, 4, 1, C.sand);
+    return s;
+  },
+  scaleArmor() {
+    const s = make(12, 12);
+    rect(s, 3, 2, 6, 8, C.swamp); rect(s, 1, 2, 2, 3, C.swamp); rect(s, 9, 2, 2, 3, C.swamp);
+    frame(s, 3, 2, 6, 8, C.dgreen);
+    for (let y = 3; y < 9; y += 2) for (let x = 4; x < 9; x += 2) px(s, x, y, C.green);
+    return s;
+  },
+  capIcon() {
+    const s = make(12, 10);
+    disc(s, 6, 5, 4, C.lbrown);
+    rect(s, 2, 5, 8, 3, C.brown);
+    px(s, 6, 1, C.dbrown);
+    return s;
+  },
+  towerShield() {
+    const s = make(10, 13);
+    rect(s, 1, 1, 8, 10, C.steel); frame(s, 1, 1, 8, 10, C.dgray);
+    px(s, 4, 11, C.dgray); px(s, 5, 11, C.dgray);
+    rect(s, 4, 3, 2, 6, C.navy);
+    px(s, 2, 2, C.white);
+    return s;
+  },
+  ringIron() {
+    const s = make(10, 10);
+    ring(s, 5, 5, 3, C.lgray); ring(s, 5, 6, 3, C.gray);
+    px(s, 5, 2, C.white);
+    return s;
+  },
   anvil() {
     const s = make(16, 16);
     rect(s, 3, 5, 10, 3, C.dgray);        // рог и тело

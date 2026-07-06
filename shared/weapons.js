@@ -71,6 +71,36 @@ export const WEAPONS = {
     projRadius: 3, projLife: 0.9, ammoType: 'mana', price: 180,
     chain: { count: 2, radius: 70, falloff: 0.7 }, // молния перескакивает
   },
+  spear: {
+    id: 'spear', structDmg: 2, name: 'Копьё', melee: true, school: 'melee', damage: 6, fireRate: 1.4,
+    range: 42, arcDeg: 40, knockback: 110, recoilShake: 0.25, infiniteAmmo: true,
+    sprite: 'wpn_spear', sound: 'swing', swingColor: '#d9a066', price: 55,
+  },
+  warhammer: {
+    id: 'warhammer', structDmg: 9, name: 'Боевой молот', melee: true, school: 'melee', damage: 13, fireRate: 0.7,
+    range: 30, arcDeg: 120, knockback: 200, recoilShake: 0.55, infiniteAmmo: true,
+    sprite: 'wpn_hammer', sound: 'swing_heavy', swingColor: '#847e87', price: 130,
+  },
+  dagger: {
+    id: 'dagger', structDmg: 1, name: 'Кинжал', melee: true, school: 'melee', damage: 2.5, fireRate: 3.4,
+    range: 24, arcDeg: 80, knockback: 40, recoilShake: 0.1, infiniteAmmo: true,
+    sprite: 'wpn_dagger', sound: 'swing', swingColor: '#eeeeee', price: 40,
+  },
+  taxes: {
+    id: 'taxes', name: 'Метательные топоры', school: 'ranged', damage: 6, projectilesPerShot: 1,
+    spreadDeg: 5, projectileSpeed: 250, fireRate: 1.1, magSize: 3,
+    reloadTime: 1.3, knockback: 90, recoilShake: 0.3,
+    sprite: 'wpn_taxe', projSprite: 'proj_taxe', sound: 'shot_knife',
+    projRadius: 3, projLife: 0.9, ammoType: 'knife', price: 95, structDmg: 3,
+  },
+  venomstaff: {
+    id: 'venomstaff', name: 'Посох яда', school: 'magic', damage: 5, projectilesPerShot: 2,
+    spreadDeg: 14, projectileSpeed: 260, fireRate: 2.2, magSize: 14,
+    reloadTime: 1.6, knockback: 8, recoilShake: 0.1,
+    sprite: 'wpn_staff_venom', projSprite: 'proj_venom', sound: 'shot_frost',
+    projRadius: 3, projLife: 1.1, ammoType: 'mana', price: 150,
+    slow: { mult: 0.8, time: 1.2 },      // яд вязкий: слегка замедляет
+  },
   bombs: {
     id: 'bombs', structDmg: 14, name: 'Огненные бомбы', school: 'ranged', damage: 10, projectilesPerShot: 1,
     spreadDeg: 3, projectileSpeed: 170, fireRate: 0.6, magSize: 1,

@@ -3,7 +3,7 @@
 import { MSG, rleDecode } from '../shared/protocol.js';
 import { CHUNK, TILE, SOLID, BULLET_SOLID, T, SIM_DT } from '../shared/constants.js';
 import { makePlayerState, stepPlayer, stepProjectile } from '../shared/simCore.js';
-import { WEAPONS } from '../shared/weapons.js';
+import { getWeapon } from '../shared/rarity.js';
 import { PATTERNS, emitDirections } from '../shared/patterns.js';
 import { mulberry32 } from '../shared/rng.js';
 
@@ -88,7 +88,7 @@ export class Net {
     switch (m.t) {
       case 'shot': {
         if (m.pid === this.myId) break; // свои пули уже нарисованы
-        const w = WEAPONS[m.weapon];
+        const w = getWeapon(m.weapon);
         if (w) this.spawnWeaponBullets(m.x, m.y, m.aim, w, m.seed);
         this.handlers.onFx?.('shot', m);
         break;

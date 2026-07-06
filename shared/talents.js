@@ -18,7 +18,7 @@ export const TALENTS = {
   ],
   mage: [
     { id: 'm_spark', tier: 1, name: 'Искра', desc: '+15% урона магии', effects: { dmgMagic: 0.15 } },
-    { id: 'm_medit', tier: 1, name: 'Медитация', desc: '+1 мана каждые 4 секунды', flag: 'manaRegen' },
+    { id: 'm_medit', tier: 1, name: 'Медитация', desc: '+2 к регену маны', effects: { manaRegen: 2 } },
     { id: 'm_robes', tier: 1, name: 'Лёгкие одежды', desc: '+6% скорость движения', effects: { speed: 0.06 } },
     { id: 'm_twin', tier: 2, name: 'Двойной сгусток', desc: 'Посохи выпускают +1 снаряд', effects: { magicProj: 1 } },
     { id: 'm_frost', tier: 2, name: 'Ледяная хватка', desc: 'Лёд замедляет сильнее и дольше', flag: 'frostMaster' },

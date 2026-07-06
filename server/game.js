@@ -24,6 +24,7 @@ import { ITEMS, GEAR_SLOTS, isGear, isPotion, describeItem, isWeaponItem, weapon
 import { AMMO_NAMES } from '../shared/weapons.js';
 import { CLASSES, STAT_KEYS, statBonuses, xpNeed, MAX_LEVEL } from '../shared/classes.js';
 import { TALENTS, findTalent, canLearn } from '../shared/talents.js';
+import { getWeapon, getItem, splitId, rollRarity, withRarity, sellPriceR } from '../shared/rarity.js';
 
 const NPC_NAMES = [
   'Радомир', 'Всеслав', 'Милана', 'Ярина', 'Добрыня', 'Горазд', 'Любава',
@@ -59,6 +60,7 @@ const SHOP = [
   { item: 'iron_helmet', price: 65 }, { item: 'wolf_amulet', price: 55 },
   { item: 'weapon:huntbow', price: 85 }, { item: 'weapon:firestaff', price: 100 },
   { item: 'weapon:axe', price: 90 }, { item: 'weapon:bombs', price: 140 },
+  { item: 'weapon:spear', price: 55 }, { item: 'padded_armor', price: 25 }, { item: 'iron_ring', price: 45 },
   { item: 'ammo_bomb', price: 20, count: 3 }, { item: 'fire_arrows', price: 25 },
   { item: 'metal', price: 14 },
 ];
@@ -184,7 +186,8 @@ export class Game {
     if (process.env.DEV_GEAR) { // отладка: стартовый набор экипировки и оружия
       Object.assign(p.inventory, {
         leather_armor: 1, iron_helmet: 1, wolf_amulet: 1, heal_potion: 2, swift_potion: 1,
-        'weapon:fireball': 1, 'weapon:stormstaff': 1, 'weapon:axe': 1, 'weapon:bombs': 1,
+        'weapon:fireball': 1, 'weapon:stormstaff': 1, 'weapon:axe@e': 1, 'weapon:bombs': 1,
+        'weapon:warhammer@r': 1, 'fox_amulet@r': 1, 'scale_armor@e': 1,
         fire_arrows: 2,
       });
       p.ammo.mana = 60;
@@ -200,7 +203,7 @@ export class Game {
 
   removePlayer(id) { this.players.delete(id); }
 
-  weapon(p) { return WEAPONS[p.weapons[p.weaponIdx]]; }
+  weapon(p) { return getWeapon(p.weapons[p.weaponIdx]); }
 
   // ---------- экипировка, характеристики, таланты ----------
   hasTalent(p, flag) { return p.talents.some(id => findTalent(p.cls, id)?.flag === flag); }
@@ -209,22 +212,26 @@ export class Game {
     const C = CLASSES[p.cls] || CLASSES.warrior;
     const sb = statBonuses(p.stats);
     const d = {
-      dmgMelee: 1 + sb.dmgMelee, dmgRanged: 1 + sb.dmgRanged, dmgMagic: 1 + sb.dmgMagic,
-      critChance: sb.critChance, critMult: 2, coinMult: 1 + sb.coinMult,
-      atkSpeed: 1, arcBonus: 0, magicProj: 0, knifeProj: 0,
+      dmgMelee: 1 + sb.dmgMelee, dmgRanged: 1, dmgMagic: 1 + sb.dmgMagic,
+      critChance: 0.03, critMult: 2, coinMult: 1 + sb.coinMult,
+      atkSpeed: 1 + sb.atkSpeed, dodge: sb.dodge, manaRegen: sb.manaRegen,
+      dropBonus: sb.dropBonus,
+      arcBonus: 0, magicProj: 0, knifeProj: 0,
     };
-    let maxHp = PLAYER_MAX_HP + (C.maxHpBonus || 0);
+    let maxHp = PLAYER_MAX_HP + (C.maxHpBonus || 0) + sb.maxHp;
     let speed = 1 + (C.speedBonus || 0);
     let gearDmg = 1;
-    let rollCd = 1 - sb.rollCd;
+    let rollCd = 1;
 
     for (const slot of GEAR_SLOTS) {
-      const it = ITEMS[p.equipment[slot]];
+      const it = getItem(p.equipment[slot]);
       if (!it?.stats) continue;
       maxHp += it.stats.maxHp || 0;
       speed += it.stats.speed || 0;
       gearDmg += it.stats.damage || 0;
       rollCd -= it.stats.rollCd || 0;
+      d.dodge += it.stats.dodge || 0;
+      d.manaRegen += it.stats.manaRegen || 0;
     }
     for (const id of p.talents) {
       const t = findTalent(p.cls, id);
@@ -242,6 +249,7 @@ export class Game {
       d.arcBonus += e.arcBonus || 0;
       d.magicProj += e.magicProj || 0;
       d.knifeProj += e.knifeProj || 0;
+      d.manaRegen += e.manaRegen || 0;
     }
     if (this.hasTalent(p, 'deadly')) d.critMult = 3;
     if (p.buffs.speed) speed += p.buffs.speed.mult;
@@ -304,14 +312,14 @@ export class Game {
 
   // Общее имя предмета (включая оружие-предметы weapon:xxx)
   itemName(itemId) {
-    if (isWeaponItem(itemId)) return WEAPONS[weaponIdOf(itemId)]?.name || itemId;
-    return ITEMS[itemId]?.name || ITEM_NAMES[itemId] || itemId;
+    if (isWeaponItem(itemId)) return getWeapon(weaponIdOf(itemId))?.name || itemId;
+    return getItem(itemId)?.name || ITEM_NAMES[itemId] || itemId;
   }
 
   equipItem(p, itemId) {
     if ((p.inventory[itemId] || 0) <= 0) return;
     if (isWeaponItem(itemId)) { this.equipWeapon(p, itemId); return; }
-    const it = ITEMS[itemId];
+    const it = getItem(itemId);
     if (!it?.slot) return;
     p.inventory[itemId]--;
     const prev = p.equipment[it.slot];
@@ -323,7 +331,7 @@ export class Game {
 
   equipWeapon(p, itemId) {
     const wid = weaponIdOf(itemId);
-    if (!WEAPONS[wid]) return;
+    if (!getWeapon(wid)) return;
     if (p.weapons.includes(wid)) { this.toast(p, 'Такое оружие уже в руках'); return; }
     p.inventory[itemId]--;
     if (p.inventory[itemId] <= 0) delete p.inventory[itemId];
@@ -335,8 +343,8 @@ export class Game {
       p.inventory['weapon:' + old] = (p.inventory['weapon:' + old] || 0) + 1;
       p.weapons[p.weaponIdx] = wid;
     }
-    if (p.mags[wid] === undefined) p.mags[wid] = WEAPONS[wid].magSize || 1;
-    this.toast(p, `В руках: ${WEAPONS[wid].name}`);
+    if (p.mags[wid] === undefined) p.mags[wid] = getWeapon(wid).magSize || 1;
+    this.toast(p, `В руках: ${getWeapon(wid).name}`);
   }
 
   // slot: 'armor'|'helmet'|... или 'w0'..'w3' (ячейка оружия)
@@ -370,7 +378,7 @@ export class Game {
     }
     if (!merchant) { this.toast(p, 'Рядом нет торговца'); return; }
     const s = this.world.settlements.find(x => x.id === merchant.home);
-    const price = Math.max(1, Math.round(sellPrice(itemId, WEAPONS) * scarcityMult(s, itemId, 'sell')));
+    const price = Math.max(1, Math.round(sellPriceR(itemId) * scarcityMult(s, itemId, 'sell')));
     p.inventory[itemId]--;
     if (p.inventory[itemId] <= 0) delete p.inventory[itemId];
     p.coins += price;
@@ -427,13 +435,11 @@ export class Game {
     }
     if (buffEnded) this.recomputeStats(p);
 
-    // Медитация: реген маны
-    if (this.hasTalent(p, 'manaRegen')) {
-      p.manaRegenT -= dt;
-      if (p.manaRegenT <= 0) {
-        p.manaRegenT = 4;
-        p.ammo.mana = Math.min(99, (p.ammo.mana || 0) + 1);
-      }
+    // Реген маны: 1 базово + интеллект + экипировка/таланты, каждые 5 секунд
+    p.manaRegenT -= dt;
+    if (p.manaRegenT <= 0) {
+      p.manaRegenT = 5;
+      p.ammo.mana = Math.min(99, (p.ammo.mana || 0) + 1 + Math.round(p.derived?.manaRegen || 0));
     }
     p.shadowT = Math.max(0, p.shadowT - dt);
 
@@ -564,7 +570,7 @@ export class Game {
   projCount(p, w) {
     let n = w.projectilesPerShot || 1;
     if (w.school === 'magic') n += p.derived?.magicProj || 0;
-    if (w.id === 'knives') n += p.derived?.knifeProj || 0;
+    if (splitId(w.id).base === 'knives') n += p.derived?.knifeProj || 0;
     return n;
   }
 
@@ -965,20 +971,24 @@ export class Game {
     // Кровожадность: лечение за убийство в ближнем бою
     if (killer && pr.school === 'melee' && this.hasTalent(killer, 'bloodlust'))
       killer.hp = Math.min(killer.maxHp, killer.hp + 1);
-    // дроп
+    // дроп: удача повышает количество, шанс и редкость добычи
+    const luck = killer?.stats?.lck || 0;
+    const dropBonus = killer?.derived?.dropBonus || 0;
     for (const [item, range] of Object.entries(def.drops || {})) {
-      if (item === 'weapon') { this.dropRandomWeapon(e.mapId, e.x, e.y); continue; }
+      if (item === 'weapon') { this.dropRandomWeapon(e.mapId, e.x, e.y, luck, 2); continue; }
       let n = Array.isArray(range) ? randInt(this.rand, range[0], range[1]) : range;
       if (item === 'coin' && killer) n = Math.round(n * (killer.derived?.coinMult || 1));
       if (n > 0) this.spawnDrop(item, n, e.mapId, e.x + (this.rand() - 0.5) * 14, e.y + (this.rand() - 0.5) * 14);
     }
-    if (this.rand() < 0.15) this.spawnDrop('herb', 1, e.mapId, e.x, e.y);
-    if (this.rand() < 0.05) this.spawnDrop('heal_potion', 1, e.mapId, e.x, e.y);
-    if (e.kind === 'wolf' && this.rand() < 0.5) this.spawnDrop('hide', 1, e.mapId, e.x, e.y);
-    if (e.kind === 'banditHeavy' && this.rand() < 0.25) this.dropRandomGear(e.mapId, e.x, e.y);
+    if (this.rand() < 0.15 * (1 + dropBonus * 2)) this.spawnDrop('herb', 1, e.mapId, e.x, e.y);
+    if (this.rand() < 0.05 * (1 + dropBonus * 3)) this.spawnDrop('heal_potion', 1, e.mapId, e.x, e.y);
+    if (e.kind === 'wolf' && this.rand() < 0.5 * (1 + dropBonus)) this.spawnDrop('hide', 1, e.mapId, e.x, e.y);
+    if (e.kind === 'banditHeavy' && this.rand() < 0.25 * (1 + dropBonus)) this.dropRandomGear(e.mapId, e.x, e.y, false, luck);
+    // удача: шанс дополнительной находки
+    if (this.rand() < dropBonus) this.spawnDrop('coin', 2 + Math.floor(this.rand() * 3), e.mapId, e.x + 8, e.y);
     if (e.token) this.abstract.onTokenUnitKilled(e.token);
     if (e.kind === 'bossOgre') {
-      this.dropRandomGear(e.mapId, e.x + 12, e.y, true);
+      this.dropRandomGear(e.mapId, e.x + 12, e.y, true, luck);
       this.toastAll(STR.bossDefeated(def.name));
       this.events.push(this.world.day, `Пал грозный ${def.name}!`);
     }
@@ -1016,6 +1026,11 @@ export class Game {
 
   damagePlayer(p, dmg, source) {
     if (p.dead || hasIFrames(p)) return;
+    // уворот от ловкости и экипировки: урон полностью игнорируется
+    if (this.rand() < (p.derived?.dodge || 0)) {
+      this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      return;
+    }
     p.hp -= dmg;
     p.hurtT = PLAYER_HURT_INVULN;
     this.fx({ t: 'phurt', id: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
@@ -1061,16 +1076,21 @@ export class Game {
     }
   }
 
-  dropRandomWeapon(mapId, x, y) {
-    const pool = ['axe', 'huntbow', 'crossbow', 'knives', 'firestaff', 'froststaff', 'fireball', 'stormstaff'];
-    this.spawnDrop('weapon:' + pick(this.rand, pool), 1, mapId, x, y);
+  // Дроп оружия: редкость зависит от удачи убийцы и источника (boost)
+  dropRandomWeapon(mapId, x, y, luck = 0, boost = 0) {
+    const pool = ['axe', 'huntbow', 'crossbow', 'knives', 'firestaff', 'froststaff',
+      'fireball', 'stormstaff', 'spear', 'warhammer', 'dagger', 'taxes', 'venomstaff', 'bombs'];
+    const rar = rollRarity(this.rand, luck, boost);
+    this.spawnDrop('weapon:' + withRarity(pick(this.rand, pool), rar), 1, mapId, x, y);
   }
 
-  dropRandomGear(mapId, x, y, elite = false) {
+  dropRandomGear(mapId, x, y, elite = false, luck = 0) {
     const pool = elite
-      ? ['chain_armor', 'plate_armor', 'bear_amulet', 'swift_ring', 'iron_shield']
-      : ['leather_armor', 'hunter_hood', 'iron_helmet', 'wolf_amulet', 'wood_shield', 'swift_ring'];
-    this.spawnDrop(pick(this.rand, pool), 1, mapId, x, y);
+      ? ['chain_armor', 'plate_armor', 'scale_armor', 'bear_amulet', 'owl_amulet', 'swift_ring', 'iron_shield', 'tower_shield']
+      : ['leather_armor', 'padded_armor', 'hunter_hood', 'leather_cap', 'iron_helmet',
+         'wolf_amulet', 'fox_amulet', 'iron_ring', 'wood_shield', 'swift_ring'];
+    const rar = rollRarity(this.rand, luck, elite ? 2 : 1);
+    this.spawnDrop(withRarity(pick(this.rand, pool), rar), 1, mapId, x, y);
   }
 
   // ---------- данжи ----------
@@ -1259,9 +1279,10 @@ export class Game {
   openChest(p, tx, ty) {
     this.chunks.setTile(p.mapId, tx, ty, p.mapId === 'over' ? T.GRASS : T.DUNGEON_FLOOR);
     this.fx({ t: 'tile', mapId: p.mapId, x: tx, y: ty, tile: p.mapId === 'over' ? T.GRASS : T.DUNGEON_FLOOR }, p.mapId, tx * TILE, ty * TILE);
-    this.dropRandomWeapon(p.mapId, tx * TILE + 8, ty * TILE + 20);
+    const luck = p.stats?.lck || 0;
+    this.dropRandomWeapon(p.mapId, tx * TILE + 8, ty * TILE + 20, luck, 1);
     this.spawnDrop('coin', randInt(this.rand, 10, 25), p.mapId, tx * TILE - 4, ty * TILE + 20);
-    if (this.rand() < 0.6) this.dropRandomGear(p.mapId, tx * TILE + 20, ty * TILE + 20);
+    if (this.rand() < 0.6 + (p.derived?.dropBonus || 0)) this.dropRandomGear(p.mapId, tx * TILE + 20, ty * TILE + 20, false, luck);
     this.fx({ t: 'chest', x: tx * TILE, y: ty * TILE }, p.mapId, tx * TILE, ty * TILE);
   }
 
@@ -1289,13 +1310,13 @@ export class Game {
         if (it.item.startsWith('ammo_')) {
           const type = it.item.slice(5);
           const users = ammoUsers(type);
-          const hasWeapon = p.weapons.some(w => WEAPONS[w].ammoType === type)
-            || Object.keys(p.inventory).some(k => isWeaponItem(k) && WEAPONS[weaponIdOf(k)]?.ammoType === type);
+          const hasWeapon = p.weapons.some(w => getWeapon(w)?.ammoType === type)
+            || Object.keys(p.inventory).some(k => isWeaponItem(k) && getWeapon(weaponIdOf(k))?.ammoType === type);
           note = hasWeapon ? '' : ` [нужен: ${users}]`;
         } else if (ITEMS[it.item]?.slot) {
           note = ` (${describeItem(it.item)})`;
         } else if (isWeaponItem(it.item)) {
-          const w = WEAPONS[weaponIdOf(it.item)];
+          const w = getWeapon(weaponIdOf(it.item));
           note = ` (${SCHOOL_NAMES[w.school]}, урон ${w.damage})`;
         }
         const price = Math.ceil(it.price * mult * scarcityMult(s, it.item, 'buy'));
@@ -1725,7 +1746,7 @@ export class Game {
     }
     if (isGear(item)) { this.equipItem(p, item); return; }
     if (isPotion(item)) {
-      const u = ITEMS[item].use;
+      const u = getItem(item).use;
       if (u.heal && p.hp >= p.maxHp) return;
       p.inventory[item]--;
       if (u.heal) p.hp = Math.min(p.maxHp, p.hp + u.heal);
