@@ -270,6 +270,7 @@ export class Game {
       d.magicProj += e.magicProj || 0;
       d.knifeProj += e.knifeProj || 0;
       d.manaRegen += e.manaRegen || 0;
+      d.dodge += e.dodge || 0;
     }
     if (this.hasTalent(p, 'deadly')) d.critMult = 3;
     if (p.buffs.speed) speed += p.buffs.speed.mult;
@@ -1053,7 +1054,8 @@ export class Game {
     if ((p.abCd[slot] || 0) > 0) return;
     if (ab.mana > 0 && (p.ammo.mana || 0) < ab.mana) { this.toast(p, 'Не хватает маны'); return; }
     if (ab.mana > 0) p.ammo.mana -= ab.mana;
-    p.abCd[slot] = ab.cd;
+    // Ледяные жилы: способности перезаряжаются быстрее
+    p.abCd[slot] = ab.cd * (this.hasTalent(p, 'cdr') ? 0.8 : 1);
     const aim = p.aim || 0;
     const d = p.derived || {};
     const map = this.mapFor(p.mapId);
@@ -1087,6 +1089,15 @@ export class Game {
           for (const q of this.players.values()) {
             if (q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > 95 * 95) continue;
             q.hp = Math.min(q.maxHp, q.hp + 1);
+          }
+        }
+        // Вождь: клич воодушевляет группу на бой
+        if (this.hasTalent(p, 'ab_crydmg')) {
+          for (const q of this.players.values()) {
+            if (q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > 95 * 95) continue;
+            q.buffs.blessed = { mult: 0.15, t: 10 };
+            this.recomputeStats(q);
+            this.toast(q, '⚔ Клич вождя: +15% урона на 10 с');
           }
         }
         break;
@@ -1541,7 +1552,18 @@ export class Game {
       if (source.entType === 'enemy') {
         const def = ENEMIES[source.kind];
         moveWithCollision(source, -Math.cos(a) * 10, -Math.sin(a) * 10, def?.radius || 5, map);
+        // Шипастый доспех: возмездие за удар вблизи
+        if (this.hasTalent(p, 'thorns'))
+          this.damageEnemy(source, 1, { vx: -Math.cos(a), vy: -Math.sin(a), knockback: 30, owner: p.id, school: 'melee' });
       }
+    }
+    // Последний рубеж: смертельный удар оставляет 1 ХП (раз в 60 с)
+    if (p.hp <= 0 && this.hasTalent(p, 'laststand') && (p.lastStandT || 0) <= this.tick) {
+      p.hp = 1;
+      p.lastStandT = this.tick + 60 * 30;
+      p.hurtT = 1.2;
+      this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      this.toast(p, '🛡 Последний рубеж: ты устоял на ногах!');
     }
     this.fx({ t: 'phurt', id: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
     if (p.hp <= 0) {
@@ -2985,10 +3007,12 @@ export class Game {
       const u = getItem(item).use;
       if (u.heal && p.hp >= p.maxHp) return;
       p.inventory[item]--;
-      if (u.heal) p.hp = Math.min(p.maxHp, p.hp + u.heal);
-      if (u.mana) p.ammo.mana = (p.ammo.mana || 0) + u.mana;
+      // Чародейская кровь: зелья на 50% сильнее
+      const alch = this.hasTalent(p, 'alchemy') ? 1.5 : 1;
+      if (u.heal) p.hp = Math.min(p.maxHp, p.hp + Math.round(u.heal * alch));
+      if (u.mana) p.ammo.mana = (p.ammo.mana || 0) + Math.round(u.mana * alch);
       if (u.buff) {
-        p.buffs[u.buff] = { mult: u.mult, t: u.time };
+        p.buffs[u.buff] = { mult: u.mult * alch, t: Math.round(u.time * alch) };
         this.recomputeStats(p);
         this.toast(p, `${ITEMS[item].name}: ${describeItem(item)}`);
       }

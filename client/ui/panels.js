@@ -5,7 +5,7 @@ import { ITEMS, GEAR_SLOTS, SLOT_NAMES, isGear, isPotion, describeItem, isWeapon
 import { AMMO_NAMES, WEAPONS } from '../../shared/weapons.js';
 import { getWeapon, getItem, rarityOf, sellPriceR, RARITIES } from '../../shared/rarity.js';
 import { CLASSES, STAT_KEYS, STAT_NAMES, STAT_DESC, xpNeed, MAX_LEVEL } from '../../shared/classes.js';
-import { TALENTS, TIER_REQ } from '../../shared/talents.js';
+import { TALENTS, TIER_REQ, SPECS, specPoints } from '../../shared/talents.js';
 import { SFX } from '../sfx.js';
 
 const USABLE_FOOD = new Set(['bread', 'meat', 'cooked_meat', 'bandage']);
@@ -753,34 +753,41 @@ export class Panels {
       el.appendChild(row);
     }
 
-    // таланты
+    // таланты: три специализации со своим прогрессом
     const th = document.createElement('h3');
     th.innerHTML = 'Таланты' + (you.tp2 > 0 ? ` <span class="pts">(+${you.tp2} очк.)</span>` : '');
     el.appendChild(th);
     const learned = you.tl || [];
-    let lastTier = 0;
-    for (const t of TALENTS[you.cls] || []) {
-      if (t.tier !== lastTier) {
-        lastTier = t.tier;
-        const tl = document.createElement('div');
-        tl.className = 'tierlabel';
-        tl.textContent = `— Ярус ${t.tier}` + (TIER_REQ[t.tier] ? ` (нужно ${TIER_REQ[t.tier]} изученных)` : '');
-        el.appendChild(tl);
+    for (const spec of SPECS[you.cls] || []) {
+      const pts = specPoints(you.cls, spec.id, learned);
+      const head = document.createElement('div');
+      head.className = 'spechead';
+      head.innerHTML = `<span style="color:${spec.color}">◆ ${spec.name}</span>`
+        + `<span class="specpts">${pts}/6</span>`;
+      head.title = spec.desc;
+      el.appendChild(head);
+      const sub = document.createElement('div');
+      sub.className = 'specdesc';
+      sub.textContent = spec.desc;
+      el.appendChild(sub);
+      for (const t of (TALENTS[you.cls] || []).filter(x => x.spec === spec.id)) {
+        const isLearned = learned.includes(t.id);
+        const tierOpen = pts >= TIER_REQ[t.tier];
+        const avail = !isLearned && tierOpen && you.tp2 > 0;
+        const box = document.createElement('div');
+        box.className = 'talent ' + (isLearned ? 'learned' : avail ? 'avail' : 'locked');
+        box.style.borderLeft = `3px solid ${isLearned ? spec.color : '#45444f'}`;
+        const req = !tierOpen && !isLearned ? ` <span class="treq">(нужно ${TIER_REQ[t.tier]} в ветке)</span>` : '';
+        box.innerHTML = `<div class="tname">${isLearned ? '✓ ' : ''}${t.name}${t.tier === 3 ? ' ★' : ''}${req}</div><div class="tdesc">${t.desc}</div>`;
+        if (avail) {
+          box.onclick = () => {
+            SFX.quest();
+            this.net.send({ t: MSG.LEARN_TALENT, id: t.id });
+            setTimeout(() => this.renderChar(), 150);
+          };
+        }
+        el.appendChild(box);
       }
-      const box = document.createElement('div');
-      const isLearned = learned.includes(t.id);
-      const tierOpen = learned.length >= TIER_REQ[t.tier];
-      const avail = !isLearned && tierOpen && you.tp2 > 0;
-      box.className = 'talent ' + (isLearned ? 'learned' : avail ? 'avail' : 'locked');
-      box.innerHTML = `<div class="tname">${isLearned ? '✓ ' : ''}${t.name}</div><div class="tdesc">${t.desc}</div>`;
-      if (avail) {
-        box.onclick = () => {
-          SFX.quest();
-          this.net.send({ t: MSG.LEARN_TALENT, id: t.id });
-          setTimeout(() => this.renderChar(), 150);
-        };
-      }
-      el.appendChild(box);
     }
   }
 }
