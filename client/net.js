@@ -69,6 +69,7 @@ export class Net {
       if (m.pops) m.pops.forEach((n, i) => { if (this.mapInfo.settlements[i]) this.mapInfo.settlements[i].pop = n; });
       if (m.sts) m.sts.forEach((st, i) => { if (this.mapInfo.settlements[i]) this.mapInfo.settlements[i].st = st; });
       if (m.rel) this.relations = m.rel;
+      if (m.dark) this.darkPower = m.dark;
       return;
     }
     if (m.t === MSG.CHUNK) {

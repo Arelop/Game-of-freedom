@@ -1,124 +1,142 @@
 // РПГ-предметы: экипировка (слоты) и зелья. Чистые данные + описания.
 // stats: maxHp (+сердца, 2 = 1 сердце), speed/damage (множители-добавки),
 // rollCd (снижение кулдауна переката).
-export const GEAR_SLOTS = ['armor', 'helmet', 'amulet', 'shield'];
-export const SLOT_NAMES = { armor: 'Броня', helmet: 'Голова', amulet: 'Амулет', shield: 'Щит' };
+export const GEAR_SLOTS = ['head', 'chest', 'legs', 'offhand', 'acc1', 'acc2', 'ring'];
+export const SLOT_NAMES = {
+  head: 'Голова', chest: 'Грудь', legs: 'Ноги', offhand: 'Левая рука',
+  acc1: 'Аксессуар', acc2: 'Аксессуар', ring: 'Кольцо',
+};
+// слот предмета 'acc' занимает acc1 ИЛИ acc2
 
 export const ITEMS = {
   // --- броня ---
   leather_armor: {
-    id: 'leather_armor', name: 'Кожаный доспех', slot: 'armor',
+    id: 'leather_armor', name: 'Кожаный доспех', slot: 'chest',
     stats: { maxHp: 2 }, price: 40, icon: 'item_armor_leather',
   },
   chain_armor: {
-    id: 'chain_armor', name: 'Кольчуга', slot: 'armor',
+    id: 'chain_armor', name: 'Кольчуга', slot: 'chest',
     stats: { maxHp: 4, speed: -0.05 }, price: 95, icon: 'item_armor_chain',
   },
   plate_armor: {
-    id: 'plate_armor', name: 'Латный доспех', slot: 'armor',
+    id: 'plate_armor', name: 'Латный доспех', slot: 'chest',
     stats: { maxHp: 6, speed: -0.12 }, price: 170, icon: 'item_armor_plate',
   },
   // --- голова ---
   hunter_hood: {
-    id: 'hunter_hood', name: 'Капюшон охотника', slot: 'helmet',
+    id: 'hunter_hood', name: 'Капюшон охотника', slot: 'head',
     stats: { speed: 0.06 }, price: 35, icon: 'item_hood',
   },
   iron_helmet: {
-    id: 'iron_helmet', name: 'Железный шлем', slot: 'helmet',
+    id: 'iron_helmet', name: 'Железный шлем', slot: 'head',
     stats: { maxHp: 2 }, price: 65, icon: 'item_helmet',
   },
   // --- амулеты и кольца ---
   wolf_amulet: {
-    id: 'wolf_amulet', name: 'Волчий амулет', slot: 'amulet',
+    id: 'wolf_amulet', name: 'Волчий амулет', slot: 'acc',
     stats: { speed: 0.12 }, price: 55, icon: 'item_amulet_wolf',
   },
   bear_amulet: {
-    id: 'bear_amulet', name: 'Медвежий амулет', slot: 'amulet',
+    id: 'bear_amulet', name: 'Медвежий амулет', slot: 'acc',
     stats: { damage: 0.25 }, price: 85, icon: 'item_amulet_bear',
   },
   swift_ring: {
-    id: 'swift_ring', name: 'Кольцо ловкости', slot: 'amulet',
+    id: 'swift_ring', name: 'Кольцо ловкости', slot: 'ring',
     stats: { rollCd: 0.35 }, price: 75, icon: 'item_ring',
   },
   // --- щиты ---
   wood_shield: {
-    id: 'wood_shield', name: 'Деревянный щит', slot: 'shield',
+    id: 'wood_shield', name: 'Деревянный щит', slot: 'offhand', block: true,
     stats: { maxHp: 1 }, price: 25, icon: 'item_shield_wood',
   },
   iron_shield: {
-    id: 'iron_shield', name: 'Железный щит', slot: 'shield',
+    id: 'iron_shield', name: 'Железный щит', slot: 'offhand', block: true,
     stats: { maxHp: 2, speed: -0.04 }, price: 70, icon: 'item_shield_iron',
   },
   // --- расширение арсенала брони ---
   padded_armor: {
-    id: 'padded_armor', name: 'Стёганка', slot: 'armor',
+    id: 'padded_armor', name: 'Стёганка', slot: 'chest',
     stats: { maxHp: 1, speed: 0.03 }, price: 25, icon: 'item_armor_padded',
   },
   scale_armor: {
-    id: 'scale_armor', name: 'Чешуйчатый доспех', slot: 'armor',
+    id: 'scale_armor', name: 'Чешуйчатый доспех', slot: 'chest',
     stats: { maxHp: 5, speed: -0.08 }, price: 130, icon: 'item_armor_scale',
   },
   leather_cap: {
-    id: 'leather_cap', name: 'Кожаный шлем', slot: 'helmet',
+    id: 'leather_cap', name: 'Кожаный шлем', slot: 'head',
     stats: { maxHp: 1 }, price: 30, icon: 'item_cap',
   },
   owl_amulet: {
-    id: 'owl_amulet', name: 'Совиный амулет', slot: 'amulet',
+    id: 'owl_amulet', name: 'Совиный амулет', slot: 'acc',
     stats: { manaRegen: 1, damage: 0.08 }, price: 70, icon: 'item_amulet_owl',
   },
   fox_amulet: {
-    id: 'fox_amulet', name: 'Лисий амулет', slot: 'amulet',
+    id: 'fox_amulet', name: 'Лисий амулет', slot: 'acc',
     stats: { dodge: 0.04, speed: 0.05 }, price: 75, icon: 'item_amulet_fox',
   },
   iron_ring: {
-    id: 'iron_ring', name: 'Железное кольцо', slot: 'amulet',
+    id: 'iron_ring', name: 'Железное кольцо', slot: 'ring',
     stats: { maxHp: 2 }, price: 45, icon: 'item_ring_iron',
   },
   tower_shield: {
-    id: 'tower_shield', name: 'Ростовой щит', slot: 'shield',
+    id: 'tower_shield', name: 'Ростовой щит', slot: 'offhand', block: true,
     stats: { maxHp: 4, speed: -0.1 }, price: 120, icon: 'item_shield_tower',
   },
 
   // --- броня с бонусами к атрибутам (чистые и смешанные) ---
   berserk_armor: {
-    id: 'berserk_armor', name: 'Доспех берсерка', slot: 'armor',
+    id: 'berserk_armor', name: 'Доспех берсерка', slot: 'chest',
     stats: { maxHp: 2, str: 2 }, price: 140, icon: 'item_armor_berserk',
   },
   mage_robe: {
-    id: 'mage_robe', name: 'Мантия чародея', slot: 'armor',
+    id: 'mage_robe', name: 'Мантия чародея', slot: 'chest',
     stats: { int: 2, speed: 0.04 }, price: 130, icon: 'item_robe',
   },
   shadow_cloak: {
-    id: 'shadow_cloak', name: 'Плащ ловкача', slot: 'armor',
+    id: 'shadow_cloak', name: 'Плащ ловкача', slot: 'chest',
     stats: { agi: 2, speed: 0.05 }, price: 135, icon: 'item_cloak',
   },
   sage_helmet: {
-    id: 'sage_helmet', name: 'Колпак мудреца', slot: 'helmet',
+    id: 'sage_helmet', name: 'Колпак мудреца', slot: 'head',
     stats: { int: 1, manaRegen: 1 }, price: 80, icon: 'item_sage_hat',
   },
   war_helm: {
-    id: 'war_helm', name: 'Шлем вождя', slot: 'helmet',
+    id: 'war_helm', name: 'Шлем вождя', slot: 'head',
     stats: { str: 1, maxHp: 1 }, price: 85, icon: 'item_war_helm',
   },
   crown: {
-    id: 'crown', name: 'Корона предводителя', slot: 'helmet',
+    id: 'crown', name: 'Корона предводителя', slot: 'head',
     stats: { str: 1, agi: 1, int: 1, lck: 1 }, price: 220, icon: 'item_crown',
   },
   rune_amulet: {
-    id: 'rune_amulet', name: 'Рунный амулет', slot: 'amulet',
+    id: 'rune_amulet', name: 'Рунный амулет', slot: 'acc',
     stats: { int: 1, lck: 1 }, price: 110, icon: 'item_amulet_rune',
   },
   totem_amulet: {
-    id: 'totem_amulet', name: 'Боевой тотем', slot: 'amulet',
+    id: 'totem_amulet', name: 'Боевой тотем', slot: 'acc',
     stats: { str: 1, agi: 1 }, price: 110, icon: 'item_totem',
   },
   gladiator_shield: {
-    id: 'gladiator_shield', name: 'Щит гладиатора', slot: 'shield',
+    id: 'gladiator_shield', name: 'Щит гладиатора', slot: 'offhand', block: true,
     stats: { maxHp: 2, str: 1 }, price: 115, icon: 'item_shield_glad',
   },
   lucky_charm: {
-    id: 'lucky_charm', name: 'Кроличья лапка', slot: 'amulet',
+    id: 'lucky_charm', name: 'Кроличья лапка', slot: 'acc',
     stats: { lck: 2 }, price: 90, icon: 'item_charm',
+  },
+
+  // --- ноги ---
+  leather_boots: {
+    id: 'leather_boots', name: 'Кожаные сапоги', slot: 'legs',
+    stats: { speed: 0.05 }, price: 30, icon: 'item_boots',
+  },
+  iron_greaves: {
+    id: 'iron_greaves', name: 'Железные поножи', slot: 'legs',
+    stats: { maxHp: 2, speed: -0.03 }, price: 70, icon: 'item_greaves',
+  },
+  swift_boots: {
+    id: 'swift_boots', name: 'Сапоги ветра', slot: 'legs',
+    stats: { agi: 1, speed: 0.08 }, price: 110, icon: 'item_boots_swift',
   },
 
   // --- зелья ---

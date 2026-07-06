@@ -126,6 +126,18 @@ export class AbstractSim {
             }
           }
         } else tok.dead = true;
+      } else if (tok.home) {
+        // гарнизон: не покидает крепость
+        tok.x = tok.home.x; tok.y = tok.home.y;
+      } else if (tok.march) {
+        // войско Тьмы: марш прямиком к цели
+        const s = world.settlements.find(x => x.id === tok.march);
+        if (!s || s.ruined || s.faction === tok.faction) tok.march = null;
+        else {
+          const dx = s.x * TILE - tok.x, dy = s.y * TILE - tok.y;
+          const d = Math.hypot(dx, dy) || 1;
+          if (d > 80) { tok.x += dx / d * 55; tok.y += dy / d * 55; }
+        }
       } else {
         tok.x += (rand() - 0.5) * 90;
         tok.y += (rand() - 0.5) * 90;
@@ -141,21 +153,25 @@ export class AbstractSim {
 
       // стая близко к поселению — осада против рейтинга обороны
       const winter = seasonOf(world.day) === 3;
-      if (tok.type === 'pack' && rand() < (winter ? 0.11 : 0.07)) {
+      const dark = tok.faction === 'darkness';
+      if (tok.type === 'pack' && !tok.garrison && rand() < (dark ? 0.5 : winter ? 0.11 : 0.07)) {
         const s = world.settlements.find(s => !s.ruined && !s.captured &&
           (s.x * TILE - tok.x) ** 2 + (s.y * TILE - tok.y) ** 2 < (TILE * 30) ** 2);
         if (s) {
           const defense = s.guards * 2 + s.towers * 3 + (s.wardT > 0 ? 6 : 0) + (s.spiritT > 0 ? 5 : 0);
-          const strength = tok.units.length * 2 + tok.units.filter(u => u === 'banditHeavy').length * 2;
+          // элита Тьмы и громилы бьют сильнее рядовых
+          const elite = tok.units.filter(u => u === 'banditHeavy' || u === 'darkKnight' || u === 'darkMage').length;
+          const strength = tok.units.length * 2 + elite * 2;
           if (strength > defense + (rand() < 0.5 ? 2 : 0)) {
             s.prosperity = Math.max(5, s.prosperity - 12);
-            s.population = Math.max(0, s.population - 1);
+            s.population = Math.max(0, s.population - (dark ? 2 : 1));
             s.food = Math.max(0, s.food - 20);
             if (s.guards > 0 && rand() < 0.6) s.guards--;
             tok.units.length > 2 && rand() < 0.4 && tok.units.pop();
-            // добитая деревня: бандиты захватывают, твари оставляют руины
+            // добитая деревня: бандиты захватывают, Тьма ставит форт, твари оставляют руины
             if (s.population <= 2 && s.guards === 0) {
               if (tok.faction === 'bandits') this.game.civ.captureSettlement(s);
+              else if (dark) { this.game.civ.captureByDarkness(s); tok.dead = true; } // войско становится гарнизоном
               else this.game.civ.ruinSettlement(s, 'разорена чудовищами');
             } else {
               events.push(world.day, `${cap(tok.name)} разорили окраины ${s.name} — есть жертвы`, { x: s.x, y: s.y });
@@ -258,7 +274,15 @@ export class AbstractSim {
     const anyAlive = tok.hydrated.some(id => this.game.entities.has(id));
     if (!anyAlive) {
       tok.dead = true;
-      this.game.events.push(this.game.world.day, `Путники истребили: ${tok.name}`, { x: Math.round(tok.x / TILE), y: Math.round(tok.y / TILE) });
+      if (tok.garrison && this.game.world.citadel) {
+        // штурм Цитадели удался: мощь Тьмы подрублена вдвое
+        const c = this.game.world.citadel;
+        c.power = Math.max(3, Math.round(c.power / 2));
+        this.game.events.push(this.game.world.day, `★ Гарнизон Чернокаменной Цитадели повержен — Тьма отступает!`, { x: Math.round(tok.x / TILE), y: Math.round(tok.y / TILE) });
+        this.game.toastAll('★ Гарнизон Цитадели повержен! Тьма ослаблена');
+      } else {
+        this.game.events.push(this.game.world.day, `Путники истребили: ${tok.name}`, { x: Math.round(tok.x / TILE), y: Math.round(tok.y / TILE) });
+      }
       this.tokens = this.tokens.filter(t => !t.dead);
     }
   }

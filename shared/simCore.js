@@ -34,7 +34,9 @@ export function stepPlayer(p, input, dt, map) {
   if (p.reloadT > 0) p.reloadT = Math.max(0, p.reloadT - dt);
   p.aim = input.aim;
 
-  const spd = PLAYER_SPEED * (p.speedMult || 1);
+  let spd = PLAYER_SPEED * (p.speedMult || 1);
+  p.blocking = !!input.blk && p.rollT <= 0;
+  if (p.blocking) spd *= 0.45; // блок щитом: медленный шаг
   let dx = 0, dy = 0;
   if (p.rollT > 0) {
     p.rollT = Math.max(0, p.rollT - dt);

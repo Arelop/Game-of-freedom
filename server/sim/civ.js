@@ -5,6 +5,8 @@
 import { TILE, CHUNK, SEASONS, seasonOf, SEASON_HARVEST } from '../../shared/constants.js';
 import { findBuildSite, buildHouse, buildField, buildTower, buildMine, buildShrine } from '../world/structures.js';
 import { RELATIONS, FACTIONS } from './factions.js';
+import { DARK_KINDS } from '../../shared/enemies.js';
+import { pick } from '../../shared/rng.js';
 
 export const CIV_DT = process.env.CIV_FAST ? 2 : 12; // сек на цив-тик (CIV_FAST — отладка)
 
@@ -37,6 +39,55 @@ export class CivSim {
     for (const s of this.game.world.settlements) this.tickSettlement(s);
     this.tickRivalry();
     this.tickResettlement();
+    this.tickDarkness();
+  }
+
+  // --- Армия Тьмы: мощь Цитадели растёт, войска идут войной на всех ---
+  tickDarkness() {
+    const g = this.game;
+    const c = g.world.citadel;
+    if (!c) return;
+    c.power = Math.min(200, c.power + 0.15 + c.forts.length * 0.15);
+
+    // гарнизон Цитадели: Лорд Тьмы и элита всегда на месте
+    if (!g.abstract.tokens.some(t => t.garrison && !t.dead)) {
+      if (c.power >= 12) c.power -= 10; // возрождение гарнизона стоит мощи
+      g.abstract.tokens.push({
+        id: 'tok' + g.abstract.nextId++, type: 'pack', name: 'гарнизон Цитадели',
+        faction: 'darkness', garrison: true,
+        units: ['darkLord', 'darkKnight', 'darkMage', 'darkArcher', 'darkSoldier', 'darkSoldier'],
+        x: c.x * TILE, y: c.y * TILE, home: { x: c.x * TILE, y: c.y * TILE },
+        hydrated: null,
+      });
+    }
+
+    // рейд: чем выше мощь, тем чаще и крупнее войско
+    const raidChance = Math.min(0.45, 0.06 + c.power / 250);
+    if (g.rand() >= raidChance) return;
+    const targets = g.world.settlements.filter(s => !s.ruined && !s.captured);
+    if (!targets.length) return;
+    // ближние к Цитадели и фортам деревни страдают первыми
+    targets.sort((a, b) =>
+      ((a.x - c.x) ** 2 + (a.y - c.y) ** 2) - ((b.x - c.x) ** 2 + (b.y - c.y) ** 2));
+    const target = targets[Math.floor(g.rand() * Math.min(3, targets.length))];
+    const size = Math.min(6, 2 + Math.floor(c.power / 25));
+    const units = [];
+    for (let i = 0; i < size; i++) units.push(pick(g.rand, DARK_KINDS));
+    // войско выходит из ближайшего к цели опорного пункта
+    let src = c;
+    for (const fid of c.forts) {
+      const f = g.world.settlements.find(s => s.id === fid);
+      if (f && !f.ruined &&
+        (f.x - target.x) ** 2 + (f.y - target.y) ** 2 < (src.x - target.x) ** 2 + (src.y - target.y) ** 2) src = f;
+    }
+    c.power = Math.max(3, c.power - size);
+    g.abstract.tokens.push({
+      id: 'tok' + g.abstract.nextId++, type: 'pack', name: 'войско Тьмы',
+      faction: 'darkness', units, march: target.id,
+      x: src.x * TILE, y: src.y * TILE, hydrated: null,
+    });
+    g.events.push(g.world.day, `⛧ Войско Тьмы выступило из ${src.name || 'Цитадели'} к ${target.name}!`, { x: src.x, y: src.y });
+    g.toastAll(`⛧ Войско Тьмы идёт к ${target.name}!`);
   }
 
   // Процветающая деревня отправляет поселенцев возрождать руины
@@ -69,6 +120,19 @@ export class CivSim {
     const g = this.game;
     const rand = g.rand;
     if (s.ruined) return;
+    if (s.captured && s.faction === 'darkness') {
+      // форт Тьмы: гарнизон копит силы, изредка высылает патрули
+      s.food = Math.max(0, s.food - 1);
+      if (rand() < 0.06) {
+        g.abstract.tokens.push({
+          id: 'tok' + g.abstract.nextId++, type: 'pack', name: 'патруль Тьмы',
+          faction: 'darkness', units: ['darkSoldier', 'darkSoldier', 'darkArcher'],
+          x: s.x * TILE, y: s.y * TILE, hydrated: null,
+        });
+        this.say(s, '⛧ Из форта Тьмы вышел патруль');
+      }
+      return;
+    }
     if (s.captured) {
       // бандиты проедают запасы и проводят тёмные ритуалы
       s.food = Math.max(0, s.food - 1);
@@ -222,15 +286,35 @@ export class CivSim {
     g.toastAll(`⚔ ${s.name} захвачена бандитами!`);
   }
 
+  // Армия Тьмы захватила деревню — теперь это её форт
+  captureByDarkness(s) {
+    const g = this.game;
+    s.captured = true;
+    s.faction = 'darkness';
+    s.guards = 0;
+    s.population = Math.max(0, s.population - 3);
+    const c = g.world.citadel;
+    if (c && !c.forts.includes(s.id)) { c.forts.push(s.id); c.power += 5; }
+    this.rehydrate(s);
+    g.events.push(g.world.day, `⛧ Армия Тьмы захватила ${s.name} — теперь это форт Тьмы!`, { x: s.x, y: s.y });
+    g.toastAll(`⛧ ${s.name} пала под натиском Тьмы!`);
+  }
+
   // Игроки перебили захватчиков — деревня свободна
   liberateSettlement(s, liberator) {
     const g = this.game;
+    const wasDark = s.faction === 'darkness';
     s.captured = false;
     s.faction = s.homeFaction;
     s.guards = 1;
     s.population = Math.max(3, s.population);
+    const c = g.world.citadel;
+    if (c) {
+      const i = c.forts.indexOf(s.id);
+      if (i >= 0) { c.forts.splice(i, 1); c.power = Math.max(3, c.power - 8); }
+    }
     this.rehydrate(s);
-    g.events.push(g.world.day, `${liberator?.name || 'Путники'} освободили ${s.name} от бандитов!`, { x: s.x, y: s.y });
+    g.events.push(g.world.day, `${liberator?.name || 'Путники'} освободили ${s.name} от ${wasDark ? 'Армии Тьмы' : 'бандитов'}!`, { x: s.x, y: s.y });
     g.toastAll(`★ ${s.name} освобождена!`);
     if (liberator) {
       liberator.rep[s.homeFaction] = Math.min(100, (liberator.rep[s.homeFaction] || 0) + 25);

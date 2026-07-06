@@ -143,6 +143,27 @@ export function makeWorld(seed) {
     world.pois.push(poi);
   }
 
+  // Чернокаменная Цитадель — оплот Армии Тьмы на юге мира
+  let cSite = null;
+  for (let tries = 0; tries < 400 && !cSite; tries++) {
+    const x = randInt(rand, 60, WORLD_TILES - 60);
+    const y = randInt(rand, WORLD_TILES - 110, WORLD_TILES - 45);
+    let ok = true;
+    for (let dy = -10; dy <= 10 && ok; dy += 5)
+      for (let dx = -10; dx <= 10 && ok; dx += 5) {
+        const b = baseTile(seed, x + dx, y + dy);
+        if (b === T.WATER || b === T.DEEP_WATER) ok = false;
+      }
+    if (ok && !sites.some(s => (s.x - x) ** 2 + (s.y - y) ** 2 < 80 * 80)) cSite = { x, y };
+  }
+  if (!cSite) cSite = { x: 256, y: WORLD_TILES - 60 }; // крайний случай: юг по центру
+  world.citadel = {
+    x: cSite.x, y: cSite.y, name: 'Чернокаменная Цитадель',
+    power: 8,        // мощь Тьмы: растёт каждый цив-тик, питает рейды
+    forts: [],       // id захваченных деревень — форты Тьмы
+  };
+  stampCitadel(world, cSite);
+
   // Дороги между ближайшими поселениями (цепочка + пара перемычек)
   const stl = world.settlements;
   const linked = new Set();
@@ -162,6 +183,28 @@ export function makeWorld(seed) {
   }
 
   return world;
+}
+
+// Крепость Тьмы: чёрные стены 19×15, башни по углам, ворота на севере,
+// внутри тёмный двор — гарнизон приходит от гидратации (game.hydrateCitadel)
+function stampCitadel(world, c) {
+  const W = 19, H = 15;
+  const x0 = c.x - Math.floor(W / 2), y0 = c.y - Math.floor(H / 2);
+  for (let y = y0; y < y0 + H; y++) {
+    for (let x = x0; x < x0 + W; x++) {
+      const key = x + ',' + y;
+      const border = x === x0 || x === x0 + W - 1 || y === y0 || y === y0 + H - 1;
+      const corner = (x <= x0 + 1 || x >= x0 + W - 2) && (y <= y0 + 1 || y >= y0 + H - 2);
+      if (corner) world.edits.set(key, T.TOWER);
+      else if (border) {
+        // ворота: три тайла по центру северной стены
+        if (y === y0 && Math.abs(x - c.x) <= 1) world.edits.set(key, T.DUNGEON_FLOOR);
+        else world.edits.set(key, T.DUNGEON_WALL);
+      } else world.edits.set(key, T.DUNGEON_FLOOR);
+    }
+  }
+  // дорожка от ворот на север — приглашение к штурму
+  for (let y = y0 - 6; y < y0; y++) world.edits.set(c.x + ',' + y, T.ROAD);
 }
 
 // Дорога: волнистый Брезенхэм, вода не мостится (обрыв дороги у берега)

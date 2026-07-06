@@ -128,6 +128,42 @@
     "item_shield_wood": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/shields/buckler1.png"
     },
+    "item_boots": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/boots1_brown.png"
+    },
+    "item_greaves": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/boots2_jackboots.png"
+    },
+    "item_boots_swift": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/boots4_green.png"
+    },
+    "ab_power_strike": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/earth/maxwells_silver_hammer.png"
+    },
+    "ab_war_cry": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/berserker_rage.png"
+    },
+    "ab_whirlwind": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/tukimas_dance.png"
+    },
+    "ab_flame_wave": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/fire/throw_flame.png"
+    },
+    "ab_frost_nova": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/ice/ozocubus_refrigeration.png"
+    },
+    "ab_blink": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/translocation/blink.png"
+    },
+    "ab_shadow_dash": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/translocation/phase_shift.png"
+    },
+    "ab_smoke_bomb": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/invisibility.png"
+    },
+    "ab_blade_storm": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/tukimas_vorpal_blade.png"
+    },
     "item_shield_iron": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/shields/shield3_round.png"
     },
@@ -294,6 +330,22 @@
     },
     "enemy_golem": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/nonliving/clay_golem.png",
+      "down": 2
+    },
+    "enemy_dark_soldier": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/undead/wight.png",
+      "down": 2
+    },
+    "enemy_dark_archer": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/undead/skeletal_warrior.png",
+      "down": 2
+    },
+    "enemy_dark_mage": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/undead/lich.png",
+      "down": 2
+    },
+    "enemy_dark_lord": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/undead/vampire_knight.png",
       "down": 2
     },
     "npc_spirit": {

@@ -5,6 +5,7 @@ export class Input {
     this.mouseX = 0; this.mouseY = 0;   // экранные координаты канваса (нативные пиксели)
     this.fire = false;
     this.rollQueued = false;
+    this.block = false;                  // ПКМ зажата — блок щитом
     this.canvas = canvas;
     this.onKey = null;                   // колбэк для разовых клавиш (E, Tab, цифры...)
 
@@ -17,7 +18,7 @@ export class Input {
       if (this.onKey) this.onKey(k);
     });
     window.addEventListener('keyup', e => this.keys.delete(e.code));
-    window.addEventListener('blur', () => { this.keys.clear(); this.fire = false; });
+    window.addEventListener('blur', () => { this.keys.clear(); this.fire = false; this.block = false; });
 
     canvas.addEventListener('mousemove', e => {
       const r = canvas.getBoundingClientRect();
@@ -26,9 +27,12 @@ export class Input {
     });
     canvas.addEventListener('mousedown', e => {
       if (e.button === 0) this.fire = true;
-      if (e.button === 2) this.rollQueued = true;
+      if (e.button === 2) this.block = true; // держим щит, пока зажата ПКМ
     });
-    window.addEventListener('mouseup', e => { if (e.button === 0) this.fire = false; });
+    window.addEventListener('mouseup', e => {
+      if (e.button === 0) this.fire = false;
+      if (e.button === 2) this.block = false;
+    });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
   }
 

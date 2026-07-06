@@ -73,9 +73,46 @@ export const ENEMIES = {
     sprite: 'enemy_mimic', xp: 9, drops: { coin: [8, 16] },
   },
   darkKnight: {
-    id: 'darkKnight', name: 'Проклятый рыцарь', archetype: 'chaser', hp: 34, speed: 44, tier: 4,
+    id: 'darkKnight', name: 'Рыцарь Тьмы', archetype: 'chaser', hp: 34, speed: 44, tier: 4,
     radius: 6, touchDamage: 2, lungeSpeed: 200, lungeWindup: 0.5, lungeRange: 55,
-    sprite: 'enemy_dark_knight', xp: 14, drops: { coin: [8, 14] },
+    sprite: 'enemy_dark_knight', xp: 14, drops: { coin: [8, 14] }, faction: 'darkness',
+  },
+  // --- Армия Тьмы: войско Чернокаменной Цитадели ---
+  darkSoldier: {
+    id: 'darkSoldier', name: 'Солдат Тьмы', archetype: 'chaser', hp: 16, speed: 52, tier: 3,
+    radius: 5, touchDamage: 1, lungeSpeed: 230, lungeWindup: 0.35, lungeRange: 48,
+    sprite: 'enemy_dark_soldier', xp: 7, drops: { coin: [3, 7] }, faction: 'darkness',
+  },
+  darkArcher: {
+    id: 'darkArcher', name: 'Стрелок Тьмы', archetype: 'shooter', hp: 12, speed: 50, tier: 3,
+    radius: 5, touchDamage: 1, preferRange: [90, 160], fireInterval: 1.8,
+    pattern: 'aimedSingle', sprite: 'enemy_dark_archer', xp: 6,
+    drops: { coin: [3, 6], ammo_arrow: [1, 2] }, faction: 'darkness',
+  },
+  darkMage: {
+    id: 'darkMage', name: 'Чернокнижник', archetype: 'shooter', hp: 20, speed: 42, tier: 4,
+    radius: 5, touchDamage: 1, preferRange: [80, 150], fireInterval: 2.2,
+    pattern: 'aimedTriple', sprite: 'enemy_dark_mage', xp: 11,
+    drops: { coin: [6, 11], crystal: [1, 2] }, faction: 'darkness',
+  },
+  darkLord: {
+    id: 'darkLord', name: 'Лорд Тьмы', archetype: 'boss', hp: 220, speed: 38, tier: 5,
+    radius: 8, touchDamage: 3, sprite: 'enemy_dark_lord', xp: 90,
+    drops: { coin: [40, 70], weapon: 1, crystal: [3, 6] }, faction: 'darkness',
+    phases: [
+      { hpAbove: 0.66, steps: [
+        { pattern: 'aimedTriple', interval: 1.4, move: 'chase' },
+        { pattern: 'fan5', interval: 2.0, move: 'strafe' },
+      ]},
+      { hpAbove: 0.33, steps: [
+        { pattern: 'ring8', interval: 1.6, move: 'chase' },
+        { pattern: 'spiral', interval: 0.22, move: 'strafe' },
+      ]},
+      { hpAbove: 0, steps: [
+        { pattern: 'spiral', interval: 0.16, move: 'strafe' },
+        { pattern: 'aimedTriple', interval: 1.0, move: 'chase' },
+      ]},
+    ],
   },
   golem: {
     id: 'golem', name: 'Каменный голем', archetype: 'shooter', hp: 45, speed: 26, tier: 4,
@@ -105,7 +142,12 @@ export const ENEMIES = {
   },
 };
 
-// Монстры тира min..max — для спавна по сложности
+// Монстры тира min..max — для спавна по сложности (без боссов и войск Тьмы)
 export function enemiesOfTier(min, max) {
-  return Object.values(ENEMIES).filter(e => e.tier >= min && e.tier <= max && e.id !== 'bossOgre').map(e => e.id);
+  return Object.values(ENEMIES)
+    .filter(e => e.tier >= min && e.tier <= max && e.archetype !== 'boss' && e.faction !== 'darkness')
+    .map(e => e.id);
 }
+
+// войско Тьмы для фортов и рейдов
+export const DARK_KINDS = ['darkSoldier', 'darkSoldier', 'darkArcher', 'darkMage', 'darkKnight'];

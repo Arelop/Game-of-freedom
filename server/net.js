@@ -51,6 +51,9 @@ export class Net {
           pois: game.world.pois.map(o => ({ x: o.x, y: o.y, name: o.name, type: o.type, cleared: o.cleared })),
           biomes: rleEncode(Array.from(this.biomeMap ??= buildBiomeMap(game.world))),
           roads: game.world.roads,
+          citadel: game.world.citadel
+            ? { x: game.world.citadel.x, y: game.world.citadel.y, name: game.world.citadel.name }
+            : null,
         },
       }));
       return;
@@ -64,7 +67,7 @@ export class Net {
         p.inputs.push({
           seq: m.seq | 0, dt,
           mx: clamp(+m.mx || 0), my: clamp(+m.my || 0),
-          aim: +m.aim || 0, fire: !!m.fire, roll: !!m.roll,
+          aim: +m.aim || 0, fire: !!m.fire, roll: !!m.roll, blk: !!m.blk,
         });
         if (p.inputs.length > 30) p.inputs.splice(0, p.inputs.length - 30);
         break;
@@ -74,8 +77,9 @@ export class Net {
         ws.send(JSON.stringify({
           t: MSG.PONG, t0: m.t0, tick: game.tick, time: game.world.time, day: game.world.day,
           pops: game.world.settlements.map(s => s.population),
-          sts: game.world.settlements.map(s => s.ruined ? 2 : s.captured ? 1 : 0),
+          sts: game.world.settlements.map(s => s.ruined ? 2 : s.captured ? s.faction === 'darkness' ? 3 : 1 : 0),
           rel: RELATIONS,
+          dark: game.world.citadel ? { pw: Math.round(game.world.citadel.power), f: game.world.citadel.forts.length } : null,
         }));
         break;
       case MSG.SWITCH_WEAPON: {
@@ -92,6 +96,7 @@ export class Net {
       case MSG.SPEND_STAT: game.spendStat(p, String(m.stat || '')); break;
       case MSG.LEARN_TALENT: game.learnTalent(p, String(m.id || '')); break;
       case MSG.SELL_ITEM: game.sellItem(p, String(m.item || '')); break;
+      case MSG.ABILITY: game.useAbility(p, Math.max(0, Math.min(2, m.slot | 0))); break;
     }
   }
 
@@ -140,6 +145,7 @@ export class Net {
         i: 'p' + q.id, tp: 'p', k: q.sprite, x: r1(q.x), y: r1(q.y),
         a: r2(q.aim), h: q.hp, hm: q.maxHp, nm: q.name, dn: q.dead ? 1 : 0,
         rl: q.rollT > 0 ? 1 : 0, w: game.weapon(q).id, lv: q.level,
+        bk: q.blocking ? 1 : 0, iv: q.invisT > 0 ? 1 : 0,
       });
     }
     for (const e of game.entities.values()) {
@@ -178,6 +184,7 @@ export class Net {
         sp: p.statPts, tp2: p.talentPts, st: p.stats, tl: p.talents,
         q: p.quest ? { title: p.quest.title, done: p.quest.done, tx: p.quest.tx, ty: p.quest.ty } : null,
         rep: p.rep,
+        ab: (p.abCd || []).map(v => r1(v)), blk: p.blocking ? 1 : 0, inv2: r1(p.invisT || 0),
       },
       ents,
     };

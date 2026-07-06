@@ -23,6 +23,7 @@ export function saveWorld(game) {
         captured: s.captured, ruined: s.ruined, faction: s.faction,
       })),
       pois: w.pois.map(o => ({ id: o.id, cleared: o.cleared })),
+      citadel: w.citadel ? { power: w.citadel.power, forts: w.citadel.forts } : null,
       tokens: game.abstract.tokens.filter(t => !t.hydrated).map(({ hydrated, ...t }) => t),
       events: game.events.entries,
       players: [...game.players.values()].map(p => ({
@@ -56,6 +57,7 @@ export function loadWorld(game) {
       if (o) o.cleared = rec.cleared;
     }
     if (data.tokens) { game.abstract.tokens = data.tokens.map(t => ({ ...t, hydrated: null })); }
+    if (data.citadel && w.citadel) { w.citadel.power = data.citadel.power; w.citadel.forts = data.citadel.forts || []; }
     if (data.events) game.events.entries = data.events;
     game.savedPlayers = new Map((data.players || []).map(p => [p.name, p]));
     game.chunks.cache.clear();
@@ -72,7 +74,16 @@ export function applySavedPlayer(game, p) {
     x: rec.x, y: rec.y, hp: Math.max(1, rec.hp), hunger: rec.hunger, coins: rec.coins,
     weapons: rec.weapons, ammo: rec.ammo, inventory: rec.inventory, rep: rec.rep,
   });
-  if (rec.equipment) p.equipment = { armor: null, helmet: null, amulet: null, shield: null, ...rec.equipment };
+  if (rec.equipment) {
+    // миграция старых слотов на новые
+    const mig = { armor: 'chest', helmet: 'head', amulet: 'acc1', shield: 'offhand' };
+    const eq = { head: null, chest: null, legs: null, offhand: null, acc1: null, acc2: null, ring: null };
+    for (const [k, v] of Object.entries(rec.equipment)) {
+      if (!v) continue;
+      eq[mig[k] || k] = v;
+    }
+    p.equipment = eq;
+  }
   if (rec.cls) { // сохранённый персонаж: класс и прокачка из сейва
     p.cls = rec.cls;
     p.sprite = CLASSES[rec.cls]?.sprite || p.sprite;

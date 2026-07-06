@@ -3,7 +3,7 @@ import { STR, ITEM_NAMES } from '../../shared/strings.js';
 import { MSG } from '../../shared/protocol.js';
 import { ITEMS, GEAR_SLOTS, SLOT_NAMES, isGear, isPotion, describeItem, isWeaponItem, weaponIdOf, sellPrice } from '../../shared/items.js';
 import { AMMO_NAMES, WEAPONS } from '../../shared/weapons.js';
-import { getWeapon, getItem, rarityOf, sellPriceR } from '../../shared/rarity.js';
+import { getWeapon, getItem, rarityOf, sellPriceR, RARITIES } from '../../shared/rarity.js';
 import { CLASSES, STAT_KEYS, STAT_NAMES, STAT_DESC, xpNeed, MAX_LEVEL } from '../../shared/classes.js';
 import { TALENTS, TIER_REQ } from '../../shared/talents.js';
 import { SFX } from '../sfx.js';
@@ -25,6 +25,71 @@ export class Panels {
     this.iconCache = new Map();
     this.helpEl.textContent = STR.controls;
     setTimeout(() => { this.helpEl.style.display = 'none'; }, 20000);
+    // плавающая карточка предмета
+    this.tipEl = document.createElement('div');
+    this.tipEl.id = 'tipcard';
+    document.body.appendChild(this.tipEl);
+  }
+
+  // ---------- карточка предмета (красивый тултип) ----------
+  showTip(html, x, y) {
+    const t = this.tipEl;
+    t.innerHTML = html;
+    t.style.display = 'block';
+    const r = t.getBoundingClientRect();
+    let px = x + 16, py = y + 12;
+    if (px + r.width > innerWidth - 8) px = x - r.width - 12;
+    if (py + r.height > innerHeight - 8) py = innerHeight - r.height - 8;
+    t.style.left = Math.max(4, px) + 'px';
+    t.style.top = Math.max(4, py) + 'px';
+  }
+
+  hideTip() { this.tipEl.style.display = 'none'; }
+
+  bindTip(el, htmlFn) {
+    el.onmouseenter = e => this.showTip(htmlFn(), e.clientX, e.clientY);
+    el.onmousemove = e => { if (this.tipEl.style.display === 'block') this.showTip(htmlFn(), e.clientX, e.clientY); };
+    el.onmouseleave = () => this.hideTip();
+  }
+
+  // карточка экипировки/зелья/материала
+  tipItem(itemId, { action = null, price = true } = {}) {
+    const it = getItem(itemId);
+    const r = rarityOf(itemId);
+    const name = it?.name || ITEM_NAMES[itemId] || itemId;
+    const type = it?.slot ? SLOT_NAMES[it.slot === 'acc' ? 'acc1' : it.slot] || it.slot
+      : it?.use ? 'Расходник' : 'Материал';
+    const rarLabel = r.name ? ` · ${r.name}` : '';
+    const stats = describeItem(itemId, it);
+    const lines = stats ? stats.split(', ').map(s => `<div class="tstat">${s}</div>`).join('') : '';
+    const blockLine = it?.block ? '<div class="tinfo">Блок на ПКМ: гасит удары спереди</div>' : '';
+    return `<div class="tname" style="color:${r.color}">${name}</div>`
+      + `<div class="ttype">${type}${rarLabel}</div>`
+      + lines + blockLine
+      + (price ? `<div class="tprice">Цена продажи: ${sellPriceR(itemId)} мон.</div>` : '')
+      + (action ? `<div class="tact">клик — ${action}</div>` : '');
+  }
+
+  // карточка оружия
+  tipWeapon(wid, { action = null, price = true } = {}) {
+    const w = getWeapon(wid);
+    if (!w) return wid;
+    const r = RARITIES[w.rarity || 'c'];
+    const school = { melee: 'Ближний бой', ranged: 'Дальний бой', magic: 'Магия' }[w.school] || '';
+    const lines = [
+      `<div class="tstat">Урон: ${w.damage}</div>`,
+      `<div class="tstat">Темп: ${w.fireRate}/с</div>`,
+    ];
+    if (w.ammoType) lines.push(`<div class="tinfo">Боеприпас: ${AMMO_NAMES[w.ammoType]}</div>`);
+    if (w.slow) lines.push('<div class="tinfo">Замедляет врагов</div>');
+    if (w.explode) lines.push('<div class="tinfo">Взрывается по области</div>');
+    if (w.chain) lines.push('<div class="tinfo">Молния скачет по врагам</div>');
+    if (w.structDmg) lines.push(`<div class="tinfo">Ломает постройки (${w.structDmg})</div>`);
+    return `<div class="tname" style="color:${r.color}">${w.name.replace(/ \[.*\]$/, '')}</div>`
+      + `<div class="ttype">${school}${r.name ? ' · ' + r.name : ''}</div>`
+      + lines.join('')
+      + (price ? `<div class="tprice">Цена продажи: ${Math.max(5, Math.round(w.price * 0.4))} мон.</div>` : '')
+      + (action ? `<div class="tact">клик — ${action}</div>` : '');
   }
 
   toast(text) {
@@ -65,7 +130,7 @@ export class Panels {
 
   toggleInventory() {
     this.invOpen = !this.invOpen;
-    if (!this.invOpen) this.sellMode = false;
+    if (!this.invOpen) { this.sellMode = false; this.hideTip(); }
     this.invEl.style.display = this.invOpen ? 'block' : 'none';
     if (this.invOpen) this.renderInventory();
   }
@@ -148,7 +213,7 @@ export class Panels {
       const wid = you.ws?.[i];
       if (wid) {
         cell.appendChild(this.freshIcon(getWeapon(wid)?.sprite));
-        cell.title = this.weaponTooltip(wid) + '\n(клик — убрать в сумку)';
+        this.bindTip(cell, () => this.tipWeapon(wid, { action: 'убрать в сумку' }));
         cell.classList.add('filled');
         const rcW = this.rarColor('weapon:' + wid);
         if (rcW) cell.style.borderColor = rcW;
@@ -156,42 +221,65 @@ export class Panels {
         const num = document.createElement('span');
         num.className = 'slotnum'; num.textContent = i + 1;
         cell.appendChild(num);
-        cell.onclick = () => { SFX.ui(); this.net.send({ t: MSG.UNEQUIP, slot: 'w' + i }); setTimeout(() => this.renderInventory(), 150); };
+        cell.onclick = () => { SFX.ui(); this.hideTip(); this.net.send({ t: MSG.UNEQUIP, slot: 'w' + i }); setTimeout(() => this.renderInventory(), 150); };
       } else {
         const lbl = document.createElement('span');
         lbl.className = 'eqlabel'; lbl.textContent = '—';
-        cell.title = 'Пустая ячейка оружия';
         cell.appendChild(lbl);
       }
       wpnRow.appendChild(cell);
     }
     el.appendChild(wpnRow);
 
-    // --- экипировка ---
+    // --- экипировка: кукла персонажа ---
     el.appendChild(header('Экипировка'));
-    const eqRow = document.createElement('div');
-    eqRow.className = 'eqrow';
-    for (const slot of GEAR_SLOTS) {
+    const doll = document.createElement('div');
+    doll.className = 'doll';
+    // сетка 3×4: голова сверху, руки по бокам груди, ноги, аксессуары и кольцо
+    const LAYOUT = [
+      null, 'head', null,
+      'offhand', 'chest', 'weapon',
+      'acc1', 'legs', 'acc2',
+      null, 'ring', null,
+    ];
+    for (const slot of LAYOUT) {
+      if (slot === null) {
+        const sp = document.createElement('div');
+        sp.className = 'dollspacer';
+        doll.appendChild(sp);
+        continue;
+      }
       const cell = document.createElement('div');
       cell.className = 'eqslot';
-      const itemId = you.eq?.[slot];
-      if (itemId) {
-        cell.appendChild(this.freshIcon(this.itemIcon(itemId)));
-        cell.title = `${this.itemName(itemId)} — ${describeItem(itemId, getItem(itemId))}\n(клик — снять)`;
-        cell.classList.add('filled');
-        const rcE = this.rarColor(itemId);
-        if (rcE) cell.style.borderColor = rcE;
-        cell.onclick = () => { SFX.ui(); this.net.send({ t: MSG.UNEQUIP, slot }); setTimeout(() => this.renderInventory(), 150); };
+      const nameTag = document.createElement('span');
+      nameTag.className = 'slotname';
+      if (slot === 'weapon') {
+        // правая рука: текущее оружие (управляется ячейками 1-4)
+        nameTag.textContent = 'Правая рука';
+        const wid = you.w;
+        if (wid) {
+          cell.appendChild(this.freshIcon(getWeapon(wid)?.sprite));
+          cell.classList.add('filled');
+          const rc = this.rarColor('weapon:' + wid);
+          if (rc) cell.style.borderColor = rc;
+          this.bindTip(cell, () => this.tipWeapon(wid, { action: null, price: false }));
+        }
       } else {
-        cell.title = SLOT_NAMES[slot];
-        const lbl = document.createElement('span');
-        lbl.className = 'eqlabel';
-        lbl.textContent = SLOT_NAMES[slot];
-        cell.appendChild(lbl);
+        nameTag.textContent = SLOT_NAMES[slot];
+        const itemId = you.eq?.[slot];
+        if (itemId) {
+          cell.appendChild(this.freshIcon(this.itemIcon(itemId)));
+          cell.classList.add('filled');
+          const rcE = this.rarColor(itemId);
+          if (rcE) cell.style.borderColor = rcE;
+          this.bindTip(cell, () => this.tipItem(itemId, { action: 'снять', price: false }));
+          cell.onclick = () => { SFX.ui(); this.hideTip(); this.net.send({ t: MSG.UNEQUIP, slot }); setTimeout(() => this.renderInventory(), 150); };
+        }
       }
-      eqRow.appendChild(cell);
+      cell.appendChild(nameTag);
+      doll.appendChild(cell);
     }
-    el.appendChild(eqRow);
+    el.appendChild(doll);
 
     // --- бафы ---
     const buffs = Object.entries(you.bf || {});
@@ -224,29 +312,33 @@ export class Panels {
       const isWpn = isWeaponItem(item);
       const rc = this.rarColor(item);
       if (rc) cell.style.borderColor = rc;
-      const desc = isWpn ? this.weaponTooltip(weaponIdOf(item)) : describeItem(item, getItem(item));
       const price = sellPriceR(item);
 
       if (this.sellMode) {
         cell.classList.add('sellable');
-        cell.title = `${this.itemName(item)}\nПродать за ${price} мон.`;
+        this.bindTip(cell, () => isWpn
+          ? this.tipWeapon(weaponIdOf(item), { action: `продать за ${price} мон.` })
+          : this.tipItem(item, { action: `продать за ${price} мон.` }));
         const tag = document.createElement('span');
         tag.className = 'pricetag'; tag.textContent = price;
         cell.appendChild(tag);
         cell.onclick = () => {
           SFX.pickup();
+          this.hideTip();
           this.net.send({ t: MSG.SELL_ITEM, item });
           setTimeout(() => this.renderInventory(), 150);
         };
       } else {
         const action = (isWpn || isGear(item)) ? (isWpn ? 'взять в руки' : 'надеть')
           : (USABLE_FOOD.has(item) || isPotion(item)) ? 'использовать' : null;
-        cell.title = (isWpn ? desc : this.itemName(item) + (desc ? ` — ${desc}` : ''))
-          + (action ? `\n(клик — ${action})` : '') + `\nЦена продажи: ${price} мон.`;
+        this.bindTip(cell, () => isWpn
+          ? this.tipWeapon(weaponIdOf(item), { action })
+          : this.tipItem(item, { action }));
         if (action) {
           cell.classList.add('usable');
           cell.onclick = () => {
             SFX.ui();
+            this.hideTip();
             this.net.send((isWpn || isGear(item)) ? { t: MSG.EQUIP, item } : { t: MSG.USE_ITEM, item });
             setTimeout(() => this.renderInventory(), 150);
           };
@@ -301,19 +393,34 @@ export class Panels {
     const you = this.net.you;
     if (!you) return;
     const NAMES = { severane: 'Северяне', ozerny: 'Озёрный союз', stepnyaki: 'Степняки', bandits: 'Вольница' };
-    el.innerHTML = '<h3>Фракции</h3>';
+    el.innerHTML = '<h3>Дипломатия</h3>';
+
+    // Армия Тьмы — общий враг: мощь Цитадели и её форты
+    const dark = this.net.darkPower;
+    if (dark) {
+      const block = document.createElement('div');
+      block.className = 'facblock dark';
+      const forts = this.net.mapInfo.settlements.filter(s => s.st === 3).map(s => s.name).join(', ');
+      const pw = Math.min(100, Math.round(dark.pw / 2));
+      block.innerHTML = `
+        <div class="facname">⛧ Армия Тьмы <span style="color:#d9574a">${you.rep?.darkness ?? -100}</span></div>
+        <div class="facbar"><div class="facfill" style="width:${pw}%;background:#7b2fbe"></div></div>
+        <div class="facvill">Мощь Цитадели: ${dark.pw} · Фортов: ${dark.f}${forts ? ` (${forts})` : ''}</div>
+        <div class="facrel">Ведёт войну со всеми добрыми фракциями</div>
+        <div class="facacts"><div>⚔ переговоры невозможны — только сталь</div>
+        <div>✓ освобождение фортов и разгром гарнизона Цитадели ослабляют Тьму</div></div>`;
+      el.appendChild(block);
+    }
+
     for (const [f, fname] of Object.entries(NAMES)) {
       const rep = you.rep?.[f] ?? 0;
       const col = rep > 20 ? '#99e550' : rep < -20 ? '#d9574a' : '#d9a066';
       const block = document.createElement('div');
       block.className = 'facblock';
 
-      // репутация полосой
-      const villages = this.net.mapInfo.settlements
-        .filter((s, i) => s.faction === f || (this.net.mapInfo.settlements[i].st === undefined && s.faction === f));
       const vlist = this.net.mapInfo.settlements
         .filter(s => s.faction === f)
-        .map(s => `${s.name}${s.st === 1 ? '⚔' : s.st === 2 ? '☠' : ''}`).join(', ');
+        .map(s => `${s.name}${s.st === 3 ? '⛧' : s.st === 1 ? '⚔' : s.st === 2 ? '☠' : ''}`).join(', ');
 
       // отношения с другими фракциями
       const rels = Object.entries(this.net.relations?.[f] || {})

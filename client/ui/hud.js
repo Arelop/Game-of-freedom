@@ -3,6 +3,7 @@
 import { VIEW_W, VIEW_H, WORLD_TILES, TILE, PLAYER_MAX_HP, SEASONS, seasonOf } from '../../shared/constants.js';
 import { getWeapon } from '../../shared/rarity.js';
 import { STR } from '../../shared/strings.js';
+import { abilitiesOf } from '../../shared/abilities.js';
 
 export class Hud {
   constructor(atlas) { this.atlas = atlas; this.debug = false; }
@@ -75,6 +76,7 @@ export class Hud {
       ctx.fillText((you.q.done ? '✓ ' : '• ') + you.q.title, 5, 26);
     }
 
+    this.renderAbilities(ctx, you);
     this.renderMinimap(ctx, net);
 
     if (this.debug) {
@@ -88,6 +90,41 @@ export class Hud {
     }
   }
 
+  // панель способностей Q/E/R с кулдаунами (снизу по центру)
+  renderAbilities(ctx, you) {
+    const abs = abilitiesOf(you.cls);
+    if (!abs.length) return;
+    const KEYS = ['Q', 'E', 'R'];
+    const S = 18, GAP = 3;
+    const x0 = Math.round(VIEW_W / 2 - (S * 3 + GAP * 2) / 2), y0 = VIEW_H - S - 5;
+    ctx.textAlign = 'left';
+    for (let i = 0; i < abs.length; i++) {
+      const ab = abs[i];
+      const x = x0 + i * (S + GAP);
+      const locked = (you.lvl || 1) < ab.lvl;
+      const cd = you.ab?.[i] || 0;
+      const noMana = ab.mana > 0 && (you.ammo?.mana || 0) < ab.mana;
+      ctx.fillStyle = 'rgba(20,18,26,.85)';
+      ctx.fillRect(x - 1, y0 - 1, S + 2, S + 2);
+      this.atlas.draw(ctx, ab.icon, x + S / 2, y0 + S / 2, {
+        alpha: locked ? 0.25 : noMana ? 0.5 : 1,
+        scale: (this.atlas.map[ab.icon]?.w || 16) > 20 ? 0.5 : 1,
+      });
+      if (locked) { // замок: откроется с уровнем
+        ctx.fillStyle = '#696a6a';
+        ctx.fillText(String(ab.lvl), x + S / 2 - 2, y0 + S / 2 - 4);
+      } else if (cd > 0) { // шторка кулдауна снизу вверх
+        const k = Math.min(1, cd / ab.cd);
+        ctx.fillStyle = 'rgba(10,10,16,.75)';
+        ctx.fillRect(x, y0 + S * (1 - k), S, S * k);
+        ctx.fillStyle = '#eee';
+        ctx.fillText(Math.ceil(cd) + '', x + S / 2 - 2, y0 + S / 2 - 4);
+      }
+      ctx.fillStyle = locked ? '#696a6a' : '#fbf236';
+      ctx.fillText(KEYS[i], x + 1, y0 + S - 8);
+    }
+  }
+
   renderMinimap(ctx, net) {
     if (net.mapId !== 'over' || !net.you) return;
     const S = 52, M = 4;
@@ -96,8 +133,12 @@ export class Hud {
     ctx.fillRect(x0 - 1, y0 - 1, S + 2, S + 2);
     const k = S / (WORLD_TILES * TILE);
     for (const s of net.mapInfo.settlements) {
-      ctx.fillStyle = '#99e550';
+      ctx.fillStyle = s.st === 3 ? '#7b2fbe' : s.st === 2 ? '#696a6a' : s.st === 1 ? '#d9574a' : '#99e550';
       ctx.fillRect(x0 + Math.round(s.x * TILE * k) - 1, y0 + Math.round(s.y * TILE * k) - 1, 2, 2);
+    }
+    if (net.mapInfo.citadel) {
+      ctx.fillStyle = '#7b2fbe';
+      ctx.fillRect(x0 + Math.round(net.mapInfo.citadel.x * TILE * k) - 1, y0 + Math.round(net.mapInfo.citadel.y * TILE * k) - 1, 3, 3);
     }
     for (const p of net.mapInfo.pois) {
       ctx.fillStyle = p.cleared ? '#696a6a' : p.type === 'dungeon' ? '#d9574a' : '#df7126';

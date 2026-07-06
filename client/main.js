@@ -3,6 +3,7 @@ import { VIEW_W, VIEW_H, SIM_DT, TILE, PLAYER_RADIUS } from '../shared/constants
 import { WEAPONS } from '../shared/weapons.js';
 import { getWeapon, getItem, rarityOf } from '../shared/rarity.js';
 import { ITEMS } from '../shared/items.js';
+import { abilitiesOf } from '../shared/abilities.js';
 import { STR } from '../shared/strings.js';
 import { MSG, rleDecode } from '../shared/protocol.js';
 import { Net } from './net.js';
@@ -57,6 +58,7 @@ let swingAnim = 0;       // анимация замаха своего игро�
 const swings = [];       // {x,y,aim,range,arc,t,maxT,color}
 const floatTexts = [];   // летящие цифры урона {x,y,text,color,t,big}
 const chainFx = [];      // молнии {pts:[[x,y]..], t}
+const ringFx = [];       // кольца/конусы способностей {x,y,r0,r1,t,dur,color,arc?,aim?,fill?}
 
 // crawl-спрайты хранятся 32px (красивые иконки) — в мире рисуем 0.5
 function worldScale(name) {
@@ -204,6 +206,11 @@ net.handlers.onFx = (kind, m) => {
     case 'toast': panels.toast(m.text); break;
     case 'dialog': panels.showDialog(m); break;
     case 'marker': net.mapInfo.markers = net.mapInfo.markers || []; net.mapInfo.markers.push(m); break;
+    case 'block':
+      particles.burst(m.x, m.y, '#9badb7', 6, 60, 0.2);
+      if (m.pid === net.myId) { addFloatText(m.x, m.y - 8, 'БЛОК', '#9badb7'); SFX.hit(); }
+      break;
+    case 'ability': spawnAbilityFx(m); break;
     case 'dodge':
       if (m.pid === net.myId) addFloatText(m.x, m.y - 6, 'УВОРОТ', '#63c5ff');
       particles.dust(m.x, m.y);
@@ -216,16 +223,83 @@ net.handlers.onFx = (kind, m) => {
 // разовые клавиши
 input.onKey = k => {
   if (menu.style.display !== 'none') return;
-  if (k === 'KeyE') { net.send({ t: MSG.INTERACT }); SFX.ui(); }
-  if (k === 'KeyR') net.send({ t: MSG.RELOAD });
+  if (k === 'KeyF') { net.send({ t: MSG.INTERACT }); SFX.ui(); }
+  if (k === 'KeyT') net.send({ t: MSG.RELOAD });
+  if (k === 'KeyQ') useAbility(0);
+  if (k === 'KeyE') useAbility(1);
+  if (k === 'KeyR') useAbility(2);
   if (k === 'Tab') panels.toggleInventory();
   if (k === 'KeyC') panels.toggleChar();
-  if (k === 'KeyF') panels.toggleFactions();
+  if (k === 'KeyP') panels.toggleFactions();
   if (k === 'KeyM') bigMap = !bigMap;
   if (k === 'F3') hud.debug = !hud.debug;
   if (k === 'Escape') panels.hideDialog();
   if (/^Digit[1-4]$/.test(k)) net.send({ t: MSG.SWITCH_WEAPON, slot: +k.slice(5) - 1 });
 };
+
+// анимации способностей: кольца, конусы, частицы, тряска
+function spawnAbilityFx(m) {
+  const my = m.pid === net.myId;
+  switch (m.id) {
+    case 'power_strike':
+      particles.burst(m.x, m.y, '#df7126', 14, 90, 0.35, 2);
+      ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 44, t: 0, dur: 0.25, color: '#df7126' });
+      cam.addTrauma(my ? 0.4 : 0.2); SFX.boom();
+      break;
+    case 'war_cry':
+      ringFx.push({ x: m.x, y: m.y, r0: 10, r1: 95, t: 0, dur: 0.45, color: '#fbf236' });
+      addFloatText(m.x, m.y - 12, 'КЛИЧ!', '#fbf236', true);
+      cam.addTrauma(0.25); SFX.die();
+      break;
+    case 'whirlwind':
+      for (let i = 0; i < 3; i++)
+        ringFx.push({ x: m.x + Math.cos(m.aim) * i * 28, y: m.y + Math.sin(m.aim) * i * 28, r0: 6, r1: 30, t: -i * 0.06, dur: 0.3, color: '#eeeeee' });
+      particles.dust(m.x, m.y); SFX.roll();
+      break;
+    case 'flame_wave':
+      ringFx.push({ x: m.x, y: m.y, r0: 12, r1: 110, t: 0, dur: 0.4, color: '#df7126', arc: 1.3, aim: m.aim, fill: true });
+      particles.burst(m.x + Math.cos(m.aim) * 30, m.y + Math.sin(m.aim) * 30, '#df7126', 16, 100, 0.4, 2);
+      particles.burst(m.x + Math.cos(m.aim) * 60, m.y + Math.sin(m.aim) * 60, '#fbf236', 10, 60, 0.35);
+      SFX.boom();
+      break;
+    case 'frost_nova':
+      ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 85, t: 0, dur: 0.45, color: '#63c5ff' });
+      particles.burst(m.x, m.y, '#63c5ff', 20, 90, 0.5);
+      SFX.zap();
+      break;
+    case 'blink':
+      particles.burst(m.x, m.y, '#b57edc', 12, 70, 0.35);
+      ringFx.push({ x: m.x, y: m.y, r0: 14, r1: 4, t: 0, dur: 0.25, color: '#b57edc' });
+      SFX.zap();
+      break;
+    case 'shadow_dash':
+      for (let i = 0; i < 4; i++)
+        particles.burst(m.x + Math.cos(m.aim) * i * 24, m.y + Math.sin(m.aim) * i * 24, '#45283c', 5, 30, 0.3);
+      SFX.roll();
+      break;
+    case 'smoke_bomb':
+      particles.burst(m.x, m.y, '#847e87', 26, 60, 0.8, 2);
+      ringFx.push({ x: m.x, y: m.y, r0: 6, r1: 40, t: 0, dur: 0.6, color: '#847e87', fill: true });
+      SFX.boom();
+      break;
+    case 'blade_storm':
+      ringFx.push({ x: m.x, y: m.y, r0: 6, r1: 50, t: 0, dur: 0.3, color: '#eeeeee' });
+      SFX.shoot?.();
+      break;
+  }
+}
+
+// применить способность Q/E/R: клиент шлёт запрос, проверив уровень и кулдаун локально
+function useAbility(slot) {
+  const you = net.you;
+  if (!you || you.dead || panels.dialogOpen) return;
+  const ab = abilitiesOf(you.cls)[slot];
+  if (!ab) return;
+  if (you.lvl < ab.lvl) { panels.toast(`«${ab.name}» откроется на уровне ${ab.lvl}`); return; }
+  if ((you.ab?.[slot] || 0) > 0.2) return;
+  if (ab.mana > 0 && (you.ammo?.mana || 0) < ab.mana) { panels.toast('Не хватает маны'); return; }
+  net.send({ t: MSG.ABILITY, slot });
+}
 
 // ---------- цикл ----------
 let last = performance.now();
@@ -259,8 +333,9 @@ function simStep() {
   const mv = panels.dialogOpen ? { mx: 0, my: 0 } : input.moveVec();
   const roll = panels.dialogOpen ? false : input.takeRoll();
   const fire = !panels.dialogOpen && input.fire;
+  const blk = !panels.dialogOpen && input.block;
 
-  net.simStep({ mx: mv.mx, my: mv.my, aim, fire, roll });
+  net.simStep({ mx: mv.mx, my: mv.my, aim, fire, roll, blk });
 
   // локальная атака (косметика; авторитет — сервер)
   const you = net.you;
@@ -292,6 +367,8 @@ function simStep() {
   for (let i = floatTexts.length - 1; i >= 0; i--) if (floatTexts[i].t <= 0) floatTexts.splice(i, 1);
   for (const c of chainFx) c.t -= SIM_DT;
   for (let i = chainFx.length - 1; i >= 0; i--) if (chainFx[i].t <= 0) chainFx.splice(i, 1);
+  for (const r of ringFx) r.t += SIM_DT;
+  for (let i = ringFx.length - 1; i >= 0; i--) if (ringFx[i].t >= ringFx[i].dur) ringFx.splice(i, 1);
 
   // перекат: эффекты на старте
   if (net.pred.rollT > 0 && !wasRolling) { particles.dust(net.pred.x, net.pred.y); SFX.roll(); }
@@ -383,6 +460,30 @@ function render(timeSec) {
     ctx.globalAlpha = 1;
   }
 
+  // кольца и конусы способностей
+  for (const r of ringFx) {
+    if (r.t < 0) continue; // отложенный старт (волны вихря)
+    const k = Math.min(1, r.t / r.dur);
+    const rad = r.r0 + (r.r1 - r.r0) * k;
+    const s = cam.toScreen(r.x, r.y);
+    ctx.globalAlpha = (1 - k) * 0.9;
+    ctx.strokeStyle = r.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (r.arc !== undefined) ctx.arc(s.x, s.y - 2, rad, r.aim - r.arc / 2, r.aim + r.arc / 2);
+    else ctx.arc(s.x, s.y - 2, rad, 0, Math.PI * 2);
+    ctx.stroke();
+    if (r.fill) {
+      ctx.globalAlpha = (1 - k) * 0.25;
+      ctx.fillStyle = r.color;
+      ctx.beginPath();
+      if (r.arc !== undefined) { ctx.moveTo(s.x, s.y - 2); ctx.arc(s.x, s.y - 2, rad, r.aim - r.arc / 2, r.aim + r.arc / 2); ctx.closePath(); }
+      else ctx.arc(s.x, s.y - 2, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // цепные молнии: ломаные линии между жертвами
   for (const c of chainFx) {
     ctx.strokeStyle = c.t > 0.1 ? '#fbf236' : '#eeeeee';
@@ -451,13 +552,22 @@ function drawMe(timeSec) {
   const flipX = Math.cos(p.aim) < 0;
   const rolling = p.rollT > 0;
   const bob = Math.abs(Math.sin(timeSec * 10)) * (moving() ? 1 : 0);
+  const alpha = (you.inv2 || 0) > 0 ? 0.35 : 1; // дымовая завеса: полупрозрачность
   if (rolling) {
     const prog = 1 - p.rollT / 0.45;
-    atlas.draw(ctx, sprite, s.x, s.y - 2, { rot: prog * Math.PI * 2 * (flipX ? -1 : 1) });
+    atlas.draw(ctx, sprite, s.x, s.y - 2, { rot: prog * Math.PI * 2 * (flipX ? -1 : 1), alpha });
   } else {
-    atlas.draw(ctx, sprite, s.x, s.y - bob, { flipX });
-    drawWeapon(getWeapon(you.w), s.x, s.y - 2 - bob, p.aim, flipX, swingAnim);
+    atlas.draw(ctx, sprite, s.x, s.y - bob, { flipX, alpha });
+    if (you.blk && input.block) drawShield(you, s.x, s.y - 2 - bob, p.aim);
+    else drawWeapon(getWeapon(you.w), s.x, s.y - 2 - bob, p.aim, flipX, swingAnim);
   }
+}
+
+// щит поднят перед собой (блок на ПКМ)
+function drawShield(you, cx, cy, aim) {
+  const it = getItem(you.eq?.offhand);
+  const icon = it?.icon || 'item_shield_wood';
+  atlas.draw(ctx, icon, cx + Math.cos(aim) * 8, cy + Math.sin(aim) * 8, { scale: worldScale(icon) });
 }
 
 // Оружие в руке: у мелее — замах по дуге, у дальнего — направление прицела.
@@ -500,7 +610,7 @@ function drawEntity(id, r, p, nowMs, timeSec) {
   if (e.tp === 'p') {
     if (e.dn) { atlas.draw(ctx, e.k, s.x, s.y, { rot: Math.PI / 2, alpha: 0.7 }); return; }
     if (flash) atlas.drawTinted(ctx, e.k, s.x, s.y, '#fff', { flipX });
-    else atlas.draw(ctx, e.k, s.x, s.y, { flipX });
+    else atlas.draw(ctx, e.k, s.x, s.y, { flipX, alpha: e.iv ? 0.35 : 1 });
     drawWeapon(getWeapon(e.w), s.x, s.y - 2, p.a || 0, flipX, 0);
     ctx.font = '8px monospace';
     ctx.fillStyle = '#99e550';
@@ -587,11 +697,20 @@ function renderBigMap() {
   for (const s of net.mapInfo.settlements) {
     const x = x0 + s.x * TILE * k, y = y0 + s.y * TILE * k;
     const sz = Math.min(7, 3 + Math.floor((s.pop || 6) / 4)); // размер точки = размер деревни
-    // статус: зелёная — живёт, красная — захвачена, серая — руины
-    ctx.fillStyle = s.st === 2 ? '#696a6a' : s.st === 1 ? '#d9574a' : '#99e550';
+    // статус: зелёная — живёт, красная — захвачена, фиолетовая — форт Тьмы, серая — руины
+    ctx.fillStyle = s.st === 3 ? '#7b2fbe' : s.st === 2 ? '#696a6a' : s.st === 1 ? '#d9574a' : '#99e550';
     ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
-    const mark = s.st === 2 ? ' ☠' : s.st === 1 ? ' ⚔' : '';
+    const mark = s.st === 3 ? ' ⛧' : s.st === 2 ? ' ☠' : s.st === 1 ? ' ⚔' : '';
     ctx.fillText(s.name + (s.pop ? ` (${s.pop})` : '') + mark, x - 18, y - 10);
+  }
+  // Чернокаменная Цитадель — сердце Тьмы
+  if (net.mapInfo.citadel) {
+    const c = net.mapInfo.citadel;
+    const x = x0 + c.x * TILE * k, y = y0 + c.y * TILE * k;
+    ctx.fillStyle = '#7b2fbe';
+    ctx.fillRect(x - 3, y - 3, 7, 7);
+    ctx.fillStyle = '#b57edc';
+    ctx.fillText('⛧ ' + c.name + (net.darkPower ? ` (мощь ${net.darkPower.pw})` : ''), x - 50, y + 6);
   }
   for (const p of net.mapInfo.pois) {
     ctx.fillStyle = p.cleared ? '#696a6a' : p.type === 'dungeon' ? '#d9574a' : '#df7126';

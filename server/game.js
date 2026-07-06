@@ -26,6 +26,7 @@ import { AMMO_NAMES } from '../shared/weapons.js';
 import { CLASSES, STAT_KEYS, statBonuses, xpNeed, MAX_LEVEL } from '../shared/classes.js';
 import { TALENTS, findTalent, canLearn } from '../shared/talents.js';
 import { getWeapon, getItem, splitId, rollRarity, withRarity, sellPriceR } from '../shared/rarity.js';
+import { abilitiesOf } from '../shared/abilities.js';
 
 const NPC_NAMES = [
   'Радомир', 'Всеслав', 'Милана', 'Ярина', 'Добрыня', 'Горазд', 'Любава',
@@ -58,6 +59,7 @@ const SHOP = [
   { item: 'ammo_arrow', price: 10, count: 20 }, { item: 'ammo_bolt', price: 15, count: 8 },
   { item: 'ammo_mana', price: 18, count: 15 }, { item: 'ammo_knife', price: 14, count: 8 },
   { item: 'leather_armor', price: 40 }, { item: 'wood_shield', price: 25 },
+  { item: 'leather_boots', price: 30 }, { item: 'iron_greaves', price: 70 },
   { item: 'iron_helmet', price: 65 }, { item: 'wolf_amulet', price: 55 },
   { item: 'weapon:huntbow', price: 85 }, { item: 'weapon:firestaff', price: 100 },
   { item: 'weapon:axe', price: 90 }, { item: 'weapon:bombs', price: 140 },
@@ -173,9 +175,10 @@ export class Game {
       mags: Object.fromEntries(C.weapons.map(w => [w, WEAPONS[w].magSize || 1])),
       ammo: { ...C.ammo },
       inventory: { bread: 2, bandage: 1 },
-      equipment: { armor: null, helmet: null, amulet: null, shield: null },
+      equipment: { head: null, chest: null, legs: null, offhand: null, acc1: null, acc2: null, ring: null },
       buffs: {},                 // { speed: { mult, t } }
       dmgMult: 1, shadowT: 0, prevRollT: 0, manaRegenT: 0,
+      abCd: [0, 0, 0], invisT: 0,
       coins: 20, hunger: HUNGER_MAX,
       rep: makeReputation(), aggroFactions: new Set(),
       dead: false, downT: 0,
@@ -330,10 +333,13 @@ export class Game {
     if (isWeaponItem(itemId)) { this.equipWeapon(p, itemId); return; }
     const it = getItem(itemId);
     if (!it?.slot) return;
+    // аксессуары занимают любой из двух слотов
+    let slot = it.slot;
+    if (slot === 'acc') slot = !p.equipment.acc1 ? 'acc1' : !p.equipment.acc2 ? 'acc2' : 'acc1';
     p.inventory[itemId]--;
-    const prev = p.equipment[it.slot];
+    const prev = p.equipment[slot];
     if (prev) p.inventory[prev] = (p.inventory[prev] || 0) + 1;
-    p.equipment[it.slot] = itemId;
+    p.equipment[slot] = itemId;
     this.recomputeStats(p);
     this.toast(p, `Надето: ${it.name}`);
   }
@@ -452,6 +458,8 @@ export class Game {
       p.ammo.mana = Math.min(99, (p.ammo.mana || 0) + 1 + Math.round(p.derived?.manaRegen || 0));
     }
     p.shadowT = Math.max(0, p.shadowT - dt);
+    p.invisT = Math.max(0, (p.invisT || 0) - dt);
+    if (p.abCd) for (let i = 0; i < 3; i++) p.abCd[i] = Math.max(0, (p.abCd[i] || 0) - dt);
 
     // Начало переката: Таран и Барьер
     if (p.rollT > p.prevRollT) {
@@ -673,15 +681,18 @@ export class Game {
         if (hyd) { for (const id of hyd) this.entities.delete(id); this.hydratedSettlements.delete(s.id); }
         continue;
       }
-      if (s.captured) { // в захваченной деревне хозяйничают бандиты
+      if (s.captured) { // в захваченной деревне хозяйничают бандиты или гарнизон Тьмы
         if (near && !hyd) {
           const ids = [];
-          const n = 4 + Math.min(3, Math.floor(s.prosperity / 25));
+          const darkFort = s.faction === 'darkness';
+          const kinds = darkFort
+            ? ['darkKnight', 'darkSoldier', 'darkSoldier', 'darkArcher', 'darkMage', 'darkSoldier', 'darkArcher']
+            : ['banditHeavy', 'bandit', 'bandit', 'bandit', 'bandit', 'banditHeavy', 'bandit'];
+          const n = (darkFort ? 5 : 4) + Math.min(3, Math.floor(s.prosperity / 25));
           for (let i = 0; i < n; i++) {
-            const kind = i === 0 ? 'banditHeavy' : 'bandit';
-            ids.push(this.spawnEnemy(kind, 'over',
+            ids.push(this.spawnEnemy(kinds[i % kinds.length], 'over',
               sx + (this.rand() - 0.5) * 120, sy + (this.rand() - 0.5) * 120,
-              { captor: s.id, faction: 'bandits' }));
+              { captor: s.id, faction: s.faction }));
           }
           this.hydratedSettlements.set(s.id, ids);
         } else if (near && hyd) {
@@ -801,6 +812,142 @@ export class Game {
         updateNpc(e, dt, map, this);
       }
     }
+  }
+
+  // ---------- активные способности (Q/E/R) ----------
+  useAbility(p, slot) {
+    if (p.dead || p.rollT > 0) return;
+    const ab = abilitiesOf(p.cls)[slot];
+    if (!ab || p.level < ab.lvl) return;
+    p.abCd = p.abCd || [0, 0, 0];
+    if ((p.abCd[slot] || 0) > 0) return;
+    if (ab.mana > 0 && (p.ammo.mana || 0) < ab.mana) { this.toast(p, 'Не хватает маны'); return; }
+    if (ab.mana > 0) p.ammo.mana -= ab.mana;
+    p.abCd[slot] = ab.cd;
+    const aim = p.aim || 0;
+    const d = p.derived || {};
+    const map = this.mapFor(p.mapId);
+    // урон всем врагам в радиусе (опц. фильтр по конусу)
+    const hitAround = (cx, cy, radius, dmg, kb, filter) => {
+      for (const e of [...this.entities.values()]) {
+        if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+        const def = ENEMIES[e.kind];
+        if (dist2(cx, cy, e.x, e.y) > (radius + def.radius) ** 2) continue;
+        if (filter && !filter(e)) continue;
+        const a = Math.atan2(e.y - cy, e.x - cx);
+        this.damageEnemy(e, dmg, {
+          vx: Math.cos(a), vy: Math.sin(a), knockback: kb, owner: p.id,
+          school: p.cls === 'mage' ? 'magic' : 'melee',
+        });
+      }
+    };
+    switch (ab.id) {
+      case 'power_strike': { // воин Q: сокрушительный удар по площади
+        const mult = this.hasTalent(p, 'ab_power') ? 3.5 : 2.5;
+        const wDmg = this.weapon(p).melee ? this.weapon(p).damage : 4;
+        hitAround(p.x, p.y, 44, Math.round(wDmg * (d.dmgMelee || 1) * mult * 10) / 10, 200);
+        break;
+      }
+      case 'war_cry': { // воин E: стан вокруг, талант — лечит группу
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) < 95 * 95) { e.stunT = 1.5; e.aggro = true; }
+        }
+        if (this.hasTalent(p, 'ab_cryheal')) {
+          for (const q of this.players.values()) {
+            if (q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > 95 * 95) continue;
+            q.hp = Math.min(q.maxHp, q.hp + 1);
+          }
+        }
+        break;
+      }
+      case 'whirlwind': { // воин R: рывок с вращением, урон по пути
+        const dash = this.hasTalent(p, 'ab_whirlfar') ? 120 : 80;
+        for (let i = 0; i < 8; i++) {
+          moveWithCollision(p, Math.cos(aim) * dash / 8, Math.sin(aim) * dash / 8, PLAYER_RADIUS, map);
+          hitAround(p.x, p.y, 30, Math.round(4 * (d.dmgMelee || 1) * 10) / 10, 80);
+        }
+        p.hurtT = Math.max(p.hurtT, 0.4);
+        break;
+      }
+      case 'flame_wave': { // маг Q: конус огня перед собой
+        const wide = this.hasTalent(p, 'ab_wave');
+        const half = (wide ? 50 : 35) * Math.PI / 180;
+        hitAround(p.x, p.y, wide ? 140 : 100, Math.round(5 * (d.dmgMagic || 1) * 1.5 * 10) / 10, 60, e => {
+          let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          return Math.abs(da) <= half;
+        });
+        break;
+      }
+      case 'frost_nova': { // маг E: кольцо льда — заморозка и урон
+        const deep = this.hasTalent(p, 'ab_nova');
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) > 85 * 85) continue;
+          e.slowT = deep ? 4 : 3;
+          e.slowMult = deep ? 0.08 : 0.35;
+          this.damageEnemy(e, Math.round(4 * (d.dmgMagic || 1) * 10) / 10,
+            { vx: 0, vy: 0, knockback: 0, owner: p.id, school: 'magic' });
+        }
+        break;
+      }
+      case 'blink': { // маг R: телепорт по прицелу до первой стены
+        const sx = p.x, sy = p.y;
+        let bx = p.x, by = p.y;
+        for (let i = 1; i <= 14; i++) {
+          const nx = p.x + Math.cos(aim) * 140 * i / 14;
+          const ny = p.y + Math.sin(aim) * 140 * i / 14;
+          if (map.isSolid(Math.floor(nx / TILE), Math.floor(ny / TILE))) break;
+          bx = nx; by = ny;
+        }
+        p.x = bx; p.y = by;
+        p.hurtT = Math.max(p.hurtT, 0.3);
+        if (this.hasTalent(p, 'ab_blink'))
+          this.explodeAt(p.mapId, sx, sy, Math.round(6 * (d.dmgMagic || 1) * 10) / 10, 30, p.id, 0);
+        break;
+      }
+      case 'shadow_dash': { // вор Q: рывок сквозь врагов, режет по линии
+        const sx = p.x, sy = p.y;
+        for (let i = 0; i < 8; i++)
+          moveWithCollision(p, Math.cos(aim) * 95 / 8, Math.sin(aim) * 95 / 8, PLAYER_RADIUS, map);
+        const len2 = dist2(sx, sy, p.x, p.y) || 1;
+        for (const e of [...this.entities.values()]) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          const t = Math.max(0, Math.min(1, ((e.x - sx) * (p.x - sx) + (e.y - sy) * (p.y - sy)) / len2));
+          const lx = sx + (p.x - sx) * t, ly = sy + (p.y - sy) * t;
+          if (dist2(e.x, e.y, lx, ly) < 26 * 26) {
+            this.damageEnemy(e, Math.round(5 * (d.dmgMelee || 1) * 10) / 10,
+              { vx: Math.cos(aim), vy: Math.sin(aim), knockback: 60, owner: p.id, school: 'melee' });
+            if (this.hasTalent(p, 'ab_dash')) e.stunT = 1;
+          }
+        }
+        p.hurtT = Math.max(p.hurtT, 0.35);
+        break;
+      }
+      case 'smoke_bomb': { // вор E: невидимость, враги теряют цель
+        const long = this.hasTalent(p, 'ab_smoke');
+        p.invisT = long ? 5 : 3;
+        if (long) { p.buffs.speed = { mult: 0.3, t: 5 }; this.recomputeStats(p); }
+        for (const e of this.entities.values())
+          if (e.entType === 'enemy' && e.mapId === p.mapId) e.aggro = false;
+        break;
+      }
+      case 'blade_storm': { // вор R: веер клинков во все стороны
+        const count = this.hasTalent(p, 'ab_blades') ? 18 : 12;
+        const atk = this.rollAttack(p, getWeapon('knives'));
+        for (let i = 0; i < count; i++) {
+          const a = aim + (i / count) * Math.PI * 2;
+          this.projectiles.push({
+            x: p.x, y: p.y - 4, vx: Math.cos(a) * 300, vy: Math.sin(a) * 300,
+            life: 0.6, radius: 2, dmg: Math.round(3 * (d.dmgRanged || 1) * 10) / 10, crit: atk.crit,
+            knockback: 40, school: 'ranged', owner: p.id, friendly: true, mapId: p.mapId,
+          });
+        }
+        break;
+      }
+    }
+    this.fx({ t: 'ability', pid: p.id, id: ab.id, x: p.x, y: p.y, aim }, p.mapId, p.x, p.y);
   }
 
   // Сепарация тел: модели не наслаиваются; игрок в перекате проскальзывает
@@ -1072,6 +1219,21 @@ export class Game {
     if (this.rand() < (p.derived?.dodge || 0)) {
       this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
       return;
+    }
+    // блок щитом в левой руке (ПКМ): режет урон, гасит полностью удары спереди
+    if (p.blocking) {
+      const off = getItem(p.equipment.offhand);
+      if (off?.block) {
+        let frontal = false;
+        if (source && source.x !== undefined) {
+          let da = Math.atan2(source.y - p.y, source.x - p.x) - p.aim;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          frontal = Math.abs(da) <= Math.PI / 2.5;
+        }
+        this.fx({ t: 'block', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        if (frontal) { p.hurtT = 0.3; return; } // лобовой удар полностью погашен
+        dmg = Math.max(0.5, Math.round(dmg * 0.5 * 10) / 10);
+      }
     }
     p.hp -= dmg;
     p.hurtT = PLAYER_HURT_INVULN;
@@ -1502,12 +1664,15 @@ export class Game {
       reward: { coins: 25, rep: 10, xp: 30 },
     });
     const captured = this.world.settlements.find(x => x.captured);
-    if (captured) list.push({
-      type: 'clear', poi: null, giver: s.id, done: false, liberate: captured.id,
-      title: `⚔ ОСОБЫЙ: освободить ${captured.name} от бандитов!`,
-      tx: captured.x, ty: captured.y,
-      reward: { coins: 80, rep: 20, xp: 80 },
-    });
+    if (captured) {
+      const dark = captured.faction === 'darkness';
+      list.push({
+        type: 'clear', poi: null, giver: s.id, done: false, liberate: captured.id,
+        title: `⚔ ОСОБЫЙ: освободить ${captured.name} от ${dark ? 'Армии Тьмы' : 'бандитов'}!`,
+        tx: captured.x, ty: captured.y,
+        reward: { coins: dark ? 120 : 80, rep: 20, xp: dark ? 120 : 80 },
+      });
+    }
     p.pendingBoard = list;
     const choices = list.map((q, i) => ({ id: 'takeq:' + i, label: `${q.title} (+${q.reward.coins} мон.)` }));
     choices.push({ id: 'close', label: STR.close });

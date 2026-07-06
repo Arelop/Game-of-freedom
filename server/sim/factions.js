@@ -4,20 +4,22 @@ export const FACTIONS = {
   ozerny: { id: 'ozerny', name: 'Озёрный союз', hostileToPlayers: false },
   stepnyaki: { id: 'stepnyaki', name: 'Степняки', hostileToPlayers: false },
   bandits: { id: 'bandits', name: 'Вольница', hostileToPlayers: true },
+  darkness: { id: 'darkness', name: 'Армия Тьмы', hostileToPlayers: true },
   monsters: { id: 'monsters', name: 'Дикие твари', hostileToPlayers: true },
 };
 
 // отношения фракций между собой (-100..100)
 export const RELATIONS = {
-  severane: { ozerny: 30, stepnyaki: 0, bandits: -80, monsters: -100 },
-  ozerny: { severane: 30, stepnyaki: 10, bandits: -70, monsters: -100 },
-  stepnyaki: { severane: 0, ozerny: 10, bandits: -50, monsters: -100 },
-  bandits: { severane: -80, ozerny: -70, stepnyaki: -50, monsters: -40 },
+  severane: { ozerny: 30, stepnyaki: 0, bandits: -80, monsters: -100, darkness: -100 },
+  ozerny: { severane: 30, stepnyaki: 10, bandits: -70, monsters: -100, darkness: -100 },
+  stepnyaki: { severane: 0, ozerny: 10, bandits: -50, monsters: -100, darkness: -100 },
+  bandits: { severane: -80, ozerny: -70, stepnyaki: -50, monsters: -40, darkness: -30 },
+  darkness: { severane: -100, ozerny: -100, stepnyaki: -100, bandits: -30 },
   monsters: {},
 };
 
 export function makeReputation() {
-  return { severane: 10, ozerny: 10, stepnyaki: 10, bandits: -50, monsters: -100 };
+  return { severane: 10, ozerny: 10, stepnyaki: 10, bandits: -50, monsters: -100, darkness: -100 };
 }
 
 export function isHostileToPlayer(factionId, rep) {

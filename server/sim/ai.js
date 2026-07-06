@@ -11,15 +11,19 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
   const def = ENEMIES[e.kind];
   const shots = [];
 
+  // стан (боевой клич, теневой рывок): полная заморозка мозгов
+  if (e.stunT > 0) { e.stunT -= dt; return shots; }
+
   // замедление (лёд): множитель скорости, пока действует slowT
   let slowF = 1;
   if (e.slowT > 0) { e.slowT -= dt; slowF = e.slowMult || 0.65; }
   e.slowF = slowF;
 
-  // цель — ближайший игрок ИЛИ житель (игроки чуть приоритетнее)
+  // цель — ближайший игрок ИЛИ житель (игроки чуть приоритетнее);
+  // невидимых (дымовая завеса) монстры не видят
   let target = null, bestD = Infinity;
   for (const p of players) {
-    if (p.dead || p.mapId !== e.mapId) continue;
+    if (p.dead || p.mapId !== e.mapId || p.invisT > 0) continue;
     const d = dist2(e.x, e.y, p.x, p.y);
     if (d < bestD) { bestD = d; target = p; }
   }
