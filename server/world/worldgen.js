@@ -143,6 +143,29 @@ export function makeWorld(seed) {
     world.pois.push(poi);
   }
 
+  // Необычные места: хижина отшельника, каменные круги, обелиски, источники
+  const SPECIALS = [
+    { type: 'hermit', name: 'Хижина отшельника', n: 1 },
+    { type: 'circle', name: 'Каменный круг', n: 2 },
+    { type: 'obelisk', name: 'Древний обелиск', n: 2 },
+    { type: 'spring', name: 'Целебный источник', n: 2 },
+  ];
+  let si = 0;
+  for (const spec of SPECIALS) {
+    for (let k = 0; k < spec.n; k++) {
+      const site = findFlatSite(seed, rand, allSites, 40);
+      if (!site) continue;
+      allSites.push(site);
+      const poi = {
+        id: 'sp' + si++, x: site.x, y: site.y, type: spec.type,
+        name: spec.name, cleared: spec.type !== 'circle', // зачищать нужно только круги
+        difficulty: 2, special: true,
+      };
+      stampSpecial(world, poi, rand);
+      world.pois.push(poi);
+    }
+  }
+
   // Чернокаменная Цитадель — оплот Армии Тьмы на юге мира
   let cSite = null;
   for (let tries = 0; tries < 400 && !cSite; tries++) {
@@ -183,6 +206,54 @@ export function makeWorld(seed) {
   }
 
   return world;
+}
+
+// Штампы необычных мест: у каждого типа — своя маленькая сцена
+function stampSpecial(world, poi, rand) {
+  const { x, y, type } = poi;
+  const set = (dx, dy, t) => world.edits.set((x + dx) + ',' + (y + dy), t);
+  if (type === 'hermit') {
+    // хижина 5×4 с дверью на юг, костёр и грядка снаружи
+    for (let dy = -2; dy <= 1; dy++)
+      for (let dx = -2; dx <= 2; dx++)
+        set(dx, dy, (dy === -2 || dy === 1 || dx === -2 || dx === 2) ? T.WALL : T.FLOOR_WOOD);
+    set(0, 1, T.DOOR);
+    set(-1, 0, T.BED);
+    set(1, 0, T.TABLE);
+    set(0, 3, T.CAMPFIRE);
+    set(2, 3, T.BUSH);
+    set(-2, 3, T.BUSH);
+  } else if (type === 'circle') {
+    // кольцо валунов вокруг осквернённого идола, кровь на земле
+    for (let a = 0; a < 8; a++) {
+      const dx = Math.round(Math.cos(a / 8 * Math.PI * 2) * 4);
+      const dy = Math.round(Math.sin(a / 8 * Math.PI * 2) * 4);
+      set(dx, dy, T.ROCK_SOLID);
+    }
+    set(0, 0, T.DARK_ALTAR);
+    set(1, 1, T.BLOOD);
+    set(-1, 0, T.BLOOD);
+    set(0, -2, T.BLOOD);
+  } else if (type === 'obelisk') {
+    // обелиск на древних плитах, обломанные колонны по углам
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++)
+        if (Math.abs(dx) + Math.abs(dy) <= 3) set(dx, dy, T.FLOOR_STONE);
+    set(0, 0, T.OBELISK);
+    set(-2, -2, T.PILLAR);
+    set(2, -2, T.PILLAR);
+    set(-2, 2, T.PILLAR);
+    set(2, 2, T.PILLAR);
+  } else if (type === 'spring') {
+    // целебный фонтан среди цветов и воды
+    set(0, 0, T.FOUNTAIN);
+    set(-1, 0, T.WATER_EDGE);
+    set(1, 0, T.WATER_EDGE);
+    set(0, 1, T.WATER_EDGE);
+    set(0, -1, T.WATER_EDGE);
+    for (const [dx, dy] of [[-2, -1], [2, 1], [-1, 2], [1, -2], [2, -1], [-2, 1]])
+      set(dx, dy, T.BUSH);
+  }
 }
 
 // Крепость Тьмы: чёрные стены 19×15, башни по углам, ворота на севере,

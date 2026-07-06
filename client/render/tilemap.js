@@ -40,6 +40,13 @@ const TILE_SPRITES = {
   [T.FENCE]: ['tile_grass', 'tile_fence'],
   [T.ANVIL]: ['tile_floor_wood', 'obj_anvil'],
   [T.BOARD]: ['tile_grass', 'obj_sign'],
+  [T.OBELISK]: ['tile_grass', 'obj_obelisk'],
+  [T.STATUE]: ['tile_dungeon_floor', 'obj_statue'],
+  [T.FOUNTAIN]: ['tile_grass', 'obj_fountain'],
+  [T.DARK_ALTAR]: ['tile_grass', 'obj_idol'],
+  [T.CRYSTAL_WALL]: ['tile_crystal_wall'],
+  [T.PILLAR]: ['tile_dungeon_floor', 'obj_column'],
+  [T.BLOOD]: ['tile_blood'],
 };
 
 export class TileRenderer {
@@ -74,7 +81,8 @@ export class TileRenderer {
         }
         this.atlas.blit(ctx, spec[0], x * TILE, y * TILE);
         if (spec[1]) this.atlas.blit(ctx, spec[1], x * TILE, y * TILE);
-        if (t === T.CAMPFIRE || t === T.DUNGEON_EXIT || t === T.BOARD)
+        if (t === T.CAMPFIRE || t === T.DUNGEON_EXIT || t === T.BOARD
+          || t === T.CRYSTAL_WALL || t === T.FOUNTAIN) // кристаллы и источники светятся в темноте
           animated.push({ x: cx * CHUNK + x, y: cy * CHUNK + y, tile: t });
       }
     }

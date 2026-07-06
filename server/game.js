@@ -186,6 +186,8 @@ export class Game {
       rep: makeReputation(), aggroFactions: new Set(),
       dead: false, downT: 0,
       quest: null,
+      // сюжетные цепочки именных NPC: стадии, счётчики, осколки
+      story: { rado: 0, capt: 0, mira: 0, bandits: 0, banditsGoal: 0, shards: [], captCamp: null },
       lastSeq: 0, inputs: [],
       fireHeld: false, fireLatch: false,
       hungerTickT: 0,
@@ -721,6 +723,14 @@ export class Game {
         const ids = [];
         const a = s.anchors;
         ids.push(this.spawnNpc('elder', s.id, 'over', sx + 20, sy - 10));
+        // именной NPC: капитан стражи Ярослава живёт в первой деревне
+        if (s === this.world.settlements[0]) {
+          const cid = this.spawnNpc('captain', s.id, 'over', sx + 42, sy + 12, { kind: 'npc_guard' });
+          const cpt = this.entities.get(cid);
+          cpt.name = 'Ярослава';
+          cpt.hp = cpt.maxHp = 24;
+          ids.push(cid);
+        }
         ids.push(this.spawnNpc('merchant', s.id, 'over', (a.stalls[0]?.x ?? s.x) * TILE + 8, (a.stalls[0]?.y ?? s.y) * TILE + 8));
         // ремесленники и служители — если деревня их «выучила»
         if (a.smithy) ids.push(this.spawnNpc('blacksmith', s.id, 'over', a.smithy.x * TILE + 8, a.smithy.y * TILE + 8));
@@ -755,26 +765,52 @@ export class Game {
       }
     }
 
-    // лагеря-POI: засада на подходе
+    // лагеря и каменные круги: засада на подходе
     for (const poi of this.world.pois) {
-      if (poi.type !== 'camp' || poi.cleared) continue;
+      if ((poi.type !== 'camp' && poi.type !== 'circle') || poi.cleared) continue;
       const cx = poi.x * TILE, cy = poi.y * TILE;
       let near = false;
       for (const p of this.players.values())
         if (p.mapId === 'over' && dist2(p.x, p.y, cx, cy) < 350 ** 2) { near = true; break; }
       if (near && !poi.spawned) {
         poi.spawned = [];
-        const kinds = ['bandit', 'bandit', 'banditHeavy', 'bandit'];
+        const circle = poi.type === 'circle';
+        const kinds = circle ? ['imp', 'imp', 'demon', 'imp'] : ['bandit', 'bandit', 'banditHeavy', 'bandit'];
         for (let i = 0; i <= poi.difficulty + 1; i++) {
           poi.spawned.push(this.spawnEnemy(kinds[i % kinds.length], 'over',
-            cx + (this.rand() - 0.5) * 90, cy + (this.rand() - 0.5) * 90, { camp: poi.id, faction: 'bandits' }));
+            cx + (this.rand() - 0.5) * 90, cy + (this.rand() - 0.5) * 90,
+            { camp: poi.id, faction: circle ? 'monsters' : 'bandits' }));
         }
       }
       if (poi.spawned && !poi.spawned.some(id => this.entities.has(id))) {
         poi.cleared = true;
-        this.events.push(this.world.day, `Зачищен лагерь: ${poi.name}`, { x: poi.x, y: poi.y });
+        this.events.push(this.world.day, `Зачищено: ${poi.name}`, { x: poi.x, y: poi.y });
         this.toastAll(`${poi.name} — зачищено!`);
         this.onPoiCleared(poi);
+      }
+    }
+
+    // именные NPC у особых мест: отшельник у хижины, странница у обелиска
+    for (const poi of this.world.pois) {
+      if (!poi.special) continue;
+      const role = poi.type === 'hermit' ? 'hermit'
+        : poi.type === 'obelisk' && this.world.pois.find(o => o.type === 'obelisk') === poi ? 'wanderer' : null;
+      if (!role) continue;
+      const cx = poi.x * TILE, cy = poi.y * TILE;
+      let near = false;
+      for (const p of this.players.values())
+        if (p.mapId === 'over' && dist2(p.x, p.y, cx, cy) < SETTLEMENT_HYDRATE_R ** 2) { near = true; break; }
+      const alive = poi.npcId && this.entities.has(poi.npcId);
+      if (near && !alive) {
+        poi.npcId = this.spawnNpc(role, poi.id, 'over', cx + 8, cy + 28, {
+          kind: 'npc_wizard',
+        });
+        const n = this.entities.get(poi.npcId);
+        n.name = role === 'hermit' ? 'Радогост' : 'Мирослава';
+        n.hp = n.maxHp = 20;
+      } else if (!near && alive) {
+        this.entities.delete(poi.npcId);
+        poi.npcId = null;
       }
     }
   }
@@ -1217,6 +1253,16 @@ export class Game {
     // Кровожадность: лечение за убийство в ближнем бою
     if (killer && pr.school === 'melee' && this.hasTalent(killer, 'bloodlust'))
       killer.hp = Math.min(killer.maxHp, killer.hp + 1);
+    // сюжет: счётчик бандитов для Ярославы — всем участникам боя
+    if (['bandit', 'banditHeavy', 'archer'].includes(e.kind))
+      for (const q of gainers) if (q.story) q.story.bandits++;
+    // Тень отшельника повержена: сила достаётся победителям
+    if (e.hermitShade) {
+      this.spawnDrop('crystal_orb@e', 1, e.mapId, e.x, e.y);
+      this.spawnDrop('crystal', 3, e.mapId, e.x + 10, e.y);
+      this.toastAll('★ Тень отшельника развеяна — сила ритуала свободна!');
+      this.events.push(this.world.day, 'Тень отшельника Радогоста повержена путниками');
+    }
     // дроп: удача повышает количество, шанс и редкость добычи
     const luck = killer?.effStats?.lck ?? killer?.stats?.lck ?? 0;
     const dropBonus = killer?.derived?.dropBonus || 0;
@@ -1467,7 +1513,10 @@ export class Game {
       }
     }
     // NPC рядом: приоритет «полезным» ролям над стражей/жителями
-    const ROLE_PRIO = { elder: 3, merchant: 2, trader: 2, blacksmith: 2, priest: 2, innkeeper: 2, hunter: 2 };
+    const ROLE_PRIO = {
+      elder: 3, merchant: 2, trader: 2, blacksmith: 2, priest: 2, innkeeper: 2, hunter: 2,
+      hermit: 4, wanderer: 4, captain: 4, // именные — важнее всех
+    };
     let npc = null, bestScore = -Infinity;
     const R2 = 26 * 26; // ближе — иначе NPC перехватывают колодцы и доски
     for (const e of this.entities.values()) {
@@ -1508,6 +1557,22 @@ export class Game {
         if (!cdReady('well', 45)) return;
         p.hunger = Math.min(HUNGER_MAX, p.hunger + 8);
         this.toast(p, '💧 Свежая вода: +сытость');
+        return;
+      }
+      if (t === T.FOUNTAIN) {
+        if (p.hp >= p.maxHp && p.hunger > 80) { this.toast(p, 'Воды источника тебе сейчас ни к чему'); return; }
+        if (!cdReady('fountain', 120)) return;
+        p.hp = Math.min(p.maxHp, p.hp + 4);
+        p.hunger = Math.min(HUNGER_MAX, p.hunger + 15);
+        this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        this.toast(p, '✨ Целебные воды: +2 сердца и сытость');
+        return;
+      }
+      if (t === T.OBELISK) { this.touchObelisk(p, tx + dx, ty + dy); return; }
+      if (t === T.DARK_ALTAR) {
+        const circle = this.world.pois.find(o => o.type === 'circle' && Math.abs(o.x - tx) < 3 && Math.abs(o.y - ty) < 3);
+        if (circle && !circle.cleared) this.toast(p, '⛧ Идол сочится тьмой. Сначала перебей его стражей!');
+        else this.toast(p, 'Идол мёртв и молчит. Отшельник Радогост знал бы, что это значит…');
         return;
       }
       if (t === T.MINE) {
@@ -1572,6 +1637,310 @@ export class Game {
     this.fx({ t: 'chest', x: tx * TILE, y: ty * TILE }, p.mapId, tx * TILE, ty * TILE);
   }
 
+  // ---------- сюжетные цепочки именных NPC ----------
+  // Радогост (отшельник): кристаллы -> зачистить каменный круг -> ВЫБОР:
+  // ритуал света (Тьма слабеет) или потребовать силу себе (бой с тенью).
+  storyDialogHermit(p, npc) {
+    const st = p.story.rado;
+    const ch = [];
+    let lines;
+    if (st === 0) {
+      lines = ['«Я Радогост. Ушёл от людей, когда увидел, ЧТО растёт на юге.',
+        'Тьму можно ранить, но мне нужны кристаллы — пять штук.',
+        'Принесёшь — покажу, как бьётся сердце Тьмы».'];
+      ch.push({ id: 'story:rado_accept', label: '✦ Помочь отшельнику (принести 5 кристаллов)' });
+    } else if (st === 1) {
+      if ((p.inventory.crystal || 0) >= 5) {
+        lines = ['«Пять кристаллов… чистых, как слеза. Отдашь их мне?»'];
+        ch.push({ id: 'story:rado_give', label: '✦ Отдать 5 кристаллов' });
+      } else {
+        lines = [`«Кристаллы, ${p.name}. Пять. У тебя ${p.inventory.crystal || 0}.`,
+          'Их добывают в шахтах, у болот и из светящихся жил в подземельях».'];
+      }
+    } else if (st === 2) {
+      const circle = this.world.pois.find(o => o.type === 'circle' && !o.cleared);
+      if (!circle) {
+        lines = ['«Круг чист! Идол мёртв. Теперь — последний шаг.',
+          'Я готов провести ритуал света и вырвать у Тьмы её мощь.',
+          'Но эту силу можно и... взять себе. Решай».'];
+        ch.push({ id: 'story:rado_light', label: '✦ Провести ритуал света (Тьма ослабнет, деревни под защитой)' });
+        ch.push({ id: 'story:rado_dark', label: '⛧ Потребовать силу себе (Радогост не отдаст её без боя)' });
+      } else {
+        lines = ['«Демоны свили гнездо в Каменном круге и питают Цитадель.',
+          'Перебей их стражу у осквернённого идола — я отметил место на карте».'];
+        this.fx({ t: 'marker', pid: p.id, x: circle.x, y: circle.y }, null);
+      }
+    } else if (st === 10) {
+      lines = ['«Свет держится. Деревни дышат спокойнее — и это твоя заслуга»'];
+    } else {
+      lines = ['Хижина пуста. Только пепел в очаге еще тёплый…'];
+    }
+    ch.push({ id: 'close', label: STR.bye });
+    this.sendDialog(p, npc.id, '🧙 Отшельник Радогост', lines, ch);
+  }
+
+  // Ярослава (капитан стражи): истребить бандитов -> зачистить лагерь -> ВЫБОР:
+  // казнить главаря (банды редеют) или взять выкуп (бандиты — «друзья»).
+  storyDialogCaptain(p, npc) {
+    const st = p.story.capt;
+    const ch = [];
+    let lines;
+    if (st === 0) {
+      lines = ['«Ярослава, капитан стражи. Вольница совсем обнаглела —',
+        'жгут поля, грабят караваны. Мне нужен острый клинок.',
+        'Перебей десяток разбойников — и поговорим о большем».'];
+      ch.push({ id: 'story:capt_accept', label: '⚔ Взяться за дело (убить 10 бандитов)' });
+    } else if (st === 1) {
+      const done = p.story.bandits - p.story.banditsGoal + 10;
+      if (done >= 10) {
+        lines = ['«Десять?! А говорили — не наёмник… Слушай дальше.',
+          'Их логово — лагерь в глуши. Разори его дотла.',
+          'Место я отметила на твоей карте».'];
+        ch.push({ id: 'story:capt_camp', label: '⚔ Выступить к лагерю' });
+      } else {
+        lines = [`«Пока ${Math.max(0, done)}/10. Разбойники шастают у дорог и лагерей»`];
+      }
+    } else if (st === 2) {
+      const camp = this.world.pois.find(o => o.id === p.story.captCamp);
+      if (camp && camp.cleared) {
+        lines = ['«Лагерь пал, а стража взяла главаря живьём.',
+          'Он предлагает выкуп — 250 монет за свою шкуру.',
+          'Закон говорит одно, кошель — другое. Тебе решать».'];
+        ch.push({ id: 'story:capt_execute', label: '⚔ Казнить главаря (банды надолго притихнут)' });
+        ch.push({ id: 'story:capt_ransom', label: '🪙 Взять выкуп (250 мон., Вольница это запомнит)' });
+      } else {
+        lines = ['«Лагерь ещё стоит. Разори его — я отметила место на карте»'];
+        if (camp) this.fx({ t: 'marker', pid: p.id, x: camp.x, y: camp.y }, null);
+      }
+    } else if (st === 10) {
+      lines = ['«Дороги стали тише. Такое не забывается, воин»'];
+    } else {
+      lines = ['«…Говорят, главарь Вольницы гуляет на твои сребреники. Уйди с глаз»'];
+    }
+    ch.push({ id: 'close', label: STR.bye });
+    this.sendDialog(p, npc.id, '🛡 Капитан Ярослава', lines, ch);
+  }
+
+  // Мирослава (странница): осколки с обелисков -> отбить стражей -> ВЫБОР:
+  // сила — людям (деревни расцветают) или себе (+2 очка характеристик).
+  storyDialogWanderer(p, npc) {
+    const st = p.story.mira;
+    const ch = [];
+    let lines;
+    if (st === 0) {
+      lines = ['«Я Мирослава. Всю жизнь иду за шёпотом этих камней.',
+        'Обелиски — замки́ древней силы. Коснись двух из них,',
+        'собери осколки — и мы разбудим то, что спит внизу».'];
+      ch.push({ id: 'story:mira_accept', label: '✦ Собрать осколки (коснуться 2 обелисков)' });
+    } else if (st === 1) {
+      if ((p.story.shards || []).length >= 2) {
+        lines = ['«Осколки поют! Кладём их к подножию — и берегись:',
+          'древние стражи не спят, когда тревожат замок».'];
+        ch.push({ id: 'story:mira_ritual', label: '✦ Начать пробуждение (бой со стражами!)' });
+      } else {
+        lines = [`«Осколков пока ${(p.story.shards || []).length}/2. Второй обелиск ищи по карте — я отметила»`];
+        const other = this.world.pois.find(o => o.type === 'obelisk' && !(p.story.shards || []).includes(o.id));
+        if (other) this.fx({ t: 'marker', pid: p.id, x: other.x, y: other.y }, null);
+      }
+    } else if (st === 2) {
+      const alive = (this.world.obeliskGuards || []).some(id => this.entities.has(id));
+      if (!alive) {
+        lines = ['«Стражи пали, и сила свободна. Слушай, как гудит камень!',
+          'Её можно разлить по земле — деревни расцветут.',
+          'А можно… впитать. Всю. Одному». Она смотрит тебе в глаза.'];
+        ch.push({ id: 'story:mira_people', label: '✦ Отдать силу людям (деревни расцветают)' });
+        ch.push({ id: 'story:mira_self', label: '★ Забрать силу себе (+2 очка характеристик)' });
+      } else {
+        lines = ['«Стражи ещё держат замок! Вернись и добей их»'];
+      }
+    } else if (st === 10) {
+      lines = ['«Чуешь? Земля тёплая. Спасибо тебе от всех, кто не узнает, кого благодарить»'];
+    } else {
+      lines = ['«Сила в тебе гудит… Надеюсь, ты знаешь, что делаешь». Она уходит не прощаясь.'];
+    }
+    ch.push({ id: 'close', label: STR.bye });
+    this.sendDialog(p, npc.id, '🔮 Странница Мирослава', lines, ch);
+  }
+
+  // Развилки сюжета: выборы игрока, меняющие мир
+  storyChoice(p, key, dialogId) {
+    const S = p.story;
+    switch (key) {
+      case 'rado_accept':
+        if (S.rado === 0) { S.rado = 1; this.toast(p, '✦ Радогост: принеси 5 кристаллов'); }
+        break;
+      case 'rado_give':
+        if (S.rado === 1 && (p.inventory.crystal || 0) >= 5) {
+          p.inventory.crystal -= 5;
+          S.rado = 2;
+          this.addXp(p, 40);
+          const circle = this.world.pois.find(o => o.type === 'circle' && !o.cleared);
+          if (circle) this.fx({ t: 'marker', pid: p.id, x: circle.x, y: circle.y }, null);
+          this.toast(p, '✦ Теперь зачисти Каменный круг (метка на карте)');
+        }
+        break;
+      case 'rado_light': { // ритуал света: мощь Тьмы вдвое, деревни под обережкой
+        if (S.rado !== 2) break;
+        S.rado = 10;
+        const c = this.world.citadel;
+        if (c) c.power = Math.max(3, Math.round(c.power / 2));
+        for (const s of this.world.settlements) if (!s.ruined) s.wardT = Math.max(s.wardT, 30);
+        p.inventory['weapon:firestaff@e'] = (p.inventory['weapon:firestaff@e'] || 0) + 1;
+        this.addXp(p, 120);
+        this.toast(p, '🏆 Награда: Огненный посох [Эпическое]');
+        this.toastAll('✦ Столб света ударил в небо: Тьма отшатнулась, деревни под защитой духов!');
+        this.events.push(this.world.day, `${p.name} и отшельник Радогост провели ритуал света — Тьма ослабла вдвое`);
+        break;
+      }
+      case 'rado_dark': { // жадность: Радогост обращается тенью и нападает
+        if (S.rado !== 2) break;
+        S.rado = 11;
+        const npc = this.entities.get(dialogId);
+        const x = npc?.x ?? p.x + 20, y = npc?.y ?? p.y;
+        if (npc) this.entities.delete(npc.id);
+        const eid = this.spawnEnemy('darkMage', p.mapId === 'over' ? 'over' : p.mapId, x, y, { hermitShade: true });
+        const e = this.entities.get(eid);
+        e.hp = e.maxHp = 60;
+        e.aggro = true;
+        this.fx({ t: 'boom', x, y, r: 20 }, p.mapId, x, y);
+        this.toastAll('⛧ Радогост обратился Тенью! Сила достанется победителю');
+        this.events.push(this.world.day, `${p.name} потребовал силу ритуала — Радогост стал Тенью отшельника`);
+        break;
+      }
+      case 'capt_accept':
+        if (S.capt === 0) {
+          S.capt = 1;
+          S.banditsGoal = S.bandits + 10;
+          this.toast(p, '⚔ Ярослава: истреби 10 бандитов');
+        }
+        break;
+      case 'capt_camp': {
+        if (S.capt !== 1) break;
+        S.capt = 2;
+        const camp = this.world.pois.find(o => o.type === 'camp' && !o.cleared);
+        S.captCamp = camp?.id || null;
+        if (camp) this.fx({ t: 'marker', pid: p.id, x: camp.x, y: camp.y }, null);
+        else S.captCamp = 'any-cleared'; // лагерей нет — засчитываем сразу
+        this.toast(p, camp ? '⚔ Разори лагерь разбойников (метка на карте)' : '⚔ Лагеря уже разорены — вернись к Ярославе');
+        break;
+      }
+      case 'capt_execute': { // казнь: банды Вольницы надолго затихают
+        if (S.capt !== 2) break;
+        S.capt = 10;
+        this.world.banditsWeakT = 1800; // ~30 минут без новых банд
+        // действующие банды разбегаются
+        for (const t of this.abstract.tokens)
+          if (t.faction === 'bandits' && t.type === 'pack') t.dead = true;
+        const s0 = this.world.settlements[0];
+        if (s0) p.rep[s0.faction] = Math.min(100, (p.rep[s0.faction] || 0) + 15);
+        p.rep.bandits = Math.max(-100, (p.rep.bandits || 0) - 20);
+        p.inventory['weapon:warhammer@e'] = (p.inventory['weapon:warhammer@e'] || 0) + 1;
+        this.addXp(p, 100);
+        this.toast(p, '🏆 Награда: Боевой молот [Эпическое]');
+        this.toastAll('⚔ Главарь Вольницы казнён — банды разбегаются по норам!');
+        this.events.push(this.world.day, `${p.name} казнил главаря Вольницы: дороги очистились`);
+        break;
+      }
+      case 'capt_ransom': { // выкуп: золото сейчас, бандиты наглеют потом
+        if (S.capt !== 2) break;
+        S.capt = 11;
+        p.coins += 250;
+        p.rep.bandits = Math.min(100, (p.rep.bandits || 0) + 45);
+        const s0 = this.world.settlements[0];
+        if (s0) p.rep[s0.faction] = Math.max(-100, (p.rep[s0.faction] || 0) - 15);
+        p.inventory['lucky_deck@e'] = (p.inventory['lucky_deck@e'] || 0) + 1;
+        // Вольница крепнет: две свежие банды выходят на дороги
+        for (let i = 0; i < 2; i++) {
+          this.abstract.tokens.push({
+            id: 'tok' + this.abstract.nextId++, type: 'pack', name: 'банда разбойников',
+            faction: 'bandits', units: ['bandit', 'bandit', 'banditHeavy'],
+            x: (this.world.settlements[0]?.x + 40 + i * 30) * TILE, y: (this.world.settlements[0]?.y + 30) * TILE,
+            hydrated: null,
+          });
+        }
+        this.addXp(p, 60);
+        this.toast(p, '🏆 +250 мон. и Колода фортуны [Эпическое]. Вольница считает тебя своим');
+        this.toastAll('🪙 Главарь Вольницы откупился и вышел на свободу…');
+        this.events.push(this.world.day, `${p.name} отпустил главаря Вольницы за выкуп — банды множатся`);
+        break;
+      }
+      case 'mira_accept':
+        if (S.mira === 0) { S.mira = 1; this.toast(p, '✦ Мирослава: коснись 2 древних обелисков'); }
+        break;
+      case 'mira_ritual': { // пробуждение: древние стражи выходят из-под земли
+        if (S.mira !== 1 || (S.shards || []).length < 2) break;
+        S.mira = 2;
+        const ob = this.world.pois.find(o => o.type === 'obelisk');
+        const ox = (ob?.x ?? Math.round(p.x / TILE)) * TILE, oy = (ob?.y ?? Math.round(p.y / TILE)) * TILE;
+        this.world.obeliskGuards = [];
+        const kinds = ['golem', 'skeleton', 'skeleton', 'dasher'];
+        for (let i = 0; i < kinds.length; i++) {
+          const a = i / kinds.length * Math.PI * 2;
+          this.world.obeliskGuards.push(this.spawnEnemy(kinds[i], 'over',
+            ox + Math.cos(a) * 40, oy + Math.sin(a) * 40, { faction: 'monsters' }));
+        }
+        for (const id of this.world.obeliskGuards) { const e = this.entities.get(id); if (e) e.aggro = true; }
+        this.fx({ t: 'boom', x: ox, y: oy, r: 30 }, 'over', ox, oy);
+        this.toastAll('✦ Древние стражи восстали у обелиска!');
+        break;
+      }
+      case 'mira_people': { // сила — людям: мир расцветает
+        if (S.mira !== 2) break;
+        S.mira = 10;
+        for (const s of this.world.settlements) {
+          if (s.ruined || s.captured) continue;
+          s.prosperity = Math.min(100, s.prosperity + 15);
+          s.guards++;
+          s.wardT = Math.max(s.wardT, 20);
+          this.civ.rehydrate(s);
+        }
+        p.inventory['rune_amulet@e'] = (p.inventory['rune_amulet@e'] || 0) + 1;
+        this.addXp(p, 120);
+        this.toast(p, '🏆 Награда: Рунный амулет [Эпическое]');
+        this.toastAll('✦ Сила обелиска разлилась по земле: деревни расцветают!');
+        this.events.push(this.world.day, `${p.name} отдал силу обелиска людям — сёла окрепли и наняли стражу`);
+        break;
+      }
+      case 'mira_self': { // сила — себе: могущество и разбуженные твари
+        if (S.mira !== 2) break;
+        S.mira = 11;
+        p.statPts += 2;
+        p.inventory['ring_fortune@e'] = (p.inventory['ring_fortune@e'] || 0) + 1;
+        const ob = this.world.pois.find(o => o.type === 'obelisk');
+        if (ob) {
+          this.abstract.tokens.push({
+            id: 'tok' + this.abstract.nextId++, type: 'pack', name: 'разбуженные твари',
+            faction: 'monsters', units: ['demon', 'imp', 'imp', 'dasher'],
+            x: ob.x * TILE, y: ob.y * TILE, hydrated: null,
+          });
+        }
+        this.addXp(p, 60);
+        this.toast(p, '🏆 +2 очка характеристик (C) и Кольцо фортуны [Эпическое]');
+        this.toastAll('⛧ Обелиск угас. Что-то древнее проснулось в глуши…');
+        this.events.push(this.world.day, `${p.name} впитал силу обелиска — древние твари разбужены`);
+        break;
+      }
+    }
+  }
+
+  // Прикосновение к обелиску: осколок для Мирославы или крупица знаний
+  touchObelisk(p, tx, ty) {
+    const poi = this.world.pois.find(o => o.type === 'obelisk' && Math.abs(o.x - tx) < 4 && Math.abs(o.y - ty) < 4);
+    if (p.story?.mira === 1 && poi && !(p.story.shards || []).includes(poi.id)) {
+      p.story.shards.push(poi.id);
+      this.fx({ t: 'pickup', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      this.toast(p, `✨ Осколок древней силы (${p.story.shards.length}/2)` +
+        (p.story.shards.length >= 2 ? ' — возвращайся к Мирославе!' : ''));
+      return;
+    }
+    p.useCd = p.useCd || {};
+    if ((p.useCd.obelisk || 0) > this.tick) { this.toast(p, 'Обелиск молчит. Он ещё помнит твоё прикосновение'); return; }
+    p.useCd.obelisk = this.tick + 300 * 30;
+    this.addXp(p, 15);
+    this.fx({ t: 'levelup', pid: -1, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+    this.toast(p, '✦ Обелиск шепчет о былом: +15 опыта');
+  }
+
   // ---------- диалоги / магазин / квесты / слухи ----------
   // NPC помнят знакомых: первая встреча — представление, дальше — приветствие
   npcGreeting(p, npc) {
@@ -1588,6 +1957,9 @@ export class Game {
   openDialog(p, npc) {
     const s = this.world.settlements.find(x => x.id === npc.home);
     const fname = s ? (FACTIONS[s.faction]?.name || '') : '';
+    if (npc.role === 'hermit') { this.storyDialogHermit(p, npc); return; }
+    if (npc.role === 'captain') { this.storyDialogCaptain(p, npc); return; }
+    if (npc.role === 'wanderer') { this.storyDialogWanderer(p, npc); return; }
     if (npc.role === 'merchant' || npc.role === 'trader') {
       // структурированный прилавок: клиент рисует окно-сетку с иконками
       const mult = priceMultiplier(s ? p.rep[s.faction] : 0);
@@ -1754,6 +2126,7 @@ export class Game {
 
   dialogChoice(p, dialogId, choice) {
     if (choice === 'close') return;
+    if (choice.startsWith('story:')) { this.storyChoice(p, choice.slice(6), dialogId); return; }
     if (choice.startsWith('buy:')) {
       const it = SHOP[+choice.split(':')[1]];
       if (!it) return;

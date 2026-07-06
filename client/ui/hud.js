@@ -163,8 +163,10 @@ export class Hud {
       ctx.fillStyle = '#7b2fbe';
       ctx.fillRect(x0 + Math.round(net.mapInfo.citadel.x * TILE * k) - 1, y0 + Math.round(net.mapInfo.citadel.y * TILE * k) - 1, 3, 3);
     }
+    const PC = { dungeon: '#d9574a', camp: '#df7126', hermit: '#99e550', circle: '#b06ee1', obelisk: '#fbf236', spring: '#63c5ff' };
     for (const p of net.mapInfo.pois) {
-      ctx.fillStyle = p.cleared ? '#696a6a' : p.type === 'dungeon' ? '#d9574a' : '#df7126';
+      const special = !['dungeon', 'camp'].includes(p.type);
+      ctx.fillStyle = (p.cleared && !special) ? '#696a6a' : PC[p.type] || '#df7126';
       ctx.fillRect(x0 + Math.round(p.x * TILE * k), y0 + Math.round(p.y * TILE * k), 1, 1);
     }
     if (net.you.q && net.you.q.tx) {

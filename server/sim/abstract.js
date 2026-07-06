@@ -193,9 +193,13 @@ export class AbstractSim {
     }
     this.tokens = this.tokens.filter(t => !t.dead);
 
+    // казнь главаря (сюжет Ярославы): Вольница временно не собирает банды
+    if (world.banditsWeakT > 0) world.banditsWeakT -= ABSTRACT_DT;
+
     // редкие мировые события
     if (rand() < 0.10 && this.tokens.length < 14) {
-      const kind = pick(rand, PACK_KINDS);
+      let kind = pick(rand, PACK_KINDS);
+      if (kind.faction === 'bandits' && world.banditsWeakT > 0) kind = PACK_KINDS[0]; // банды притихли
       const x = randInt(rand, 30, WORLD_TILES - 30), y = randInt(rand, 30, WORLD_TILES - 30);
       this.tokens.push({
         id: 'tok' + this.nextId++, type: 'pack', name: kind.name,

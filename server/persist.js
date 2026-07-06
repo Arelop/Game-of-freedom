@@ -34,7 +34,9 @@ export function saveWorld(game) {
         cls: p.cls, level: p.level, xp: p.xp,
         statPts: p.statPts, talentPts: p.talentPts, stats: p.stats, talents: p.talents,
         weaponUp: p.weaponUp || {},
+        story: p.story,
       })),
+      banditsWeakT: w.banditsWeakT || 0,
     };
     writeFileSync(FILE, JSON.stringify(data));
   } catch (e) { console.warn('[save] не удалось сохранить:', e.message); }
@@ -65,6 +67,7 @@ export function loadWorld(game) {
         t.faction !== 'darkness' || t.garrison || ++darkN <= cap);
     }
     if (data.citadel && w.citadel) { w.citadel.power = data.citadel.power; w.citadel.forts = data.citadel.forts || []; }
+    if (data.banditsWeakT) w.banditsWeakT = data.banditsWeakT;
     if (data.events) game.events.entries = data.events;
     game.savedPlayers = new Map((data.players || []).map(p => [p.name, p]));
     game.chunks.cache.clear();
@@ -99,6 +102,7 @@ export function applySavedPlayer(game, p) {
     if (rec.stats) p.stats = rec.stats;
     if (rec.talents) p.talents = rec.talents;
     if (rec.weaponUp) p.weaponUp = rec.weaponUp;
+    if (rec.story) p.story = { ...p.story, ...rec.story };
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);

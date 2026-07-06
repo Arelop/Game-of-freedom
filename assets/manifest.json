@@ -177,6 +177,34 @@
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/nonliving/fire_elemental.png",
       "down": 2
     },
+    "obj_obelisk": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/zot_pillar.png",
+      "down": 2
+    },
+    "obj_statue": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/dngn_granite_statue.png",
+      "down": 2
+    },
+    "obj_fountain": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/dngn_blue_fountain.png",
+      "down": 2
+    },
+    "obj_idol": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/dngn_orcish_idol.png",
+      "down": 2
+    },
+    "tile_crystal_wall": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/wall/crystal_wall00.png",
+      "down": 2
+    },
+    "obj_column": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/crumbled_column.png",
+      "down": 2
+    },
+    "tile_blood": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/cobble_blood3.png",
+      "down": 2
+    },
     "item_amulet_eye": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/eye_cyan.png"
     },

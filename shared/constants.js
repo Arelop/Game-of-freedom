@@ -39,6 +39,14 @@ export const T = {
   CAMPFIRE: 19, STALL: 20, BED: 21, TABLE: 22, WELL: 23, CHEST: 24,
   DUNGEON_DOOR: 25, DUNGEON_EXIT: 26, FIELD: 27, TOWER: 28,
   MINE: 29, SHRINE: 30, RUBBLE: 31, FENCE: 32, ANVIL: 33, BOARD: 34,
+  // достопримечательности и декор
+  OBELISK: 35,       // древний обелиск — точка интереса, крупица знаний
+  STATUE: 36,        // гранитная статуя — украшение данжей и кругов
+  FOUNTAIN: 37,      // целебный источник — лечит путников
+  DARK_ALTAR: 38,    // осквернённый идол каменных кругов
+  CRYSTAL_WALL: 39,  // светящийся кристалл — свет в данжах, добыча кристаллов
+  PILLAR: 40,        // обломанная колонна — руины
+  BLOOD: 41,         // засохшая кровь на полу данжа
 };
 
 // Разрушаемые тайлы: прочность, во что превращаются, дроп.
@@ -56,6 +64,9 @@ export const DESTRUCTIBLE = {
   [T.WELL]: { hp: 20, becomes: T.RUBBLE, drops: {} },
   [T.FENCE]: { hp: 4, becomes: T.GRASS, drops: { wood: 0.6 } },
   [T.ANVIL]: { hp: 15, becomes: T.FLOOR_WOOD, drops: { metal: 0.6 } },
+  [T.STATUE]: { hp: 20, becomes: T.RUBBLE, drops: {} },
+  [T.PILLAR]: { hp: 8, becomes: T.RUBBLE, drops: {} },
+  [T.CRYSTAL_WALL]: { hp: 12, becomes: T.DUNGEON_FLOOR, drops: { crystal: 1 } },
 };
 
 // Сезоны: 3 игровых дня каждый. Влияют на урожай и агрессию монстров.
@@ -69,9 +80,10 @@ export const SOLID = new Set([
   T.DEEP_WATER, T.WATER, T.WALL, T.TREE, T.ROCK_SOLID,
   T.DUNGEON_WALL, T.STALL, T.WELL, T.CHEST, T.TABLE, T.BED, T.TOWER,
   T.MINE, T.SHRINE, T.FENCE, T.ANVIL,
+  T.OBELISK, T.STATUE, T.FOUNTAIN, T.DARK_ALTAR, T.CRYSTAL_WALL, T.PILLAR,
 ]);
 // Блокирует пули (стены — да, вода — нет)
 export const BULLET_SOLID = new Set([
   T.WALL, T.TREE, T.ROCK_SOLID, T.DUNGEON_WALL, T.STALL, T.WELL, T.TOWER,
-  T.MINE,
+  T.MINE, T.OBELISK, T.STATUE, T.CRYSTAL_WALL, T.PILLAR,
 ]);

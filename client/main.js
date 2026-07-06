@@ -755,9 +755,16 @@ function renderBigMap() {
     ctx.fillStyle = '#b57edc';
     ctx.fillText('⛧ ' + c.name + (net.darkPower ? ` (мощь ${net.darkPower.pw})` : ''), x - 50, y + 6);
   }
+  const POI_COLORS = {
+    dungeon: '#d9574a', camp: '#df7126',
+    hermit: '#99e550', circle: '#b06ee1', obelisk: '#fbf236', spring: '#63c5ff',
+  };
   for (const p of net.mapInfo.pois) {
-    ctx.fillStyle = p.cleared ? '#696a6a' : p.type === 'dungeon' ? '#d9574a' : '#df7126';
-    ctx.fillRect(x0 + p.x * TILE * k - 1, y0 + p.y * TILE * k - 1, 3, 3);
+    const special = !!POI_COLORS[p.type] && p.type !== 'dungeon' && p.type !== 'camp';
+    ctx.fillStyle = (p.cleared && !special) ? '#696a6a' : POI_COLORS[p.type] || '#df7126';
+    const sz = special ? 4 : 3;
+    ctx.fillRect(x0 + p.x * TILE * k - 1, y0 + p.y * TILE * k - 1, sz, sz);
+    if (special) ctx.fillText({ hermit: '🛖', circle: '⛧', obelisk: '▲', spring: '~' }[p.type] || '', x0 + p.x * TILE * k + 4, y0 + p.y * TILE * k - 4);
   }
   for (const m of net.mapInfo.markers || []) {
     ctx.fillStyle = '#fbf236';
@@ -781,7 +788,7 @@ function renderBigMap() {
   ctx.fillRect(x0 + net.pred.x * k - 1, y0 + net.pred.y * k - 1, 3, 3);
   // легенда
   ctx.fillStyle = '#847e87';
-  ctx.fillText('■ деревня  ■ данж  ■ лагерь  ⚔ захвачена  ☠ руины  ● ты', x0 + 4, y0 + S - 8);
+  ctx.fillText('■ деревня  ■ данж  ■ лагерь  ▲ обелиск  ⛧ круг/Тьма  ~ источник  🛖 отшельник  ● ты', x0 + 4, y0 + S - 8);
 }
 
 function blit() {

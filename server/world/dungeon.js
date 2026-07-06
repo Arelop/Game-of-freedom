@@ -65,10 +65,41 @@ export function generateDungeon(seed, difficulty, withBoss) {
     treasureRoom.chest = { x: treasureRoom.x, y: treasureRoom.y, opened: false };
   }
 
+  // --- декор: кровь на полу, колонны, светящиеся кристаллы, статуи ---
+  for (let y = 1; y < SIZE - 1; y++) {
+    for (let x = 1; x < SIZE - 1; x++) {
+      const i = y * SIZE + x;
+      if (g[i] === T.DUNGEON_FLOOR) {
+        const r = rand();
+        if (r < 0.03) g[i] = T.BLOOD;                       // следы старых боёв
+        else if (r < 0.045 && !nearTile(g, x, y, T.DUNGEON_EXIT)) g[i] = T.PILLAR; // обломки колонн
+      } else if (g[i] === T.DUNGEON_WALL && rand() < 0.02 && nearTile(g, x, y, T.DUNGEON_FLOOR)) {
+        g[i] = T.CRYSTAL_WALL;                              // светящиеся жилы кристалла
+      }
+    }
+  }
+  // статуи-стражи у входа в комнату босса
+  const bossRoom = rooms.find(r => r.isBoss);
+  if (bossRoom) {
+    const bx = bossRoom.x, by = bossRoom.y + bossRoom.h - 1;
+    if (g[by * SIZE + bx - 2] === T.DUNGEON_FLOOR) g[by * SIZE + bx - 2] = T.STATUE;
+    if (g[by * SIZE + bx + 2] === T.DUNGEON_FLOOR) g[by * SIZE + bx + 2] = T.STATUE;
+  }
+  // целебный фонтан в сокровищнице — передышка перед боссом
+  if (treasureRoom) {
+    const fx2 = treasureRoom.x + 2, fy2 = treasureRoom.y;
+    if (g[fy2 * SIZE + fx2] === T.DUNGEON_FLOOR) g[fy2 * SIZE + fx2] = T.FOUNTAIN;
+  }
+
   // выход = вход (портал наружу)
   g[entrance.y * SIZE + entrance.x] = T.DUNGEON_EXIT;
 
   return { size: SIZE, grid: g, rooms, entrance, seed, difficulty };
+}
+
+function nearTile(g, x, y, tile) {
+  return g[(y - 1) * SIZE + x] === tile || g[(y + 1) * SIZE + x] === tile
+    || g[y * SIZE + x - 1] === tile || g[y * SIZE + x + 1] === tile;
 }
 
 function carveRoom(g, cx, cy, rw, rh) {
