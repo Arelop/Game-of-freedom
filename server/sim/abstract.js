@@ -145,8 +145,14 @@ export class AbstractSim {
         tok.y = Math.max(TILE * 20, Math.min(TILE * (WORLD_TILES - 20), tok.y));
       }
 
-      // стаи множатся в глуши (особенно ночью)
-      if (tok.type === 'pack' && tok.units.length < 6) {
+      // стаи множатся в глуши (особенно ночью); войска Тьмы не плодятся —
+      // их численность задаёт Цитадель, а праздные отряды тают (уходят домой)
+      if (tok.faction === 'darkness') {
+        if (!tok.march && !tok.garrison && rand() < 0.05) {
+          tok.units.pop();
+          if (!tok.units.length) tok.dead = true;
+        }
+      } else if (tok.type === 'pack' && tok.units.length < 6) {
         const nightBonus = this.game.isNight() ? 0.06 : 0.02;
         if (rand() < nightBonus) tok.units.push(tok.units[0]);
       }
@@ -154,7 +160,7 @@ export class AbstractSim {
       // стая близко к поселению — осада против рейтинга обороны
       const winter = seasonOf(world.day) === 3;
       const dark = tok.faction === 'darkness';
-      if (tok.type === 'pack' && !tok.garrison && rand() < (dark ? 0.5 : winter ? 0.11 : 0.07)) {
+      if (tok.type === 'pack' && !tok.garrison && rand() < (dark ? 0.12 : winter ? 0.11 : 0.07)) {
         const s = world.settlements.find(s => !s.ruined && !s.captured &&
           (s.x * TILE - tok.x) ** 2 + (s.y * TILE - tok.y) ** 2 < (TILE * 30) ** 2);
         if (s) {
@@ -164,7 +170,7 @@ export class AbstractSim {
           const strength = tok.units.length * 2 + elite * 2;
           if (strength > defense + (rand() < 0.5 ? 2 : 0)) {
             s.prosperity = Math.max(5, s.prosperity - 12);
-            s.population = Math.max(0, s.population - (dark ? 2 : 1));
+            s.population = Math.max(0, s.population - 1);
             s.food = Math.max(0, s.food - 20);
             if (s.guards > 0 && rand() < 0.6) s.guards--;
             tok.units.length > 2 && rand() < 0.4 && tok.units.pop();

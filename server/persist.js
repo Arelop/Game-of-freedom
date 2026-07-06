@@ -56,7 +56,14 @@ export function loadWorld(game) {
       const o = w.pois.find(x => x.id === rec.id);
       if (o) o.cleared = rec.cleared;
     }
-    if (data.tokens) { game.abstract.tokens = data.tokens.map(t => ({ ...t, hydrated: null })); }
+    if (data.tokens) {
+      game.abstract.tokens = data.tokens.map(t => ({ ...t, hydrated: null }));
+      // страховка от разбушевавшихся сейвов: полевых отрядов Тьмы — не больше лимита
+      let darkN = 0;
+      const cap = 2 + (data.citadel?.forts?.length || 0);
+      game.abstract.tokens = game.abstract.tokens.filter(t =>
+        t.faction !== 'darkness' || t.garrison || ++darkN <= cap);
+    }
     if (data.citadel && w.citadel) { w.citadel.power = data.citadel.power; w.citadel.forts = data.citadel.forts || []; }
     if (data.events) game.events.entries = data.events;
     game.savedPlayers = new Map((data.players || []).map(p => [p.name, p]));

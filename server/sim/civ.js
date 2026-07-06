@@ -47,7 +47,8 @@ export class CivSim {
     const g = this.game;
     const c = g.world.citadel;
     if (!c) return;
-    c.power = Math.min(200, c.power + 0.15 + c.forts.length * 0.15);
+    c.power = Math.min(200, c.power + 0.05 + c.forts.length * 0.05);
+    if (c.raidCd > 0) c.raidCd--;
 
     // гарнизон Цитадели: Лорд Тьмы и элита всегда на месте
     if (!g.abstract.tokens.some(t => t.garrison && !t.dead)) {
@@ -61,16 +62,22 @@ export class CivSim {
       });
     }
 
-    // рейд: чем выше мощь, тем чаще и крупнее войско
-    const raidChance = Math.min(0.45, 0.06 + c.power / 250);
+    // лимит полевых отрядов Тьмы: мир не должен тонуть в нежити
+    const darkPacks = g.abstract.tokens.filter(t => t.faction === 'darkness' && !t.garrison && !t.dead).length;
+    if (darkPacks >= 2 + c.forts.length) return;
+
+    // рейд: копим мощь, ходим редко (кулдаун), войско стоит мощи
+    if (c.raidCd > 0 || c.power < 25) return;
+    const raidChance = Math.min(0.25, 0.05 + c.power / 800);
     if (g.rand() >= raidChance) return;
     const targets = g.world.settlements.filter(s => !s.ruined && !s.captured);
     if (!targets.length) return;
+    c.raidCd = 35; // ~7 минут между рейдами (тик 12 с)
     // ближние к Цитадели и фортам деревни страдают первыми
     targets.sort((a, b) =>
       ((a.x - c.x) ** 2 + (a.y - c.y) ** 2) - ((b.x - c.x) ** 2 + (b.y - c.y) ** 2));
     const target = targets[Math.floor(g.rand() * Math.min(3, targets.length))];
-    const size = Math.min(6, 2 + Math.floor(c.power / 25));
+    const size = Math.min(6, 2 + Math.floor(c.power / 50));
     const units = [];
     for (let i = 0; i < size; i++) units.push(pick(g.rand, DARK_KINDS));
     // войско выходит из ближайшего к цели опорного пункта
@@ -80,7 +87,7 @@ export class CivSim {
       if (f && !f.ruined &&
         (f.x - target.x) ** 2 + (f.y - target.y) ** 2 < (src.x - target.x) ** 2 + (src.y - target.y) ** 2) src = f;
     }
-    c.power = Math.max(3, c.power - size);
+    c.power = Math.max(3, c.power - size * 3);
     g.abstract.tokens.push({
       id: 'tok' + g.abstract.nextId++, type: 'pack', name: 'войско Тьмы',
       faction: 'darkness', units, march: target.id,
@@ -121,9 +128,11 @@ export class CivSim {
     const rand = g.rand;
     if (s.ruined) return;
     if (s.captured && s.faction === 'darkness') {
-      // форт Тьмы: гарнизон копит силы, изредка высылает патрули
+      // форт Тьмы: гарнизон копит силы, изредка высылает патрули (в пределах лимита)
       s.food = Math.max(0, s.food - 1);
-      if (rand() < 0.06) {
+      const c2 = g.world.citadel;
+      const darkPacks = g.abstract.tokens.filter(t => t.faction === 'darkness' && !t.garrison && !t.dead).length;
+      if (rand() < 0.015 && darkPacks < 2 + (c2?.forts.length || 0)) {
         g.abstract.tokens.push({
           id: 'tok' + g.abstract.nextId++, type: 'pack', name: 'патруль Тьмы',
           faction: 'darkness', units: ['darkSoldier', 'darkSoldier', 'darkArcher'],
