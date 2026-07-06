@@ -23,7 +23,12 @@ export function saveWorld(game) {
         captured: s.captured, ruined: s.ruined, faction: s.faction,
       })),
       pois: w.pois.map(o => ({ id: o.id, cleared: o.cleared })),
-      citadel: w.citadel ? { power: w.citadel.power, forts: w.citadel.forts } : null,
+      citadel: w.citadel
+        ? { power: w.citadel.power, forts: w.citadel.forts, weakened: w.citadel.weakened, dead: w.citadel.dead, owned: w.citadel.owned }
+        : null,
+      war: w.war ? { stage: w.war.stage } : null,
+      stash: w.stash || {},
+      weather: w.weather,
       tokens: game.abstract.tokens.filter(t => !t.hydrated).map(({ hydrated, ...t }) => t),
       events: game.events.entries,
       players: [...game.players.values()].map(p => ({
@@ -66,8 +71,17 @@ export function loadWorld(game) {
       game.abstract.tokens = game.abstract.tokens.filter(t =>
         t.faction !== 'darkness' || t.garrison || ++darkN <= cap);
     }
-    if (data.citadel && w.citadel) { w.citadel.power = data.citadel.power; w.citadel.forts = data.citadel.forts || []; }
+    if (data.citadel && w.citadel) {
+      w.citadel.power = data.citadel.power;
+      w.citadel.forts = data.citadel.forts || [];
+      w.citadel.weakened = data.citadel.weakened || false;
+      w.citadel.dead = data.citadel.dead || false;
+      w.citadel.owned = data.citadel.owned || false;
+    }
     if (data.banditsWeakT) w.banditsWeakT = data.banditsWeakT;
+    if (data.war) w.war.stage = data.war.stage;
+    if (data.stash) w.stash = data.stash;
+    if (data.weather) w.weather = data.weather;
     if (data.events) game.events.entries = data.events;
     game.savedPlayers = new Map((data.players || []).map(p => [p.name, p]));
     game.chunks.cache.clear();

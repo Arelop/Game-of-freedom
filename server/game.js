@@ -1,7 +1,7 @@
 // Авторитетная симуляция: игроки, враги, NPC, пули, данжи, квесты, голод.
 import {
   TICK_DT, TILE, SOLID, BULLET_SOLID, T, PLAYER_MAX_HP, PLAYER_HURT_INVULN,
-  HUNGER_MAX, HUNGER_RATE, DAY_LENGTH, PLAYER_RADIUS, DESTRUCTIBLE,
+  HUNGER_MAX, HUNGER_RATE, DAY_LENGTH, PLAYER_RADIUS, DESTRUCTIBLE, seasonOf,
 } from '../shared/constants.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { ENEMIES } from '../shared/enemies.js';
@@ -425,7 +425,11 @@ export class Game {
     // время суток
     const wasNight = this.isNight();
     this.world.time += dt / DAY_LENGTH;
-    if (this.world.time >= 1) { this.world.time -= 1; this.world.day++; }
+    if (this.world.time >= 1) {
+      this.world.time -= 1;
+      this.world.day++;
+      this.rollWeather();
+    }
     if (this.isNight() !== wasNight)
       this.toastAll(this.isNight() ? STR.night : STR.morning);
 
@@ -441,6 +445,18 @@ export class Game {
   }
 
   isNight() { return this.world.time < 0.22 || this.world.time > 0.85; }
+
+  // Погода нового дня: зимой — снегопады, весной/осенью — дожди
+  rollWeather() {
+    const season = seasonOf(this.world.day);
+    const r = this.rand();
+    const old = this.world.weather;
+    if (season === 3) this.world.weather = r < 0.55 ? 'snow' : 'clear';
+    else if (season === 0 || season === 2) this.world.weather = r < 0.35 ? 'rain' : 'clear';
+    else this.world.weather = r < 0.15 ? 'rain' : 'clear';
+    if (this.world.weather !== old && this.world.weather !== 'clear')
+      this.toastAll(this.world.weather === 'rain' ? '🌧 Зарядил дождь…' : '❄ Пошёл снег…');
+  }
 
   stepPlayerTick(p, dt) {
     const map = this.mapFor(p.mapId);
@@ -642,11 +658,22 @@ export class Game {
     const def = ENEMIES[kind];
     if (!def) return null;
     const id = 'e' + this.nextId++;
-    this.entities.set(id, {
+    const e = {
       id, kind, entType: 'enemy', mapId, x, y, aim: 0,
       hp: def.hp, maxHp: def.hp, state: 'idle', stateT: 0, aggro: false,
       ...extra,
-    });
+    };
+    // элитные аффиксы: редкие усиленные монстры с лучшей добычей
+    if (!extra.noElite && def.archetype !== 'boss' && def.faction !== 'darkness' && this.rand() < 0.07) {
+      const affix = pick(this.rand, ['Свирепый', 'Живучий', 'Стремительный', 'Золотой']);
+      e.elite = affix;
+      e.hp = e.maxHp = Math.round(def.hp * (affix === 'Живучий' ? 2.4 : 1.7));
+      e.xpMult = 2.5;
+      if (affix === 'Свирепый') e.dmgBonus = 1;
+      if (affix === 'Стремительный') e.hasteF = 1.35;
+      if (affix === 'Золотой') e.goldMult = 3;
+    }
+    this.entities.set(id, e);
     return id;
   }
 
@@ -765,21 +792,22 @@ export class Game {
       }
     }
 
-    // лагеря и каменные круги: засада на подходе
+    // лагеря, каменные круги и логова боссов: засада на подходе
     for (const poi of this.world.pois) {
-      if ((poi.type !== 'camp' && poi.type !== 'circle') || poi.cleared) continue;
+      if ((poi.type !== 'camp' && poi.type !== 'circle' && poi.type !== 'lair') || poi.cleared) continue;
       const cx = poi.x * TILE, cy = poi.y * TILE;
       let near = false;
       for (const p of this.players.values())
         if (p.mapId === 'over' && dist2(p.x, p.y, cx, cy) < 350 ** 2) { near = true; break; }
       if (near && !poi.spawned) {
         poi.spawned = [];
-        const circle = poi.type === 'circle';
-        const kinds = circle ? ['imp', 'imp', 'demon', 'imp'] : ['bandit', 'bandit', 'banditHeavy', 'bandit'];
-        for (let i = 0; i <= poi.difficulty + 1; i++) {
+        const kinds = poi.kinds
+          || (poi.type === 'circle' ? ['imp', 'imp', 'demon', 'imp'] : ['bandit', 'bandit', 'banditHeavy', 'bandit']);
+        const n = poi.kinds ? poi.kinds.length : poi.difficulty + 2;
+        for (let i = 0; i < n; i++) {
           poi.spawned.push(this.spawnEnemy(kinds[i % kinds.length], 'over',
             cx + (this.rand() - 0.5) * 90, cy + (this.rand() - 0.5) * 90,
-            { camp: poi.id, faction: circle ? 'monsters' : 'bandits' }));
+            { camp: poi.id, faction: poi.type === 'camp' ? 'bandits' : 'monsters', noElite: true }));
         }
       }
       if (poi.spawned && !poi.spawned.some(id => this.entities.has(id))) {
@@ -842,7 +870,7 @@ export class Game {
           for (const p of this.players.values()) {
             if (p.dead || p.mapId !== e.mapId) continue;
             if (circlesOverlap(e.x, e.y, def.radius, p.x, p.y, PLAYER_RADIUS))
-              this.damagePlayer(p, def.touchDamage, e);
+              this.damagePlayer(p, def.touchDamage + (e.dmgBonus || 0), e);
           }
         }
         // стража дерётся с врагами
@@ -1249,10 +1277,16 @@ export class Game {
     const nearby = [...this.players.values()].filter(q =>
       !q.dead && q.mapId === e.mapId && dist2(q.x, q.y, e.x, e.y) < 350 ** 2);
     const gainers = nearby.length ? nearby : (killer ? [killer] : []);
-    for (const q of gainers) this.addXp(q, def.xp);
+    for (const q of gainers) this.addXp(q, Math.round(def.xp * (e.xpMult || 1)));
     // Кровожадность: лечение за убийство в ближнем бою
     if (killer && pr.school === 'melee' && this.hasTalent(killer, 'bloodlust'))
       killer.hp = Math.min(killer.maxHp, killer.hp + 1);
+    // Клинок рассвета: убийство лечит владельца
+    if (killer) {
+      const kw = this.weapon(killer);
+      if (kw?.lifeOnKill && pr.school === kw.school)
+        killer.hp = Math.min(killer.maxHp, killer.hp + kw.lifeOnKill);
+    }
     // сюжет: счётчик бандитов для Ярославы — всем участникам боя
     if (['bandit', 'banditHeavy', 'archer'].includes(e.kind))
       for (const q of gainers) if (q.story) q.story.bandits++;
@@ -1270,7 +1304,20 @@ export class Game {
       if (item === 'weapon') { this.dropRandomWeapon(e.mapId, e.x, e.y, luck, 2); continue; }
       let n = Array.isArray(range) ? randInt(this.rand, range[0], range[1]) : range;
       if (item === 'coin' && killer) n = Math.round(n * (killer.derived?.coinMult || 1));
+      if (item === 'coin' && e.goldMult) n *= e.goldMult; // элита «Золотой»
       if (n > 0) this.spawnDrop(item, n, e.mapId, e.x + (this.rand() - 0.5) * 14, e.y + (this.rand() - 0.5) * 14);
+    }
+    // элита: щедрый дроп экипировки
+    if (e.elite && this.rand() < 0.45) this.dropRandomGear(e.mapId, e.x, e.y, false, luck + 4);
+    // Война с Тьмой: реликвии
+    if (e.kind === 'heartKeeper') {
+      this.spawnDrop('shadow_heart', 1, e.mapId, e.x, e.y);
+      this.toastAll('🖤 Сердце Тени выпало из Хранителя!');
+      this.events.push(this.world.day, 'Хранитель сердца повержен — реликвия у путников');
+    }
+    if (def.archetype === 'boss' && this.world.war?.stage === 2 && e.kind !== 'darkLord') {
+      this.spawnDrop('ancient_shard', 1, e.mapId, e.x + 8, e.y);
+      this.toastAll('💠 Древний осколок выпал из босса!');
     }
     if (this.rand() < 0.15 * (1 + dropBonus * 2)) this.spawnDrop('herb', 1, e.mapId, e.x, e.y);
     if (this.rand() < 0.05 * (1 + dropBonus * 3)) this.spawnDrop('heal_potion', 1, e.mapId, e.x, e.y);
@@ -1515,7 +1562,7 @@ export class Game {
     // NPC рядом: приоритет «полезным» ролям над стражей/жителями
     const ROLE_PRIO = {
       elder: 3, merchant: 2, trader: 2, blacksmith: 2, priest: 2, innkeeper: 2, hunter: 2,
-      hermit: 4, wanderer: 4, captain: 4, // именные — важнее всех
+      hermit: 4, wanderer: 4, captain: 4, darkheart: 5, // именные и Сердце — важнее всех
     };
     let npc = null, bestScore = -Infinity;
     const R2 = 26 * 26; // ближе — иначе NPC перехватывают колодцы и доски
@@ -1589,9 +1636,20 @@ export class Game {
         }
         if (!cdReady('shrine', 60)) return;
         p.ammo.mana = Math.max(0, (p.ammo.mana || 0) - 5);
-        p.buffs.blessed = { mult: 0.1, t: 120 };
-        this.recomputeStats(p);
-        this.toast(p, '✦ Духи довольны: +10% урона на 2 мин');
+        // совместная молитва: если рядом союзники — благословение сильнее и на всех
+        const allies = [...this.players.values()].filter(q =>
+          !q.dead && q.mapId === p.mapId && dist2(q.x, q.y, p.x, p.y) < 70 * 70);
+        if (allies.length >= 2) {
+          for (const q of allies) {
+            q.buffs.blessed = { mult: 0.15, t: 180 };
+            this.recomputeStats(q);
+            this.toast(q, '✦ Совместная молитва: +15% урона всей группе на 3 мин');
+          }
+        } else {
+          p.buffs.blessed = { mult: 0.1, t: 120 };
+          this.recomputeStats(p);
+          this.toast(p, '✦ Духи довольны: +10% урона на 2 мин');
+        }
         return;
       }
       if (t === T.TOWER) {
@@ -1635,6 +1693,120 @@ export class Game {
     this.spawnDrop('coin', randInt(this.rand, 10, 25), p.mapId, tx * TILE - 4, ty * TILE + 20);
     if (this.rand() < 0.6 + (p.derived?.dropBonus || 0)) this.dropRandomGear(p.mapId, tx * TILE + 20, ty * TILE + 20, false, luck);
     this.fx({ t: 'chest', x: tx * TILE, y: ty * TILE }, p.mapId, tx * TILE, ty * TILE);
+  }
+
+  // ---------- Война с Тьмой: эндгейм-кампания ----------
+  // Этапы (общие для всего мира): 1 союз фракций -> 2 сбор реликвий ->
+  // 3 великий ритуал и штурм -> 4 выбор у Сердца Тьмы -> 10/11 финалы.
+  warStep(p) {
+    const w = this.world.war, c = this.world.citadel;
+    if (!w || !c || c.dead) return;
+    if (w.stage === 0) {
+      w.stage = 1;
+      this.toast(p, '⚔ Война началась! Заручись доверием Северян, Озёрного союза и Степняков (репутация 25)');
+      this.toastAll('⚔ ВОЙНА С ТЬМОЙ: старейшины зовут героев объединить фракции!');
+      this.events.push(this.world.day, `${p.name} поднял знамя Войны с Тьмой`);
+    } else if (w.stage === 1) {
+      const reps = ['severane', 'ozerny', 'stepnyaki'].map(f => p.rep[f] || 0);
+      if (reps.some(r => r < 25)) {
+        this.toast(p, `⚔ Доверие фракций: Северяне ${reps[0]}, Озёрный союз ${reps[1]}, Степняки ${reps[2]} — нужно 25 у всех`);
+        return;
+      }
+      w.stage = 2;
+      this.spawnHeartKeeper();
+      this.toastAll('⚔ Союз трёх фракций заключён! Для великого ритуала нужны реликвии:');
+      this.toastAll('10 кристаллов · Сердце Тени (Хранитель у Каменного круга) · Древний осколок (боссы данжей)');
+      this.events.push(this.world.day, `${p.name} объединил три фракции против Тьмы`);
+      const circle = this.world.pois.find(o => o.type === 'circle');
+      if (circle) this.fx({ t: 'marker', pid: p.id, x: circle.x, y: circle.y }, null);
+    } else if (w.stage === 2) {
+      const need = [];
+      if ((p.inventory.crystal || 0) < 10) need.push(`кристаллы ${p.inventory.crystal || 0}/10`);
+      if ((p.inventory.shadow_heart || 0) < 1) need.push('Сердце Тени');
+      if ((p.inventory.ancient_shard || 0) < 1) need.push('Древний осколок');
+      if (need.length) { this.toast(p, '⚔ Не хватает: ' + need.join(', ')); return; }
+      p.inventory.crystal -= 10;
+      p.inventory.shadow_heart -= 1;
+      p.inventory.ancient_shard -= 1;
+      w.stage = 3;
+      c.power = Math.max(3, Math.round(c.power * 0.6));
+      c.weakened = true; // гарнизон возрождается ослабленным
+      const g = this.abstract.tokens.find(t => t.garrison && !t.dead);
+      if (g && !g.hydrated) g.units = ['darkLord', 'darkKnight', 'darkArcher'];
+      this.addXp(p, 150);
+      this.toastAll('✦ ВЕЛИКИЙ РИТУАЛ СВЕРШЁН! Врата Чернокаменной Цитадели пали — на штурм!');
+      this.events.push(this.world.day, 'Великий ритуал трёх фракций ослабил Цитадель — начался штурм');
+      for (const q of this.players.values()) this.fx({ t: 'marker', pid: q.id, x: c.x, y: c.y }, null);
+    } else if (w.stage === 3) {
+      this.toast(p, '⚔ Цитадель ждёт: срази Лорда Тьмы и его свиту в самом сердце крепости');
+    }
+  }
+
+  spawnHeartKeeper() {
+    const w = this.world.war;
+    const circle = this.world.pois.find(o => o.type === 'circle') || this.world.pois[0];
+    w.keeperId = this.spawnEnemy('heartKeeper', 'over',
+      circle.x * TILE + 8, circle.y * TILE - 20, { noElite: true });
+  }
+
+  // страховка: Хранитель/Сердце не должны потеряться (вызывается из civ-тика)
+  warUpkeep() {
+    const w = this.world.war, c = this.world.citadel;
+    if (!w || !c) return;
+    if (w.stage === 2 && !(w.keeperId && this.entities.has(w.keeperId))) {
+      const heartExists = [...this.players.values()].some(q => (q.inventory.shadow_heart || 0) > 0)
+        || [...this.entities.values()].some(e => e.entType === 'drop' && e.item === 'shadow_heart');
+      if (!heartExists) this.spawnHeartKeeper();
+    }
+    if (w.stage === 4 && !(w.heartId && this.entities.has(w.heartId))) this.spawnDarkHeart();
+  }
+
+  spawnDarkHeart() {
+    const w = this.world.war, c = this.world.citadel;
+    w.heartId = this.spawnNpc('darkheart', null, 'over', c.x * TILE + 8, c.y * TILE + 8, { kind: 'obj_darkheart' });
+    const h = this.entities.get(w.heartId);
+    h.name = 'Сердце Тьмы';
+    h.hp = h.maxHp = 999;
+  }
+
+  // Финал: уничтожить источник Тьмы или подчинить его
+  warFinale(p, destroy) {
+    const w = this.world.war, c = this.world.citadel;
+    if (!w || w.stage !== 4) return;
+    w.stage = destroy ? 10 : 11;
+    c.dead = true;
+    c.power = 0;
+    if (w.heartId) this.entities.delete(w.heartId);
+    // герои штурма: все живые рядом с Цитаделью (или хотя бы выбравший)
+    const heroes = [...this.players.values()].filter(q =>
+      !q.dead && q.mapId === 'over' && dist2(q.x, q.y, c.x * TILE, c.y * TILE) < 500 ** 2);
+    const grp = heroes.length ? heroes : [p];
+    const LEG = { warrior: 'sunblade', mage: 'dawnstaff', rogue: 'windbow' };
+    for (const q of grp) {
+      const lw = (LEG[q.cls] || 'sunblade') + '@l';
+      q.inventory['weapon:' + lw] = (q.inventory['weapon:' + lw] || 0) + 1;
+      this.addXp(q, 300);
+      this.toast(q, `🏆 ЛЕГЕНДАРНАЯ награда: ${getWeapon(lw).name}!`);
+    }
+    // форты Тьмы освобождаются в любом случае — войска расходятся
+    for (const s of this.world.settlements)
+      if (s.faction === 'darkness') this.civ.liberateSettlement(s, p);
+    if (destroy) {
+      for (const q of grp)
+        for (const f of ['severane', 'ozerny', 'stepnyaki'])
+          q.rep[f] = Math.min(100, (q.rep[f] || 0) + 25);
+      this.toastAll('☀ СЕРДЦЕ ТЬМЫ УНИЧТОЖЕНО! Война окончена — свет победил навсегда');
+      this.events.push(this.world.day, `${p.name} уничтожил Сердце Тьмы. Цитадель мертва, мир свободен`);
+    } else {
+      p.inventory['dark_seal@l'] = (p.inventory['dark_seal@l'] || 0) + 1;
+      this.toast(p, '🏆 Печать Тьмы [Легендарное] пульсирует у тебя на груди');
+      c.owned = true;
+      for (const q of grp)
+        for (const f of ['severane', 'ozerny', 'stepnyaki'])
+          q.rep[f] = Math.max(-100, (q.rep[f] || 0) - 30);
+      this.toastAll(`⛧ ${p.name} ПОДЧИНИЛ Сердце Тьмы. Цитадель принадлежит смертному… Люди этого не забудут`);
+      this.events.push(this.world.day, `${p.name} подчинил Сердце Тьмы — добрые фракции отвернулись от него`);
+    }
   }
 
   // ---------- сюжетные цепочки именных NPC ----------
@@ -1960,6 +2132,17 @@ export class Game {
     if (npc.role === 'hermit') { this.storyDialogHermit(p, npc); return; }
     if (npc.role === 'captain') { this.storyDialogCaptain(p, npc); return; }
     if (npc.role === 'wanderer') { this.storyDialogWanderer(p, npc); return; }
+    if (npc.role === 'darkheart') {
+      const ch = this.world.war?.stage === 4
+        ? [{ id: 'war_destroy', label: '☀ Уничтожить Сердце (Тьма падёт навсегда, слава героям)' },
+           { id: 'war_claim', label: '⛧ Подчинить Сердце (Печать Тьмы и Цитадель — твои, но люди не простят)' },
+           { id: 'close', label: 'Отойти…' }]
+        : [{ id: 'close', label: STR.bye }];
+      this.sendDialog(p, npc.id, '🖤 Сердце Тьмы',
+        ['Сгусток изначальной Тьмы бьётся в пустом зале, как живое сердце.',
+         'Его сила течёт сквозь пальцы — тёплая, жадная, послушная…'], ch);
+      return;
+    }
     if (npc.role === 'merchant' || npc.role === 'trader') {
       // структурированный прилавок: клиент рисует окно-сетку с иконками
       const mult = priceMultiplier(s ? p.rep[s.faction] : 0);
@@ -2014,6 +2197,17 @@ export class Game {
       }
       if (s?.project && (p.inventory.wood || 0) >= 5)
         choices.push({ id: 'donate', label: 'Пожертвовать 5 древесины на стройку (+реп)' });
+      // Война с Тьмой: общемировая кампания до самой Цитадели
+      const war = this.world.war;
+      if (war && this.world.citadel && !this.world.citadel.dead) {
+        const warLabel = [
+          '⚔ «Тьма растёт с каждым днём. Пора дать отпор» (начать Войну с Тьмой)',
+          '⚔ Война: заключить союз фракций (репутация 25 у всех трёх)',
+          '⚔ Война: передать реликвии (10 кристаллов, Сердце Тени, Древний осколок)',
+          '⚔ Война: врата пали — штурмуй Цитадель и срази гарнизон!',
+        ][war.stage];
+        if (warLabel) choices.push({ id: 'war', label: warLabel });
+      }
       choices.push({ id: 'rumor', label: STR.rumor });
       choices.push({ id: 'close', label: STR.bye });
       this.sendDialog(p, npc.id, `Старейшина ${npc.name}`, [this.npcGreeting(p, npc), ...lines.slice(1)], choices);
@@ -2026,8 +2220,10 @@ export class Game {
       else {
         const costM = 3 * (lvl + 1), costC = 30 * (lvl + 1);
         lines.push(`${w.name}${lvl ? ' +' + lvl : ''} → +${(lvl + 1) * 10}% урона`);
-        choices.push({ id: 'forge', label: `Улучшить (${costM} металла, ${costC} мон.)` });
+        choices.push({ id: 'forge', label: `Улучшить оружие в руках (${costM} металла, ${costC} мон.)` });
       }
+      choices.push({ id: 'smithup', label: '⚒ Перековать вещь в высшую редкость…' });
+      choices.push({ id: 'smithbrk', label: '🔨 Разобрать вещь на материалы…' });
       choices.push({ id: 'close', label: STR.bye });
       this.sendDialog(p, npc.id, `Кузнец ${npc.name}`, [this.npcGreeting(p, npc), ...lines.slice(1)], choices);
     } else if (npc.role === 'priest') {
@@ -2042,6 +2238,7 @@ export class Game {
       const choices = [
         { id: 'rest', label: 'Отдых: полное восстановление (15 мон.)' },
         ...(hasMerc ? [] : [{ id: 'hire', label: '⚔ Нанять бойца-компаньона (60 мон.)' }]),
+        { id: 'stash', label: '📦 Общий сундук отряда' },
         { id: 'rumor', label: STR.rumor },
         { id: 'close', label: STR.bye },
       ];
@@ -2059,6 +2256,122 @@ export class Game {
       const line = rumors.length ? `Говорят, ${lc(rumors[0].text)}…` : 'Тихо у нас, и слава богам.';
       this.sendDialog(p, npc.id, `${npc.name}`, [this.npcGreeting(p, npc), line], [{ id: 'close', label: STR.bye }]);
     }
+  }
+
+  // ---------- кооп: общий сундук отряда и передача вещей ----------
+  openStash(p) {
+    this.fx({ t: 'stash', pid: p.id, items: { ...this.world.stash } }, null);
+  }
+
+  stashOp(p, op, item) {
+    if (p.dead || !item) return;
+    const stash = this.world.stash;
+    if (op === 'put') {
+      if ((p.inventory[item] | 0) <= 0) return;
+      if (!stash[item] && Object.keys(stash).length >= 40) { this.toast(p, 'Сундук отряда полон'); return; }
+      p.inventory[item]--;
+      if (p.inventory[item] <= 0) delete p.inventory[item];
+      stash[item] = (stash[item] || 0) + 1;
+    } else {
+      if ((stash[item] | 0) <= 0) return;
+      stash[item]--;
+      if (stash[item] <= 0) delete stash[item];
+      p.inventory[item] = (p.inventory[item] || 0) + 1;
+    }
+    this.openStash(p);
+  }
+
+  giveItem(p, item) {
+    if (p.dead || (p.inventory[item] | 0) <= 0) return;
+    let ally = null, bd = 48 * 48;
+    for (const q of this.players.values()) {
+      if (q === p || q.dead || q.mapId !== p.mapId) continue;
+      const d = dist2(p.x, p.y, q.x, q.y);
+      if (d < bd) { bd = d; ally = q; }
+    }
+    if (!ally) { this.toast(p, 'Рядом нет союзника — подойди ближе'); return; }
+    p.inventory[item]--;
+    if (p.inventory[item] <= 0) delete p.inventory[item];
+    ally.inventory[item] = (ally.inventory[item] || 0) + 1;
+    const name = this.itemName(item);
+    this.toast(p, `🤝 Передано ${ally.name}: ${name}`);
+    this.toast(ally, `🤝 ${p.name} передал тебе: ${name}`);
+  }
+
+  // ---------- кузнец-эндгейм: перековка редкости и разборка ----------
+  // стоимость перековки: c->r и r->e; кольца/аксессуары платят кристаллами
+  smithUpCost(it) {
+    const jewelry = it.slot === 'acc' || it.slot === 'ring'; // украшения зачаровываются кристаллами
+    if (it.rarity === 'c') return jewelry ? { crystal: 3, coins: 50 } : { metal: 4, coins: 50 };
+    return jewelry ? { crystal: 7, coins: 150 } : { metal: 10, crystal: 2, coins: 150 };
+  }
+
+  openSmithUpgrade(p, npcId) {
+    const list = Object.keys(p.inventory).filter(id => {
+      if ((p.inventory[id] | 0) <= 0 || id.startsWith('weapon:')) return false;
+      const it = getItem(id);
+      return it?.slot && (it.rarity === 'c' || it.rarity === 'r');
+    }).slice(0, 7);
+    const choices = list.map(id => {
+      const it = getItem(id);
+      const cost = this.smithUpCost(it);
+      const next = it.rarity === 'c' ? 'Редкое' : 'Эпическое';
+      const costTxt = [cost.metal && `${cost.metal} мет.`, cost.crystal && `${cost.crystal} крист.`, `${cost.coins} мон.`]
+        .filter(Boolean).join(', ');
+      return { id: 'smithup:' + id, label: `${it.name} → [${next}] (${costTxt})` };
+    });
+    if (!choices.length) choices.push({ id: 'close', label: 'В сумке нет вещей под перековку (легендарное и эпическое не куются выше)' });
+    else choices.push({ id: 'close', label: STR.close });
+    this.sendDialog(p, npcId, '⚒ Перековка', ['«Хорошую вещь можно сделать великой. Что несёшь?»'], choices);
+  }
+
+  openSmithBreak(p, npcId) {
+    const list = Object.keys(p.inventory).filter(id => {
+      if ((p.inventory[id] | 0) <= 0 || id.startsWith('weapon:')) return false;
+      return !!getItem(id)?.slot;
+    }).slice(0, 8);
+    const choices = list.map(id => {
+      const it = getItem(id);
+      const y = it.rarity === 'e' ? '6 мет. + 3 крист.' : it.rarity === 'r' ? '3 мет. + 1 крист.' : '1-2 мет.';
+      return { id: 'smithbrk:' + id, label: `${it.name} → ${y}` };
+    });
+    if (!choices.length) choices.push({ id: 'close', label: 'Нечего разбирать' });
+    else choices.push({ id: 'close', label: STR.close });
+    this.sendDialog(p, npcId, '🔨 Разборка', ['«Что в лом? Верну, что смогу».'], choices);
+  }
+
+  smithUpgrade(p, itemId, npcId) {
+    const it = getItem(itemId);
+    if (!it?.slot || (p.inventory[itemId] | 0) <= 0) return;
+    if (it.rarity === 'e' || it.rarity === 'l') return;
+    const cost = this.smithUpCost(it);
+    if ((p.inventory.metal || 0) < (cost.metal || 0)) { this.toast(p, 'Не хватает металла'); return; }
+    if ((p.inventory.crystal || 0) < (cost.crystal || 0)) { this.toast(p, 'Не хватает кристаллов'); return; }
+    if (p.coins < cost.coins) { this.toast(p, STR.notEnoughCoins); return; }
+    p.inventory.metal = (p.inventory.metal || 0) - (cost.metal || 0);
+    p.inventory.crystal = (p.inventory.crystal || 0) - (cost.crystal || 0);
+    p.coins -= cost.coins;
+    p.inventory[itemId]--;
+    if (p.inventory[itemId] <= 0) delete p.inventory[itemId];
+    const newId = withRarity(it.baseId, it.rarity === 'c' ? 'r' : 'e');
+    p.inventory[newId] = (p.inventory[newId] || 0) + 1;
+    this.fx({ t: 'chest', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+    this.toast(p, `⚒ Выковано: ${getItem(newId).name}`);
+    this.openSmithUpgrade(p, npcId); // остаться в меню
+  }
+
+  smithBreak(p, itemId, npcId) {
+    const it = getItem(itemId);
+    if (!it?.slot || (p.inventory[itemId] | 0) <= 0) return;
+    p.inventory[itemId]--;
+    if (p.inventory[itemId] <= 0) delete p.inventory[itemId];
+    const yields = it.rarity === 'e' ? { metal: 6, crystal: 3 }
+      : it.rarity === 'r' ? { metal: 3, crystal: 1 }
+      : { metal: 1 + Math.round(this.rand()) };
+    for (const [m, n] of Object.entries(yields)) p.inventory[m] = (p.inventory[m] || 0) + n;
+    this.fx({ t: 'hit', kind: 'wall', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+    this.toast(p, `🔨 Разобрано: ${Object.entries(yields).map(([m, n]) => `${n} ${m === 'metal' ? 'металла' : 'кристаллов'}`).join(', ')}`);
+    this.openSmithBreak(p, npcId);
   }
 
   openCrafting(p) {
@@ -2127,6 +2440,14 @@ export class Game {
   dialogChoice(p, dialogId, choice) {
     if (choice === 'close') return;
     if (choice.startsWith('story:')) { this.storyChoice(p, choice.slice(6), dialogId); return; }
+    if (choice === 'war') { this.warStep(p); return; }
+    if (choice === 'war_destroy') { this.warFinale(p, true); return; }
+    if (choice === 'war_claim') { this.warFinale(p, false); return; }
+    if (choice === 'stash') { this.openStash(p); return; }
+    if (choice === 'smithup') { this.openSmithUpgrade(p, dialogId); return; }
+    if (choice === 'smithbrk') { this.openSmithBreak(p, dialogId); return; }
+    if (choice.startsWith('smithup:')) { this.smithUpgrade(p, choice.slice(8), dialogId); return; }
+    if (choice.startsWith('smithbrk:')) { this.smithBreak(p, choice.slice(9), dialogId); return; }
     if (choice.startsWith('buy:')) {
       const it = SHOP[+choice.split(':')[1]];
       if (!it) return;

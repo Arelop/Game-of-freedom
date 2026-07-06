@@ -228,6 +228,20 @@ export const ITEMS = {
     stats: { lck: 2 }, price: 105, icon: 'item_ring_fortune',
   },
 
+  // --- реликвии Войны с Тьмой ---
+  shadow_heart: {
+    id: 'shadow_heart', name: 'Сердце Тени',
+    price: 200, icon: 'item_heart_shadow', // реликвия: падает с Хранителя сердца
+  },
+  ancient_shard: {
+    id: 'ancient_shard', name: 'Древний осколок',
+    price: 150, icon: 'item_shard', // реликвия: с боссов подземелий во время войны
+  },
+  dark_seal: {
+    id: 'dark_seal', name: 'Печать Тьмы', slot: 'acc',
+    stats: { str: 1, agi: 1, int: 1, lck: 1 }, price: 500, icon: 'item_seal_dark',
+  },
+
   // --- зелья ---
   heal_potion: {
     id: 'heal_potion', name: 'Зелье лечения', use: { heal: 3 },

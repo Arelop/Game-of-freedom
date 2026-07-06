@@ -70,6 +70,7 @@ export class Net {
       if (m.sts) m.sts.forEach((st, i) => { if (this.mapInfo.settlements[i]) this.mapInfo.settlements[i].st = st; });
       if (m.rel) this.relations = m.rel;
       if (m.dark) this.darkPower = m.dark;
+      this.weather = m.wt || 'clear';
       return;
     }
     if (m.t === MSG.CHUNK) {

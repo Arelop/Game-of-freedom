@@ -290,6 +290,14 @@ export class AbstractSim {
         c.power = Math.max(3, Math.round(c.power / 2));
         this.game.events.push(this.game.world.day, `★ Гарнизон Чернокаменной Цитадели повержен — Тьма отступает!`, { x: Math.round(tok.x / TILE), y: Math.round(tok.y / TILE) });
         this.game.toastAll('★ Гарнизон Цитадели повержен! Тьма ослаблена');
+        // Война с Тьмой: победа в штурме обнажает Сердце Тьмы
+        const w = this.game.world.war;
+        if (w && w.stage === 3) {
+          w.stage = 4;
+          this.game.spawnDarkHeart();
+          this.game.toastAll('🖤 В пустом зале Цитадели обнажилось СЕРДЦЕ ТЬМЫ. Реши его судьбу (E)');
+          this.game.events.push(this.game.world.day, 'Штурм Цитадели удался — Сердце Тьмы беззащитно');
+        }
       } else {
         this.game.events.push(this.game.world.day, `Путники истребили: ${tok.name}`, { x: Math.round(tok.x / TILE), y: Math.round(tok.y / TILE) });
       }

@@ -47,16 +47,21 @@ export class CivSim {
     const g = this.game;
     const c = g.world.citadel;
     if (!c) return;
+    g.warUpkeep(); // страховка реликвий/Сердца кампании
+    if (c.dead) return; // Тьма повержена в Войне — Цитадель мертва
     c.power = Math.min(200, c.power + 0.05 + c.forts.length * 0.05);
     if (c.raidCd > 0) c.raidCd--;
 
     // гарнизон Цитадели: Лорд Тьмы и элита всегда на месте
+    // (после великого ритуала — ослабленный состав)
     if (!g.abstract.tokens.some(t => t.garrison && !t.dead)) {
       if (c.power >= 12) c.power -= 10; // возрождение гарнизона стоит мощи
       g.abstract.tokens.push({
         id: 'tok' + g.abstract.nextId++, type: 'pack', name: 'гарнизон Цитадели',
         faction: 'darkness', garrison: true,
-        units: ['darkLord', 'darkKnight', 'darkMage', 'darkArcher', 'darkSoldier', 'darkSoldier'],
+        units: c.weakened
+          ? ['darkLord', 'darkKnight', 'darkArcher']
+          : ['darkLord', 'darkKnight', 'darkMage', 'darkArcher', 'darkSoldier', 'darkSoldier'],
         x: c.x * TILE, y: c.y * TILE, home: { x: c.x * TILE, y: c.y * TILE },
         hydrated: null,
       });

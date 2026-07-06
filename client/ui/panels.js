@@ -129,8 +129,81 @@ export class Panels {
   hideDialog() {
     this.dialogEl.style.display = 'none';
     this.hideShop();
+    this.hideStash();
   }
-  get dialogOpen() { return this.dialogEl.style.display === 'block' || this.shopOpen; }
+  get dialogOpen() { return this.dialogEl.style.display === 'block' || this.shopOpen || this.stashOpen; }
+
+  // ---------- общий сундук отряда (таверна) ----------
+  showStash(m) {
+    this.stashData = m.items || {};
+    this.stashOpen = true;
+    let el = document.getElementById('stash');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'stash';
+      document.body.appendChild(el);
+    }
+    el.style.display = 'block';
+    this.renderStash();
+  }
+
+  hideStash() {
+    this.stashOpen = false;
+    const el = document.getElementById('stash');
+    if (el) el.style.display = 'none';
+    this.hideTip();
+  }
+
+  renderStash() {
+    const el = document.getElementById('stash');
+    if (!el || !this.stashOpen) return;
+    el.innerHTML = '<div class="shophead"><span>📦 Сундук отряда</span><span class="shopgreet">общее добро — бери и клади</span></div>';
+    const mkGrid = (items, take) => {
+      const grid = document.createElement('div');
+      grid.className = 'shopgrid';
+      const entries = Object.entries(items).filter(([, n]) => n > 0);
+      if (!entries.length) {
+        const e = document.createElement('div');
+        e.className = 'empty'; e.textContent = '— пусто —';
+        e.style.cssText = 'color:#45444f;font-size:12px;padding:4px';
+        grid.appendChild(e);
+      }
+      for (const [item, n] of entries) {
+        const cell = document.createElement('div');
+        cell.className = 'shopcell';
+        cell.appendChild(this.freshIcon(this.itemIcon(item)));
+        if (n > 1) {
+          const b = document.createElement('span');
+          b.className = 'count'; b.textContent = 'x' + n;
+          cell.appendChild(b);
+        }
+        const rc = this.rarColor(item);
+        if (rc) cell.style.borderColor = rc;
+        const isWpn = isWeaponItem(item);
+        this.bindTip(cell, () => isWpn
+          ? this.tipWeapon(weaponIdOf(item), { action: take ? 'забрать' : 'положить', price: false })
+          : this.tipItem(item, { action: take ? 'забрать' : 'положить', price: false }));
+        cell.onclick = () => {
+          SFX.ui();
+          this.hideTip();
+          this.net.send({ t: MSG.STASH, op: take ? 'take' : 'put', item });
+        };
+        grid.appendChild(cell);
+      }
+      return grid;
+    };
+    el.appendChild(header('В сундуке (клик — забрать)'));
+    el.appendChild(mkGrid(this.stashData, true));
+    el.appendChild(header('Твоя сумка (клик — положить)'));
+    el.appendChild(mkGrid(this.net.you?.inv || {}, false));
+    const btn = document.createElement('div');
+    btn.className = 'shopbtns';
+    const close = document.createElement('button');
+    close.textContent = STR.close + ' (Esc)';
+    close.onclick = () => this.hideStash();
+    btn.appendChild(close);
+    el.appendChild(btn);
+  }
 
   // ---------- окно торговли: сетка товаров с иконками и карточками ----------
   showShop(m) {
@@ -317,7 +390,18 @@ export class Panels {
       banner.className = 'sellbanner';
       banner.textContent = '💰 ПРОДАЖА: клик по предмету в сумке продаёт его';
       el.appendChild(banner);
+    } else if (this.giveMode) {
+      const banner = document.createElement('div');
+      banner.className = 'sellbanner';
+      banner.textContent = '🤝 ПЕРЕДАЧА: клик по предмету отдаёт его союзнику рядом';
+      el.appendChild(banner);
     }
+    // передача вещей союзнику (кооп)
+    const giveBtn = document.createElement('button');
+    giveBtn.className = 'givebtn';
+    giveBtn.textContent = this.giveMode ? '✕ Закончить передачу' : '🤝 Передать вещи союзнику';
+    giveBtn.onclick = () => { this.giveMode = !this.giveMode; this.sellMode = false; this.renderInventory(); };
+    el.appendChild(giveBtn);
 
     // --- оружие (ячейки 1-4) ---
     el.appendChild(header('Оружие (клавиши 1–4)'));
@@ -442,6 +526,17 @@ export class Panels {
           SFX.pickup();
           this.hideTip();
           this.net.send({ t: MSG.SELL_ITEM, item });
+          setTimeout(() => this.renderInventory(), 150);
+        };
+      } else if (this.giveMode) {
+        cell.classList.add('sellable');
+        this.bindTip(cell, () => isWpn
+          ? this.tipWeapon(weaponIdOf(item), { action: 'передать союзнику' })
+          : this.tipItem(item, { action: 'передать союзнику' }));
+        cell.onclick = () => {
+          SFX.ui();
+          this.hideTip();
+          this.net.send({ t: MSG.GIVE, item });
           setTimeout(() => this.renderInventory(), 150);
         };
       } else {

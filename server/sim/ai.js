@@ -17,6 +17,7 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
   // замедление (лёд): множитель скорости, пока действует slowT
   let slowF = 1;
   if (e.slowT > 0) { e.slowT -= dt; slowF = e.slowMult || 0.65; }
+  if (e.hasteF) slowF *= e.hasteF; // элита «Стремительный»
   e.slowF = slowF;
 
   // цель — ближайший игрок ИЛИ житель (игроки чуть приоритетнее);

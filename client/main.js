@@ -14,7 +14,7 @@ import { Particles } from './render/particles.js';
 import { TileRenderer } from './render/tilemap.js';
 import { Hud } from './ui/hud.js';
 import { Panels } from './ui/panels.js';
-import { SFX, playWeaponSound } from './sfx.js';
+import { SFX, playWeaponSound, Music } from './sfx.js';
 
 // ---------- инициализация ----------
 const screen = document.getElementById('screen');
@@ -116,6 +116,7 @@ net.handlers.onWelcome = () => {
   menu.style.display = 'none';
   SFX.quest();
   buildBiomeCanvas();
+  Music.start(); // фоновая музыка (N — вкл/выкл)
 };
 
 // ---------- карта мира: биомная подложка ----------
@@ -205,6 +206,7 @@ net.handlers.onFx = (kind, m) => {
       break;
     case 'sellMode': panels.openSellMode(); break;
     case 'shop': panels.showShop(m); break;
+    case 'stash': panels.showStash(m); break;
     case 'toast': panels.toast(m.text); break;
     case 'dialog': panels.showDialog(m); break;
     case 'marker': net.mapInfo.markers = net.mapInfo.markers || []; net.mapInfo.markers.push(m); break;
@@ -256,6 +258,7 @@ input.onKey = k => {
   if (k === 'KeyC') panels.toggleChar();
   if (k === 'KeyP') panels.toggleFactions();
   if (k === 'KeyM') bigMap = !bigMap;
+  if (k === 'KeyN') panels.toast(Music.toggle() ? '🎵 Музыка включена' : '🔇 Музыка выключена');
   if (k === 'F3') hud.debug = !hud.debug;
   if (k === 'Escape') panels.hideDialog();
   if (/^Digit[1-4]$/.test(k)) net.send({ t: MSG.SWITCH_WEAPON, slot: +k.slice(5) - 1 });
@@ -438,6 +441,53 @@ function simStep() {
   }
 }
 
+// ---------- погода: дождь и снег поверх мира ----------
+const weatherDrops = [];
+let lastWeatherT = 0;
+function renderWeather(timeSec) {
+  const dtSec = Math.min(0.1, timeSec - lastWeatherT || 0.016);
+  lastWeatherT = timeSec;
+  const w = net.weather;
+  if (net.mapId !== 'over' || !w || w === 'clear') { weatherDrops.length = 0; return; }
+  const target = w === 'rain' ? 80 : 55;
+  while (weatherDrops.length < target) {
+    weatherDrops.push({
+      x: Math.random() * VIEW_W, y: Math.random() * VIEW_H,
+      spd: w === 'rain' ? 240 + Math.random() * 90 : 22 + Math.random() * 16,
+      drift: Math.random() * 2 - 1,
+    });
+  }
+  ctx.strokeStyle = 'rgba(150,180,230,0.45)';
+  ctx.fillStyle = 'rgba(238,242,255,0.85)';
+  ctx.lineWidth = 1;
+  for (const d of weatherDrops) {
+    d.y += d.spd * dtSec;
+    d.x += (w === 'rain' ? 34 * dtSec : (d.drift * 12 + Math.sin(timeSec * 1.7 + d.y * 0.05) * 10) * dtSec);
+    if (d.y > VIEW_H) { d.y = -4; d.x = Math.random() * VIEW_W; }
+    if (d.x > VIEW_W) d.x -= VIEW_W;
+    if (d.x < 0) d.x += VIEW_W;
+    if (w === 'rain') {
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x - 1.5, d.y - 7);
+      ctx.stroke();
+    } else {
+      ctx.fillRect(d.x, d.y, 1.5, 1.5);
+    }
+  }
+  if (w === 'rain') { // серая пелена ливня
+    ctx.fillStyle = 'rgba(30,40,80,0.10)';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
+}
+
+// настроение музыки: данж — дрон, ночь — минор, день — мажор
+setInterval(() => {
+  if (!net.connected) return;
+  Music.setMood(net.mapId !== 'over' ? 'dungeon'
+    : (net.worldTime < 0.22 || net.worldTime > 0.85) ? 'night' : 'day');
+}, 3000);
+
 // ---------- рендер ----------
 function render(timeSec) {
   ctx.fillStyle = '#14121a';
@@ -555,6 +605,7 @@ function render(timeSec) {
 
   particles.render(ctx, cam);
   renderLight(timeSec);
+  renderWeather(timeSec);
 
   // виньетка урона
   if (vignette > 0) {
@@ -668,10 +719,18 @@ function drawEntity(id, r, p, nowMs, timeSec) {
   if (tint) atlas.drawTinted(ctx, e.k, s.x, s.y, tint, { flipX });
   else atlas.draw(ctx, e.k, s.x, s.y, { flipX });
 
+  // элитный монстр: золотая звезда и полоса
+  if (e.tp === 'e' && e.el) {
+    ctx.font = '8px monospace';
+    ctx.fillStyle = '#fbf236';
+    ctx.textAlign = 'center';
+    ctx.fillText('★', s.x, s.y - 16 + Math.sin(timeSec * 4) * 1.5);
+    ctx.textAlign = 'left';
+  }
   if (e.tp === 'e' && e.h < e.hm) {
     ctx.fillStyle = '#222034';
     ctx.fillRect(s.x - 7, s.y - 12, 14, 2);
-    ctx.fillStyle = '#d9574a';
+    ctx.fillStyle = e.el ? '#fbf236' : '#d9574a';
     ctx.fillRect(s.x - 7, s.y - 12, Math.max(1, Math.round(14 * e.h / e.hm)), 2);
   }
 }

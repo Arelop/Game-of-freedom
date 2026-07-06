@@ -140,6 +140,53 @@ export const ENEMIES = {
       ]},
     ],
   },
+
+  // --- боссы биомов: живут в логовах на карте ---
+  swampWitch: {
+    id: 'swampWitch', name: 'Болотная колдунья', archetype: 'boss', hp: 130, speed: 38, tier: 5,
+    radius: 7, touchDamage: 2, sprite: 'enemy_swamp_witch', xp: 55,
+    drops: { coin: [25, 40], weapon: 1, crystal: [2, 4] },
+    phases: [
+      { hpAbove: 0.5, steps: [
+        { pattern: 'aimedTriple', interval: 1.5, move: 'strafe' },
+        { pattern: 'fan5', interval: 2.0, move: 'chase' },
+      ]},
+      { hpAbove: 0, steps: [
+        { pattern: 'ring8', interval: 1.6, move: 'strafe' },
+        { pattern: 'burst3aimed', interval: 1.0, move: 'chase' },
+      ]},
+    ],
+  },
+  rockKing: {
+    id: 'rockKing', name: 'Каменный король', archetype: 'boss', hp: 220, speed: 26, tier: 5,
+    radius: 9, touchDamage: 3, sprite: 'enemy_rock_king', xp: 70,
+    drops: { coin: [30, 50], weapon: 1, metal: [4, 8] },
+    phases: [
+      { hpAbove: 0.6, steps: [
+        { pattern: 'ring8', interval: 2.2, move: 'chase' },
+        { pattern: 'aimedTriple', interval: 1.6, move: 'chase' },
+      ]},
+      { hpAbove: 0.3, steps: [
+        { pattern: 'ring12', interval: 1.9, move: 'chase' },
+        { pattern: 'wideWave', interval: 1.4, move: 'strafe' },
+      ]},
+      { hpAbove: 0, steps: [
+        { pattern: 'spiral', interval: 0.18, move: 'strafe' },
+        { pattern: 'ring12', interval: 1.6, move: 'chase' },
+      ]},
+    ],
+  },
+  packLeader: {
+    id: 'packLeader', name: 'Вожак варгов', archetype: 'chaser', hp: 90, speed: 80, tier: 5,
+    radius: 7, touchDamage: 2, lungeSpeed: 300, lungeWindup: 0.4, lungeRange: 70,
+    sprite: 'enemy_pack_leader', xp: 45, drops: { coin: [20, 35], weapon: 1, hide: [2, 4], meat: [2, 3] },
+  },
+  heartKeeper: {
+    id: 'heartKeeper', name: 'Хранитель сердца', archetype: 'shooter', hp: 120, speed: 44, tier: 5,
+    radius: 7, touchDamage: 2, preferRange: [70, 130], fireInterval: 1.5,
+    pattern: 'fan5', sprite: 'enemy_heart_keeper', xp: 60,
+    drops: { coin: [20, 40], crystal: [2, 4] }, faction: 'darkness',
+  },
 };
 
 // Монстры тира min..max — для спавна по сложности (без боссов и войск Тьмы)

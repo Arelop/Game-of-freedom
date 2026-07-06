@@ -80,6 +80,7 @@ export class Net {
           sts: game.world.settlements.map(s => s.ruined ? 2 : s.captured ? s.faction === 'darkness' ? 3 : 1 : 0),
           rel: RELATIONS,
           dark: game.world.citadel ? { pw: Math.round(game.world.citadel.power), f: game.world.citadel.forts.length } : null,
+          wt: game.world.weather,
         }));
         break;
       case MSG.SWITCH_WEAPON: {
@@ -98,6 +99,8 @@ export class Net {
       case MSG.SELL_ITEM: game.sellItem(p, String(m.item || '')); break;
       case MSG.ABILITY: game.useAbility(p, Math.max(0, Math.min(2, m.slot | 0))); break;
       case MSG.OFFHAND: game.useOffhand(p); break;
+      case MSG.STASH: game.stashOp(p, m.op === 'take' ? 'take' : 'put', String(m.item || '')); break;
+      case MSG.GIVE: game.giveItem(p, String(m.item || '')); break;
     }
   }
 
@@ -158,7 +161,8 @@ export class Net {
         const def = ENEMIES[e.kind];
         ents.push({
           i: e.id, tp: 'e', k: def.sprite, x: r1(e.x), y: r1(e.y), a: r2(e.aim || 0),
-          h: e.hp, hm: def.hp, st: e.state === 'windup' || e.state === 'dash' ? e.state : undefined,
+          h: e.hp, hm: e.maxHp || def.hp, st: e.state === 'windup' || e.state === 'dash' ? e.state : undefined,
+          el: e.elite || undefined,
         });
       } else {
         ents.push({

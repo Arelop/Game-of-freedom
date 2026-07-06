@@ -17,6 +17,8 @@ export const MSG = {
   SELL_ITEM: 'sellItem',       // { item } продать торговцу рядом
   ABILITY: 'ability',          // { slot: 0..2 } применить способность Q/X/R
   OFFHAND: 'offhand',          // активировать предмет в левой руке (ПКМ)
+  STASH: 'stash',              // { op: 'put'|'take', item } общий сундук отряда
+  GIVE: 'give',                // { item } передать предмет союзнику рядом
 
   // сервер -> клиент
   WELCOME: 'welcome',     // { id, worldSeed, worldMeta, tick }

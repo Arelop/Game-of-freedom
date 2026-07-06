@@ -177,6 +177,44 @@
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/nonliving/fire_elemental.png",
       "down": 2
     },
+    "wpn_sunblade": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/artefact/spwpn_sword_of_power.png"
+    },
+    "wpn_dawnstaff": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/artefact/urand_elemental.png"
+    },
+    "wpn_windbow": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/artefact/urand_storm_bow.png"
+    },
+    "item_heart_shadow": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-misc/heart.png"
+    },
+    "item_shard": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_rune.png"
+    },
+    "item_seal_dark": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/penta_orange.png"
+    },
+    "obj_darkheart": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_crystal.png",
+      "down": 2
+    },
+    "enemy_swamp_witch": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/naga_mage.png",
+      "down": 2
+    },
+    "enemy_rock_king": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/stone_giant.png",
+      "down": 2
+    },
+    "enemy_pack_leader": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/warg.png",
+      "down": 2
+    },
+    "enemy_heart_keeper": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/demons/shadow_fiend.png",
+      "down": 2
+    },
     "obj_obelisk": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/zot_pillar.png",
       "down": 2

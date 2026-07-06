@@ -74,6 +74,9 @@ export function makeWorld(seed) {
     roads: [],                  // точки дорог для карты мира
     time: 0.3,                  // доля суток (0.3 = утро)
     day: 1,
+    war: { stage: 0 },          // «Война с Тьмой»: 0 не начата, 1 союз, 2 реликвии, 3 штурм, 10/11 финалы
+    stash: {},                  // общий сундук группы (таверна)
+    weather: 'clear',           // погода дня: clear | rain | snow
   };
 
   // Поселения: 6 сайтов, три городские фракции по кругу
@@ -164,6 +167,34 @@ export function makeWorld(seed) {
       stampSpecial(world, poi, rand);
       world.pois.push(poi);
     }
+  }
+
+  // Логова боссов биомов: колдунья в болоте, король в скалах, вожак в лесу
+  const LAIRS = [
+    { type: 'lair', name: 'Логово болотной колдуньи', biome: T.SWAMP, kinds: ['swampWitch', 'slime', 'slime'] },
+    { type: 'lair', name: 'Трон каменного короля', biome: T.ROCK, kinds: ['rockKing', 'golem'] },
+    { type: 'lair', name: 'Логово вожака варгов', biome: T.FOREST_FLOOR, kinds: ['packLeader', 'wolf', 'wolf', 'wolf'] },
+  ];
+  for (const L of LAIRS) {
+    let site = null;
+    for (let tries = 0; tries < 600 && !site; tries++) {
+      const x = randInt(rand, 40, WORLD_TILES - 40), y = randInt(rand, 40, WORLD_TILES - 40);
+      if (baseTile(seed, x, y) !== L.biome) continue;
+      if (allSites.some(s => (s.x - x) ** 2 + (s.y - y) ** 2 < 45 * 45)) continue;
+      site = { x, y };
+    }
+    if (!site) continue; // биома не нашлось — босс останется легендой
+    allSites.push(site);
+    const poi = {
+      id: 'lair' + si++, x: site.x, y: site.y, type: 'lair', name: L.name,
+      cleared: false, difficulty: 4, kinds: L.kinds, special: false,
+    };
+    // сцена логова: кровь, черепа камней и колонны
+    const set = (dx, dy, t) => world.edits.set((site.x + dx) + ',' + (site.y + dy), t);
+    set(0, 0, T.BLOOD); set(1, 1, T.BLOOD); set(-2, 1, T.BLOOD);
+    set(-3, -2, T.PILLAR); set(3, 2, T.PILLAR);
+    set(-2, -3, T.ROCK_SOLID); set(2, -2, T.ROCK_SOLID); set(3, -3, T.ROCK_SOLID);
+    world.pois.push(poi);
   }
 
   // Чернокаменная Цитадель — оплот Армии Тьмы на юге мира

@@ -109,6 +109,30 @@ export const WEAPONS = {
     projRadius: 4, projLife: 1.4, ammoType: 'bomb', price: 140,
     explode: { radius: 34 },              // сносит стены пачками
   },
+
+  // --- ЛЕГЕНДАРНОЕ оружие: не выпадает в мире — только награда за
+  // финал «Войны с Тьмой». Выдаётся с суффиксом @l. У каждого — уникальное свойство.
+  sunblade: {
+    id: 'sunblade', structDmg: 6, name: 'Клинок рассвета', melee: true, school: 'melee',
+    damage: 5, fireRate: 1.9, range: 32, arcDeg: 130, knockback: 120, recoilShake: 0.3,
+    infiniteAmmo: true, lifeOnKill: 1, // убийство в ближнем бою лечит
+    sprite: 'wpn_sunblade', sound: 'swing', swingColor: '#fbf236', price: 400, legendary: true,
+  },
+  dawnstaff: {
+    id: 'dawnstaff', structDmg: 2, name: 'Посох зари', school: 'magic', damage: 4,
+    projectilesPerShot: 1, spreadDeg: 1, projectileSpeed: 400, fireRate: 2.2, magSize: 16,
+    reloadTime: 1.4, knockback: 15, recoilShake: 0.15,
+    sprite: 'wpn_dawnstaff', projSprite: 'proj_lightning', sound: 'shot_laserlike',
+    projRadius: 3, projLife: 1.0, ammoType: 'mana', price: 450, legendary: true,
+    chain: { count: 3, radius: 85, falloff: 0.75 }, // каждая молния скачет трижды
+  },
+  windbow: {
+    id: 'windbow', name: 'Ветер степей', school: 'ranged', damage: 4,
+    projectilesPerShot: 2, spreadDeg: 6, projectileSpeed: 480, fireRate: 2.3, magSize: 14,
+    reloadTime: 0.8, knockback: 35, recoilShake: 0.2,
+    sprite: 'wpn_windbow', projSprite: 'proj_arrow', sound: 'shot_bow',
+    projRadius: 2, projLife: 1.8, ammoType: 'arrow', price: 420, legendary: true,
+  },
 };
 
 export const AMMO_NAMES = {
