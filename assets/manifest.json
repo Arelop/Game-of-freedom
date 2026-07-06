@@ -5,173 +5,639 @@
     "s": "assets/raw/pixel-shmup/Tilemap/tiles_packed.png"
   },
   "sprites": {
-    "tile_grass":        { "pack": "t", "tx": 0, "ty": 0 },
-    "tile_grass2":       { "pack": "t", "tx": 1, "ty": 0 },
-    "tile_grass_flowers":{ "pack": "t", "tx": 2, "ty": 0 },
-    "tile_dirt":         { "pack": "t", "tx": 1, "ty": 2 },
-    "tile_road":         { "pack": "t", "tx": 4, "ty": 3 },
-    "tile_tree":         { "pack": "t", "tx": 4, "ty": 0 },
-    "tile_tree2":        { "pack": "t", "tx": 3, "ty": 0 },
-    "tile_bush":         { "pack": "t", "tx": 4, "ty": 2 },
-    "tile_mushroom":     { "pack": "t", "tx": 5, "ty": 2 },
-    "tile_fence":        { "pack": "t", "tx": 9, "ty": 3 },
-    "tile_wall":         { "pack": "t", "tx": 0, "ty": 6 },
-    "tile_wall_stone":   { "pack": "t", "tx": 1, "ty": 9 },
-    "tile_door":         { "pack": "t", "tx": 1, "ty": 7 },
-    "obj_sign":          { "pack": "t", "tx": 11, "ty": 4 },
-    "obj_pot":           { "pack": "t", "tx": 10, "ty": 6 },
-
-    "tile_dungeon_floor":  { "pack": "d", "tx": 0, "ty": 0 },
-    "tile_dungeon_floor2": { "pack": "d", "tx": 0, "ty": 1 },
-    "tile_dungeon_wall":   { "pack": "d", "tx": 1, "ty": 3 },
-    "tile_floor_wood":     { "pack": "d", "tx": 1, "ty": 4 },
-    "obj_chest":           { "pack": "d", "tx": 5, "ty": 7 },
-    "obj_chest_open":      { "pack": "d", "tx": 6, "ty": 7 },
-    "item_potion":         { "pack": "d", "tx": 7, "ty": 9 },
-    "item_potion_green":   { "pack": "d", "tx": 6, "ty": 9 },
-    "item_potion_blue":    { "pack": "d", "tx": 8, "ty": 9 },
-    "item_shield_wood":    { "pack": "d", "tx": 5, "ty": 8 },
-    "item_shield_iron":    { "pack": "d", "tx": 6, "ty": 8 },
-    "item_armor_leather":  { "proc": "armorIcon", "args": { "tier": "leather" } },
-    "item_armor_chain":    { "proc": "armorIcon", "args": { "tier": "chain" } },
-    "item_armor_plate":    { "proc": "armorIcon", "args": { "tier": "plate" } },
-    "item_hood":           { "proc": "hoodIcon" },
-    "item_helmet":         { "proc": "helmetIcon" },
-    "item_amulet_wolf":    { "proc": "amuletIcon", "args": { "kind": "wolf" } },
-    "item_amulet_bear":    { "proc": "amuletIcon", "args": { "kind": "bear" } },
-    "item_ring":           { "proc": "ringIcon" },
-
-    "wpn_sword":         { "pack": "d", "tx": 10, "ty": 8 },
-    "wpn_dagger":        { "pack": "d", "tx": 7, "ty": 8 },
-    "wpn_axe":           { "pack": "d", "tx": 11, "ty": 9 },
-    "wpn_staff_frost":   { "pack": "d", "tx": 10, "ty": 10 },
-
-    "player_0": { "pack": "d", "tx": 1, "ty": 8 },
-    "player_1": { "pack": "d", "tx": 3, "ty": 8 },
-    "player_2": { "pack": "d", "tx": 4, "ty": 8 },
-    "player_3": { "pack": "d", "tx": 2, "ty": 8 },
-    "player_warrior": { "pack": "d", "tx": 1, "ty": 8 },
-    "player_mage":    { "pack": "d", "tx": 0, "ty": 7 },
-    "player_rogue":   { "pack": "d", "tx": 3, "ty": 9 },
-
-    "npc_wizard":   { "pack": "d", "tx": 0, "ty": 7 },
-    "npc_villager": { "pack": "d", "tx": 1, "ty": 7 },
-    "npc_villager2":{ "pack": "d", "tx": 2, "ty": 7 },
-    "npc_elder":    { "pack": "d", "tx": 3, "ty": 7 },
-    "npc_merchant": { "pack": "d", "tx": 4, "ty": 7 },
-    "npc_guard":    { "pack": "d", "tx": 0, "ty": 8 },
-
-    "enemy_slime":        { "pack": "d", "tx": 0, "ty": 9 },
-    "enemy_bandit":       { "pack": "d", "tx": 3, "ty": 9 },
-    "enemy_bandit_heavy": { "pack": "d", "tx": 1, "ty": 9 },
-    "enemy_skeleton":     { "pack": "d", "tx": 1, "ty": 10 },
-    "enemy_dasher":       { "pack": "d", "tx": 2, "ty": 10 },
-    "enemy_bat":          { "pack": "d", "tx": 0, "ty": 10 },
-    "enemy_demon":        { "pack": "d", "tx": 2, "ty": 9 },
-    "enemy_imp":          { "pack": "d", "tx": 0, "ty": 10 },
-    "enemy_rat":          { "pack": "d", "tx": 4, "ty": 10 },
-    "enemy_archer":       { "pack": "d", "tx": 4, "ty": 9 },
-    "enemy_dark_knight":  { "pack": "d", "tx": 3, "ty": 10 },
-    "enemy_mimic":        { "pack": "d", "tx": 7, "ty": 7 },
-    "enemy_golem":        { "proc": "golem" },
-    "npc_spirit":         { "pack": "d", "tx": 1, "ty": 10 },
-
-    "proj_small":  { "pack": "s", "tx": 0, "ty": 0 },
-    "fx_flash":    { "pack": "s", "tx": 4, "ty": 0 },
-    "fx_sparkle":  { "pack": "s", "tx": 7, "ty": 0 },
-    "item_medkit": { "pack": "s", "tx": 0, "ty": 2 },
-
-    "tile_water":        { "proc": "water" },
-    "tile_deep_water":   { "proc": "deepWater" },
-    "tile_water_edge":   { "proc": "waterEdge" },
-    "tile_sand":         { "proc": "sand" },
-    "tile_swamp":        { "proc": "swamp" },
-    "tile_rock":         { "proc": "rockFloor" },
-    "tile_rock_solid":   { "proc": "rockSolid" },
-    "tile_field":        { "proc": "field" },
-    "obj_campfire_0":    { "proc": "campfire", "args": { "frame": 0 } },
-    "obj_campfire_1":    { "proc": "campfire", "args": { "frame": 1 } },
-    "obj_well":          { "proc": "well" },
-    "obj_bed":           { "proc": "bed" },
-    "obj_table":         { "proc": "table" },
-    "obj_stall":         { "proc": "stall" },
-    "obj_dungeon_entrance": { "proc": "dungeonEntrance" },
-    "obj_exit_portal":   { "proc": "exitPortal" },
-    "obj_shrine":        { "proc": "shrine" },
-    "obj_anvil":         { "proc": "anvil" },
-    "npc_smith":         { "pack": "d", "tx": 4, "ty": 8 },
-    "npc_merc":          { "pack": "d", "tx": 2, "ty": 8 },
-    "npc_innkeeper":     { "pack": "d", "tx": 2, "ty": 7 },
-    "npc_hunter":        { "pack": "d", "tx": 4, "ty": 9 },
-    "wpn_bombs":         { "proc": "bombsWeapon" },
-    "wpn_spear":         { "proc": "spearWeapon" },
-    "wpn_hammer":        { "proc": "hammerWeapon" },
-    "wpn_taxe":          { "proc": "taxeWeapon" },
-    "proj_taxe":         { "proc": "taxeProj" },
-    "wpn_staff_venom":   { "proc": "staff", "args": { "gem": "arcane" } },
-    "proj_venom":        { "proc": "venomProj" },
-    "item_armor_padded": { "proc": "paddedArmor" },
-    "item_armor_scale":  { "proc": "scaleArmor" },
-    "item_cap":          { "proc": "capIcon" },
-    "item_amulet_owl":   { "proc": "amuletIcon", "args": { "kind": "wolf" } },
-    "item_amulet_fox":   { "proc": "amuletIcon", "args": { "kind": "bear" } },
-    "item_ring_iron":    { "proc": "ringIron" },
-    "item_shield_tower": { "proc": "towerShield" },
-    "item_armor_berserk": { "proc": "berserkArmor" },
-    "item_robe":         { "proc": "robeIcon" },
-    "item_cloak":        { "proc": "cloakIcon" },
-    "item_sage_hat":     { "proc": "sageHat" },
-    "item_war_helm":     { "proc": "warHelm" },
-    "item_crown":        { "proc": "crownIcon" },
-    "item_amulet_rune":  { "proc": "runeAmulet" },
-    "item_totem":        { "proc": "totemIcon" },
-    "item_shield_glad":  { "proc": "gladShield" },
-    "item_charm":        { "proc": "charmIcon" },
-    "proj_bomb":         { "proc": "bombProj" },
-    "item_fire_arrow":   { "proc": "fireArrowItem" },
-    "item_metal":        { "proc": "metalIngot" },
-    "item_ammo_bomb":    { "proc": "bombProj" },
-    "tile_rubble":       { "proc": "rubbleTile" },
-
-    "wpn_bow":      { "proc": "bow", "args": { "kind": "short" } },
-    "wpn_bow2":     { "proc": "bow", "args": { "kind": "hunt" } },
-    "wpn_crossbow": { "proc": "crossbow" },
-    "wpn_staff_fire": { "proc": "staff", "args": { "gem": "fire" } },
-    "wpn_staff_bomb": { "proc": "staff", "args": { "gem": "bomb" } },
-    "wpn_staff_storm": { "proc": "staff", "args": { "gem": "storm" } },
-    "proj_fireball": { "proc": "fireballOrb" },
-    "proj_lightning": { "proc": "lightningBolt" },
-
-    "proj_orb":    { "proc": "orb", "args": { "color": "purple" } },
-    "proj_arrow":  { "proc": "arrow" },
-    "proj_bolt":   { "proc": "bolt" },
-    "proj_knife":  { "proc": "knife" },
-    "proj_fire":   { "proc": "magicOrb", "args": { "color": "fire" } },
-    "proj_frost":  { "proc": "magicOrb", "args": { "color": "frost" } },
-
-    "item_coin":        { "proc": "coin" },
-    "item_meat":        { "proc": "meat", "args": { "cooked": false } },
-    "item_cooked_meat": { "proc": "meat", "args": { "cooked": true } },
-    "item_bread":       { "proc": "bread" },
-    "item_bandage":     { "proc": "bandage" },
-    "item_ammo_arrow":  { "proc": "ammo", "args": { "color": "yellow" } },
-    "item_ammo_bolt":   { "proc": "ammo", "args": { "color": "red" } },
-    "item_ammo_mana":   { "proc": "ammo", "args": { "color": "blue" } },
-    "item_ammo_knife":  { "proc": "ammo", "args": { "color": "green" } },
-    "item_wood":        { "proc": "wood" },
-    "item_hide":        { "proc": "hide" },
-    "item_herb":        { "proc": "herb" },
-
-    "enemy_wolf":    { "proc": "wolf" },
-    "enemy_turret":  { "proc": "totem", "args": { "variant": 0 } },
-    "enemy_turret2": { "proc": "totem", "args": { "variant": 1 } },
-    "enemy_boss":    { "proc": "ogre" },
-
-    "ui_heart_full":  { "proc": "heart", "args": { "fill": "full" } },
-    "ui_heart_half":  { "proc": "heart", "args": { "fill": "half" } },
-    "ui_heart_empty": { "proc": "heart", "args": { "fill": "empty" } },
-    "fx_shadow":      { "proc": "shadow" },
-    "ui_crosshair":   { "proc": "crosshair" },
-    "ui_quest_mark":  { "proc": "questMark" }
+    "tile_grass": {
+      "pack": "t",
+      "tx": 0,
+      "ty": 0
+    },
+    "tile_grass2": {
+      "pack": "t",
+      "tx": 1,
+      "ty": 0
+    },
+    "tile_grass_flowers": {
+      "pack": "t",
+      "tx": 2,
+      "ty": 0
+    },
+    "tile_dirt": {
+      "pack": "t",
+      "tx": 1,
+      "ty": 2
+    },
+    "tile_road": {
+      "pack": "t",
+      "tx": 4,
+      "ty": 3
+    },
+    "tile_tree": {
+      "pack": "t",
+      "tx": 4,
+      "ty": 0
+    },
+    "tile_tree2": {
+      "pack": "t",
+      "tx": 3,
+      "ty": 0
+    },
+    "tile_bush": {
+      "pack": "t",
+      "tx": 4,
+      "ty": 2
+    },
+    "tile_mushroom": {
+      "pack": "t",
+      "tx": 5,
+      "ty": 2
+    },
+    "tile_fence": {
+      "pack": "t",
+      "tx": 9,
+      "ty": 3
+    },
+    "tile_wall": {
+      "pack": "t",
+      "tx": 0,
+      "ty": 6
+    },
+    "tile_wall_stone": {
+      "pack": "t",
+      "tx": 1,
+      "ty": 9
+    },
+    "tile_door": {
+      "pack": "t",
+      "tx": 1,
+      "ty": 7
+    },
+    "obj_sign": {
+      "pack": "t",
+      "tx": 11,
+      "ty": 4
+    },
+    "obj_pot": {
+      "pack": "t",
+      "tx": 10,
+      "ty": 6
+    },
+    "tile_dungeon_floor": {
+      "pack": "d",
+      "tx": 0,
+      "ty": 0
+    },
+    "tile_dungeon_floor2": {
+      "pack": "d",
+      "tx": 0,
+      "ty": 1
+    },
+    "tile_dungeon_wall": {
+      "pack": "d",
+      "tx": 1,
+      "ty": 3
+    },
+    "tile_floor_wood": {
+      "pack": "d",
+      "tx": 1,
+      "ty": 4
+    },
+    "obj_chest": {
+      "pack": "d",
+      "tx": 5,
+      "ty": 7
+    },
+    "obj_chest_open": {
+      "pack": "d",
+      "tx": 6,
+      "ty": 7
+    },
+    "item_potion": {
+      "pack": "d",
+      "tx": 7,
+      "ty": 9
+    },
+    "item_potion_green": {
+      "pack": "d",
+      "tx": 6,
+      "ty": 9
+    },
+    "item_potion_blue": {
+      "pack": "d",
+      "tx": 8,
+      "ty": 9
+    },
+    "item_shield_wood": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/shields/buckler1.png"
+    },
+    "item_shield_iron": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/shields/shield3_round.png"
+    },
+    "item_armor_leather": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/leather_armour1.png"
+    },
+    "item_armor_chain": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/chain_mail1.png"
+    },
+    "item_armor_plate": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/plate_mail1.png"
+    },
+    "item_hood": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/headgear/helmet1_visored.png"
+    },
+    "item_helmet": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/headgear/helmet3.png"
+    },
+    "item_amulet_wolf": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/celtic_blue.png"
+    },
+    "item_amulet_bear": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/crystal_red.png"
+    },
+    "item_ring": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/ring/diamond.png"
+    },
+    "wpn_sword": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/long_sword1.png"
+    },
+    "wpn_dagger": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/dagger.png"
+    },
+    "wpn_axe": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/battle_axe1.png"
+    },
+    "wpn_staff_frost": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/staff/staff04.png"
+    },
+    "player_0": {
+      "pack": "d",
+      "tx": 1,
+      "ty": 8
+    },
+    "player_1": {
+      "pack": "d",
+      "tx": 3,
+      "ty": 8
+    },
+    "player_2": {
+      "pack": "d",
+      "tx": 4,
+      "ty": 8
+    },
+    "player_3": {
+      "pack": "d",
+      "tx": 2,
+      "ty": 8
+    },
+    "player_warrior": {
+      "pack": "d",
+      "tx": 1,
+      "ty": 8
+    },
+    "player_mage": {
+      "pack": "d",
+      "tx": 0,
+      "ty": 7
+    },
+    "player_rogue": {
+      "pack": "d",
+      "tx": 3,
+      "ty": 9
+    },
+    "npc_wizard": {
+      "pack": "d",
+      "tx": 0,
+      "ty": 7
+    },
+    "npc_villager": {
+      "pack": "d",
+      "tx": 1,
+      "ty": 7
+    },
+    "npc_villager2": {
+      "pack": "d",
+      "tx": 2,
+      "ty": 7
+    },
+    "npc_elder": {
+      "pack": "d",
+      "tx": 3,
+      "ty": 7
+    },
+    "npc_merchant": {
+      "pack": "d",
+      "tx": 4,
+      "ty": 7
+    },
+    "npc_guard": {
+      "pack": "d",
+      "tx": 0,
+      "ty": 8
+    },
+    "enemy_slime": {
+      "pack": "d",
+      "tx": 0,
+      "ty": 9
+    },
+    "enemy_bandit": {
+      "pack": "d",
+      "tx": 3,
+      "ty": 9
+    },
+    "enemy_bandit_heavy": {
+      "pack": "d",
+      "tx": 1,
+      "ty": 9
+    },
+    "enemy_skeleton": {
+      "pack": "d",
+      "tx": 1,
+      "ty": 10
+    },
+    "enemy_dasher": {
+      "pack": "d",
+      "tx": 2,
+      "ty": 10
+    },
+    "enemy_bat": {
+      "pack": "d",
+      "tx": 0,
+      "ty": 10
+    },
+    "enemy_demon": {
+      "pack": "d",
+      "tx": 2,
+      "ty": 9
+    },
+    "enemy_imp": {
+      "pack": "d",
+      "tx": 0,
+      "ty": 10
+    },
+    "enemy_rat": {
+      "pack": "d",
+      "tx": 4,
+      "ty": 10
+    },
+    "enemy_archer": {
+      "pack": "d",
+      "tx": 4,
+      "ty": 9
+    },
+    "enemy_dark_knight": {
+      "pack": "d",
+      "tx": 3,
+      "ty": 10
+    },
+    "enemy_mimic": {
+      "pack": "d",
+      "tx": 7,
+      "ty": 7
+    },
+    "enemy_golem": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/nonliving/clay_golem.png",
+      "down": 2
+    },
+    "npc_spirit": {
+      "pack": "d",
+      "tx": 1,
+      "ty": 10
+    },
+    "proj_small": {
+      "pack": "s",
+      "tx": 0,
+      "ty": 0
+    },
+    "fx_flash": {
+      "pack": "s",
+      "tx": 4,
+      "ty": 0
+    },
+    "fx_sparkle": {
+      "pack": "s",
+      "tx": 7,
+      "ty": 0
+    },
+    "item_medkit": {
+      "pack": "s",
+      "tx": 0,
+      "ty": 2
+    },
+    "tile_water": {
+      "proc": "water"
+    },
+    "tile_deep_water": {
+      "proc": "deepWater"
+    },
+    "tile_water_edge": {
+      "proc": "waterEdge"
+    },
+    "tile_sand": {
+      "proc": "sand"
+    },
+    "tile_swamp": {
+      "proc": "swamp"
+    },
+    "tile_rock": {
+      "proc": "rockFloor"
+    },
+    "tile_rock_solid": {
+      "proc": "rockSolid"
+    },
+    "tile_field": {
+      "proc": "field"
+    },
+    "obj_campfire_0": {
+      "proc": "campfire",
+      "args": {
+        "frame": 0
+      }
+    },
+    "obj_campfire_1": {
+      "proc": "campfire",
+      "args": {
+        "frame": 1
+      }
+    },
+    "obj_well": {
+      "proc": "well"
+    },
+    "obj_bed": {
+      "proc": "bed"
+    },
+    "obj_table": {
+      "proc": "table"
+    },
+    "obj_stall": {
+      "proc": "stall"
+    },
+    "obj_dungeon_entrance": {
+      "proc": "dungeonEntrance"
+    },
+    "obj_exit_portal": {
+      "proc": "exitPortal"
+    },
+    "obj_shrine": {
+      "proc": "shrine"
+    },
+    "obj_anvil": {
+      "proc": "anvil"
+    },
+    "npc_smith": {
+      "pack": "d",
+      "tx": 4,
+      "ty": 8
+    },
+    "npc_merc": {
+      "pack": "d",
+      "tx": 2,
+      "ty": 8
+    },
+    "npc_innkeeper": {
+      "pack": "d",
+      "tx": 2,
+      "ty": 7
+    },
+    "npc_hunter": {
+      "pack": "d",
+      "tx": 4,
+      "ty": 9
+    },
+    "wpn_bombs": {
+      "proc": "bombsWeapon"
+    },
+    "wpn_spear": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/spear2.png"
+    },
+    "wpn_hammer": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/hammer2.png"
+    },
+    "wpn_taxe": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/hand_axe1.png"
+    },
+    "proj_taxe": {
+      "proc": "taxeProj"
+    },
+    "wpn_staff_venom": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/staff/staff05.png"
+    },
+    "proj_venom": {
+      "proc": "venomProj"
+    },
+    "item_armor_padded": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/animal_skin1.png"
+    },
+    "item_armor_scale": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/scale_mail1.png"
+    },
+    "item_cap": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/headgear/elven_leather_helm.png"
+    },
+    "item_amulet_owl": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/eye_cyan.png"
+    },
+    "item_amulet_fox": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/cameo_orange.png"
+    },
+    "item_ring_iron": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/ring/bronze.png"
+    },
+    "item_shield_tower": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/shields/large_shield1.png"
+    },
+    "item_armor_berserk": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/crystal_plate_mail.png"
+    },
+    "item_robe": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/robe2.png"
+    },
+    "item_cloak": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/cloak2.png"
+    },
+    "item_sage_hat": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/headgear/wizard_hat1.png"
+    },
+    "item_war_helm": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/headgear/helmet4_visor.png"
+    },
+    "item_crown": {
+      "proc": "crownIcon"
+    },
+    "item_amulet_rune": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/celtic_yellow.png"
+    },
+    "item_totem": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/bone_gray.png"
+    },
+    "item_shield_glad": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/shields/shield2_kite.png"
+    },
+    "item_charm": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/cylinder_gray.png"
+    },
+    "proj_bomb": {
+      "proc": "bombProj"
+    },
+    "item_fire_arrow": {
+      "proc": "fireArrowItem"
+    },
+    "item_metal": {
+      "proc": "metalIngot"
+    },
+    "item_ammo_bomb": {
+      "proc": "bombProj"
+    },
+    "tile_rubble": {
+      "proc": "rubbleTile"
+    },
+    "wpn_bow": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/ranged/bow1.png"
+    },
+    "wpn_bow2": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/ranged/longbow.png"
+    },
+    "wpn_crossbow": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/ranged/crossbow1.png"
+    },
+    "wpn_staff_fire": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/staff/staff03.png"
+    },
+    "wpn_staff_bomb": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/staff/staff07.png"
+    },
+    "wpn_staff_storm": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/staff/staff02.png"
+    },
+    "proj_fireball": {
+      "proc": "fireballOrb"
+    },
+    "proj_lightning": {
+      "proc": "lightningBolt"
+    },
+    "proj_orb": {
+      "proc": "orb",
+      "args": {
+        "color": "purple"
+      }
+    },
+    "proj_arrow": {
+      "proc": "arrow"
+    },
+    "proj_bolt": {
+      "proc": "bolt"
+    },
+    "proj_knife": {
+      "proc": "knife"
+    },
+    "proj_fire": {
+      "proc": "magicOrb",
+      "args": {
+        "color": "fire"
+      }
+    },
+    "proj_frost": {
+      "proc": "magicOrb",
+      "args": {
+        "color": "frost"
+      }
+    },
+    "item_coin": {
+      "proc": "coin"
+    },
+    "item_meat": {
+      "proc": "meat",
+      "args": {
+        "cooked": false
+      }
+    },
+    "item_cooked_meat": {
+      "proc": "meat",
+      "args": {
+        "cooked": true
+      }
+    },
+    "item_bread": {
+      "proc": "bread"
+    },
+    "item_bandage": {
+      "proc": "bandage"
+    },
+    "item_ammo_arrow": {
+      "proc": "ammo",
+      "args": {
+        "color": "yellow"
+      }
+    },
+    "item_ammo_bolt": {
+      "proc": "ammo",
+      "args": {
+        "color": "red"
+      }
+    },
+    "item_ammo_mana": {
+      "proc": "ammo",
+      "args": {
+        "color": "blue"
+      }
+    },
+    "item_ammo_knife": {
+      "proc": "ammo",
+      "args": {
+        "color": "green"
+      }
+    },
+    "item_wood": {
+      "proc": "wood"
+    },
+    "item_hide": {
+      "proc": "hide"
+    },
+    "item_herb": {
+      "proc": "herb"
+    },
+    "enemy_wolf": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/wolf.png",
+      "down": 2
+    },
+    "enemy_turret": {
+      "proc": "totem",
+      "args": {
+        "variant": 0
+      }
+    },
+    "enemy_turret2": {
+      "proc": "totem",
+      "args": {
+        "variant": 1
+      }
+    },
+    "enemy_boss": {
+      "proc": "ogre"
+    },
+    "ui_heart_full": {
+      "proc": "heart",
+      "args": {
+        "fill": "full"
+      }
+    },
+    "ui_heart_half": {
+      "proc": "heart",
+      "args": {
+        "fill": "half"
+      }
+    },
+    "ui_heart_empty": {
+      "proc": "heart",
+      "args": {
+        "fill": "empty"
+      }
+    },
+    "fx_shadow": {
+      "proc": "shadow"
+    },
+    "ui_crosshair": {
+      "proc": "crosshair"
+    },
+    "ui_quest_mark": {
+      "proc": "questMark"
+    }
   }
 }

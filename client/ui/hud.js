@@ -41,7 +41,8 @@ export class Hud {
     const w = getWeapon(you.w);
     if (w) {
       const gx = VIEW_W - 78, gy = VIEW_H - 26;
-      this.atlas.draw(ctx, w.sprite, gx, gy + 6);
+      const ws = this.atlas.map[w.sprite];
+      this.atlas.draw(ctx, w.sprite, gx, gy + 6, { scale: ws && ws.w > 20 ? 0.5 : 1 });
       ctx.fillStyle = '#eee';
       ctx.fillText(w.name, gx + 12, gy);
       let ammoTxt, col;

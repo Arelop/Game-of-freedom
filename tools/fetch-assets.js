@@ -21,6 +21,22 @@ const PACKS = [
     name: 'pixel-shmup',
     url: 'https://kenney.nl/media/pages/assets/pixel-shmup/640246b9cc-1677495782/kenney_pixel-shmup.zip',
   },
+  {
+    name: 'roguelike-rpg',
+    url: 'https://kenney.nl/media/pages/assets/roguelike-rpg-pack/12c03cd78b-1677697420/kenney_roguelike-rpg-pack.zip',
+  },
+  {
+    name: 'roguelike-chars',
+    url: 'https://kenney.nl/media/pages/assets/roguelike-characters/53ffff4133-1729196490/kenney_roguelike-characters.zip',
+  },
+  {
+    name: 'roguelike-caves',
+    url: 'https://kenney.nl/media/pages/assets/roguelike-caves-dungeons/5195ceb8ca-1677694831/kenney_roguelike-caves-dungeons.zip',
+  },
+  { // Dungeon Crawl Stone Soup tiles — CC0, тысячи предметов и монстров 32x32
+    name: 'crawl-tiles',
+    url: 'https://opengameart.org/sites/default/files/crawl-tiles%20Oct-5-2010.zip',
+  },
 ];
 
 mkdirSync(RAW, { recursive: true });

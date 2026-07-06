@@ -123,5 +123,6 @@ npm test
 - `tools/` — пайплайн ассетов: скачивание CC0-паков Kenney + процедурная
   генерация недостающих спрайтов в палитре DB32, сборка атласа.
 
-Графика: [Kenney](https://kenney.nl) Tiny Dungeon / Tiny Town / Pixel Shmup (CC0)
-+ процедурные спрайты. Звук синтезируется на лету (WebAudio).
+Графика: [Kenney](https://kenney.nl) Tiny Dungeon / Tiny Town / Pixel Shmup /
+Roguelike-паки (CC0) + [Dungeon Crawl Stone Soup tiles](https://opengameart.org/content/dungeon-crawl-32x32-tiles)
+(CC0) для предметов и оружия + процедурные спрайты. Звук синтезируется на лету (WebAudio).

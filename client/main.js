@@ -58,6 +58,12 @@ const swings = [];       // {x,y,aim,range,arc,t,maxT,color}
 const floatTexts = [];   // летящие цифры урона {x,y,text,color,t,big}
 const chainFx = [];      // молнии {pts:[[x,y]..], t}
 
+// crawl-спрайты хранятся 32px (красивые иконки) — в мире рисуем 0.5
+function worldScale(name) {
+  const s = atlas.map[name];
+  return s && s.w > 20 ? 0.5 : 1;
+}
+
 function addFloatText(x, y, text, color, big = false) {
   floatTexts.push({ x: x + (Math.random() - 0.5) * 8, y: y - 10, text, color, t: 0.9, big });
   if (floatTexts.length > 40) floatTexts.shift();
@@ -462,9 +468,9 @@ function drawWeapon(w, cx, cy, aim, flipX, swingT = 0) {
     const k = swingT > 0 ? 1 - swingT / 0.18 : 0.5;   // покой = середина дуги
     const ang = aim - half + half * 2 * k;
     const reach = 8 + (swingT > 0 ? (1 - Math.abs(k - 0.5) * 2) * 6 : 0);
-    atlas.draw(ctx, w.sprite, cx + Math.cos(ang) * reach, cy + Math.sin(ang) * reach, { rot: ang + Math.PI / 2 });
+    atlas.draw(ctx, w.sprite, cx + Math.cos(ang) * reach, cy + Math.sin(ang) * reach, { rot: ang + Math.PI / 2, scale: worldScale(w.sprite) });
   } else {
-    atlas.draw(ctx, w.sprite, cx + Math.cos(aim) * 7, cy + Math.sin(aim) * 7, { rot: flipX ? aim + Math.PI : aim, flipX });
+    atlas.draw(ctx, w.sprite, cx + Math.cos(aim) * 7, cy + Math.sin(aim) * 7, { rot: flipX ? aim + Math.PI : aim, flipX, scale: worldScale(w.sprite) });
   }
 }
 
@@ -484,7 +490,7 @@ function drawEntity(id, r, p, nowMs, timeSec) {
     const spriteName = e.k.startsWith('weapon:') ? getWeapon(e.k.slice(7))?.sprite
       : (ITEMS[e.k]?.icon || 'item_' + e.k);
     atlas.draw(ctx, 'fx_shadow', s.x, s.y + 4, { alpha: 0.6 });
-    atlas.draw(ctx, spriteName || 'item_coin', s.x, s.y - 3 + bob);
+    atlas.draw(ctx, spriteName || 'item_coin', s.x, s.y - 3 + bob, { scale: worldScale(spriteName || 'item_coin') });
     return;
   }
 

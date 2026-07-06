@@ -16,22 +16,66 @@ const PROC_FALLBACK = {
   tile_grass: ['sand'], player_0: null, // null -> заглушка
 };
 
+// Некоторые старые PNG (DCSS) содержат мусор после IEND — обрезаем.
+function readPngLoose(path) {
+  let buf = readFileSync(path);
+  const iend = buf.indexOf(Buffer.from([0x49, 0x45, 0x4E, 0x44]));
+  if (iend > 0) buf = buf.subarray(0, iend + 8);
+  return PNG.sync.read(buf);
+}
+
 const packs = {};
-for (const [key, rel] of Object.entries(manifest.packs)) {
+const packMeta = {};
+for (const [key, def] of Object.entries(manifest.packs)) {
+  const rel = typeof def === 'string' ? def : def.path;
+  packMeta[key] = typeof def === 'string' ? {} : def;
   const p = join(ROOT, rel);
-  if (existsSync(p)) packs[key] = PNG.sync.read(readFileSync(p));
+  if (existsSync(p)) packs[key] = readPngLoose(p);
   else console.warn(`[warn] пак ${key} (${rel}) не найден — процедурный фолбэк`);
 }
 
-function extract(pack, tx, ty, tw = 1, th = 1) {
+// stride — шаг сетки (17 у листов Kenney Roguelike с зазором 1px)
+function extract(pack, tx, ty, tw = 1, th = 1, stride = 16) {
   const w = tw * 16, h = th * 16;
   const out = { w, h, data: new Uint8Array(w * h * 4) };
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const si = ((ty * 16 + y) * pack.width + (tx * 16 + x)) * 4;
+      const si = ((ty * stride + y) * pack.width + (tx * stride + x)) * 4;
       const di = (y * w + x) * 4;
       out.data[di] = pack.data[si]; out.data[di + 1] = pack.data[si + 1];
       out.data[di + 2] = pack.data[si + 2]; out.data[di + 3] = pack.data[si + 3];
+    }
+  }
+  return out;
+}
+
+// Композиция слоёв (посох DCSS = древко + элемент-навершие)
+function extractLayers(relPaths, down = 1) {
+  let out = null;
+  for (const rel of relPaths) {
+    const layer = extractFile(rel, down);
+    if (!out) { out = layer; continue; }
+    for (let i = 0; i < layer.data.length; i += 4) {
+      if (layer.data[i + 3] > 10) {
+        out.data[i] = layer.data[i]; out.data[i + 1] = layer.data[i + 1];
+        out.data[i + 2] = layer.data[i + 2]; out.data[i + 3] = layer.data[i + 3];
+      }
+    }
+  }
+  return out;
+}
+
+// Отдельный файл-спрайт (DCSS): как есть или с nearest-даунскейлом
+function extractFile(relPath, down = 1) {
+  const p = readPngLoose(join(ROOT, relPath));
+  const w = Math.floor(p.width / down), h = Math.floor(p.height / down);
+  const out = { w, h, data: new Uint8Array(w * h * 4) };
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const si = ((y * down) * p.width + x * down) * 4;
+      const di = (y * w + x) * 4;
+      out.data[di] = p.data[si]; out.data[di + 1] = p.data[si + 1];
+      out.data[di + 2] = p.data[si + 2]; out.data[di + 3] = p.data[si + 3];
     }
   }
   return out;
@@ -54,8 +98,13 @@ for (const [name, spec] of Object.entries(manifest.sprites)) {
   try {
     if (spec.proc) {
       img = genSprite(spec.proc, spec.args);
+    } else if (spec.files) {
+      img = extractLayers(spec.files, spec.down || 1);
+    } else if (spec.file) {
+      img = extractFile(spec.file, spec.down || 1);
     } else if (packs[spec.pack]) {
-      img = extract(packs[spec.pack], spec.tx, spec.ty, spec.tw || 1, spec.th || 1);
+      img = extract(packs[spec.pack], spec.tx, spec.ty, spec.tw || 1, spec.th || 1,
+        packMeta[spec.pack]?.stride || 16);
     } else {
       const fb = PROC_FALLBACK[name];
       img = fb ? genSprite(fb[0], fb[1]) : placeholder();
