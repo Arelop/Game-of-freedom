@@ -239,14 +239,15 @@ export class Net {
     this.send({ t: MSG.INPUT, ...input });
   }
 
-  // косметические пули
+  // косметические пули (свои горящие стрелы рисуются огнём)
   spawnWeaponBullets(x, y, aim, w, seed) {
     const rand = mulberry32(seed >>> 0);
+    const fiery = this.you?.bf?.fireArrows && (w.ammoType === 'arrow' || w.ammoType === 'bolt');
     for (let i = 0; i < w.projectilesPerShot; i++) {
       const a = aim + (rand() - 0.5) * w.spreadDeg * Math.PI / 180;
       this.bullets.push({
         x, y: y - 4, vx: Math.cos(a) * w.projectileSpeed, vy: Math.sin(a) * w.projectileSpeed,
-        life: w.projLife, sprite: w.projSprite, hostile: false, ang: a,
+        life: w.projLife, sprite: fiery ? 'proj_fire' : w.projSprite, hostile: false, ang: a,
       });
     }
   }

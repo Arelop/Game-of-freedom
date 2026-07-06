@@ -38,7 +38,22 @@ export const T = {
   DUNGEON_FLOOR: 15, DUNGEON_WALL: 16, DOOR: 17, WATER_EDGE: 18,
   CAMPFIRE: 19, STALL: 20, BED: 21, TABLE: 22, WELL: 23, CHEST: 24,
   DUNGEON_DOOR: 25, DUNGEON_EXIT: 26, FIELD: 27, TOWER: 28,
-  MINE: 29, SHRINE: 30,
+  MINE: 29, SHRINE: 30, RUBBLE: 31,
+};
+
+// Разрушаемые тайлы: прочность, во что превращаются, дроп.
+export const DESTRUCTIBLE = {
+  [T.WALL]: { hp: 12, becomes: T.RUBBLE, drops: { wood: 0.5 } },
+  [T.DOOR]: { hp: 8, becomes: T.RUBBLE, drops: { wood: 0.5 } },
+  [T.TOWER]: { hp: 25, becomes: T.RUBBLE, drops: { metal: 0.5 } },
+  [T.MINE]: { hp: 25, becomes: T.RUBBLE, drops: { metal: 0.7 } },
+  [T.ROCK_SOLID]: { hp: 15, becomes: T.ROCK, drops: { metal: 0.4 } },
+  [T.TREE]: { hp: 3, becomes: T.GRASS, drops: { wood: 1.4 } },
+  [T.BUSH]: { hp: 2, becomes: T.GRASS, drops: { herb: 0.3 } },
+  [T.STALL]: { hp: 8, becomes: T.RUBBLE, drops: { wood: 0.5 } },
+  [T.TABLE]: { hp: 5, becomes: T.FLOOR_WOOD, drops: { wood: 0.5 } },
+  [T.BED]: { hp: 5, becomes: T.FLOOR_WOOD, drops: { wood: 0.3 } },
+  [T.WELL]: { hp: 20, becomes: T.RUBBLE, drops: {} },
 };
 
 // Сезоны: 3 игровых дня каждый. Влияют на урожай и агрессию монстров.

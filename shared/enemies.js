@@ -44,6 +44,17 @@ export const ENEMIES = {
     radius: 5, touchDamage: 2, dashSpeed: 280, dashWindup: 0.6, dashTime: 0.5,
     sprite: 'enemy_dasher', xp: 5, drops: { coin: [2, 5] },
   },
+  demon: {
+    id: 'demon', name: 'Демон', archetype: 'shooter', hp: 30, speed: 58,
+    radius: 6, touchDamage: 2, preferRange: [60, 110], fireInterval: 1.7,
+    pattern: 'fan5', sprite: 'enemy_demon', xp: 12,
+    drops: { coin: [6, 12] },
+  },
+  imp: {
+    id: 'imp', name: 'Бес', archetype: 'chaser', hp: 8, speed: 92,
+    radius: 4, touchDamage: 1, lungeSpeed: 260, lungeWindup: 0.25, lungeRange: 45,
+    sprite: 'enemy_imp', xp: 4, drops: { coin: [2, 4] },
+  },
   bossOgre: {
     id: 'bossOgre', name: 'Огр-вожак', archetype: 'boss', hp: 170, speed: 34,
     radius: 10, touchDamage: 2, sprite: 'enemy_boss', xp: 60,

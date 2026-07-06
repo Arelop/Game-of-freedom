@@ -3,12 +3,12 @@
 // Темп боя намеренно размеренный: реже атаки, весомее каждый удар.
 export const WEAPONS = {
   sword: {
-    id: 'sword', name: 'Меч', melee: true, school: 'melee', damage: 4, fireRate: 1.8,
+    id: 'sword', structDmg: 2, name: 'Меч', melee: true, school: 'melee', damage: 4, fireRate: 1.8,
     range: 30, arcDeg: 110, knockback: 90, recoilShake: 0.2, infiniteAmmo: true,
     sprite: 'wpn_sword', sound: 'swing', swingColor: '#eeeeee', price: 30,
   },
   axe: {
-    id: 'axe', name: 'Секира', melee: true, school: 'melee', damage: 9, fireRate: 1.0,
+    id: 'axe', structDmg: 6, name: 'Секира', melee: true, school: 'melee', damage: 9, fireRate: 1.0,
     range: 32, arcDeg: 130, knockback: 150, recoilShake: 0.4, infiniteAmmo: true,
     sprite: 'wpn_axe', sound: 'swing_heavy', swingColor: '#d9a066', price: 90,
   },
@@ -27,7 +27,7 @@ export const WEAPONS = {
     projRadius: 2, projLife: 1.8, ammoType: 'arrow', price: 85,
   },
   crossbow: {
-    id: 'crossbow', name: 'Арбалет', school: 'ranged', damage: 10, projectilesPerShot: 1,
+    id: 'crossbow', structDmg: 2, name: 'Арбалет', school: 'ranged', damage: 10, projectilesPerShot: 1,
     spreadDeg: 1, projectileSpeed: 420, fireRate: 0.7, magSize: 1,
     reloadTime: 1.4, knockback: 90, recoilShake: 0.35,
     sprite: 'wpn_crossbow', projSprite: 'proj_bolt', sound: 'shot_crossbow',
@@ -41,7 +41,7 @@ export const WEAPONS = {
     projRadius: 2, projLife: 0.7, ammoType: 'knife', price: 70,
   },
   firestaff: {
-    id: 'firestaff', name: 'Посох огня', school: 'magic', damage: 4, projectilesPerShot: 1,
+    id: 'firestaff', structDmg: 1, name: 'Посох огня', school: 'magic', damage: 4, projectilesPerShot: 1,
     spreadDeg: 4, projectileSpeed: 230, fireRate: 3.2, magSize: 20,
     reloadTime: 1.6, knockback: 12, recoilShake: 0.1,
     sprite: 'wpn_staff_fire', projSprite: 'proj_fire', sound: 'shot_fire',
@@ -56,7 +56,7 @@ export const WEAPONS = {
     slow: { mult: 0.65, time: 1.5 },      // лёд замедляет врагов
   },
   fireball: {
-    id: 'fireball', name: 'Посох огненных шаров', school: 'magic', damage: 9, projectilesPerShot: 1,
+    id: 'fireball', structDmg: 10, name: 'Посох огненных шаров', school: 'magic', damage: 9, projectilesPerShot: 1,
     spreadDeg: 2, projectileSpeed: 190, fireRate: 0.8, magSize: 6,
     reloadTime: 1.8, knockback: 40, recoilShake: 0.35,
     sprite: 'wpn_staff_bomb', projSprite: 'proj_fireball', sound: 'shot_fire',
@@ -64,15 +64,23 @@ export const WEAPONS = {
     explode: { radius: 30 },              // взрыв бьёт всех вокруг
   },
   stormstaff: {
-    id: 'stormstaff', name: 'Посох бури', school: 'magic', damage: 6, projectilesPerShot: 1,
+    id: 'stormstaff', structDmg: 1, name: 'Посох бури', school: 'magic', damage: 6, projectilesPerShot: 1,
     spreadDeg: 1, projectileSpeed: 420, fireRate: 1.5, magSize: 10,
     reloadTime: 1.6, knockback: 15, recoilShake: 0.18,
     sprite: 'wpn_staff_storm', projSprite: 'proj_lightning', sound: 'shot_laserlike',
     projRadius: 3, projLife: 0.9, ammoType: 'mana', price: 180,
     chain: { count: 2, radius: 70, falloff: 0.7 }, // молния перескакивает
   },
+  bombs: {
+    id: 'bombs', structDmg: 14, name: 'Огненные бомбы', school: 'ranged', damage: 10, projectilesPerShot: 1,
+    spreadDeg: 3, projectileSpeed: 170, fireRate: 0.6, magSize: 1,
+    reloadTime: 1.0, knockback: 60, recoilShake: 0.4,
+    sprite: 'wpn_bombs', projSprite: 'proj_bomb', sound: 'shot_bow',
+    projRadius: 4, projLife: 1.4, ammoType: 'bomb', price: 140,
+    explode: { radius: 34 },              // сносит стены пачками
+  },
 };
 
 export const AMMO_NAMES = {
-  arrow: 'стрелы', bolt: 'болты', mana: 'мана', knife: 'ножи',
+  arrow: 'стрелы', bolt: 'болты', mana: 'мана', knife: 'ножи', bomb: 'бомбы',
 };

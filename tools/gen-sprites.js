@@ -396,6 +396,45 @@ const GEN = {
     rect(s, 2, 0, 2, 6, C.yellow); rect(s, 2, 8, 2, 2, C.yellow);
     return s;
   },
+  bombsWeapon() {
+    const s = make(13, 12);
+    // связка из двух бомб с фитилями
+    disc(s, 4, 7, 3, C.dgray); disc(s, 4, 7, 2, C.dblue); px(s, 3, 6, C.lgray);
+    disc(s, 9, 8, 3, C.dgray); disc(s, 9, 8, 2, C.dblue); px(s, 8, 7, C.lgray);
+    px(s, 4, 3, C.brown); px(s, 5, 2, C.orange); px(s, 5, 1, C.yellow);
+    px(s, 9, 4, C.brown); px(s, 10, 3, C.orange);
+    return s;
+  },
+  bombProj() {
+    const s = make(9, 9);
+    disc(s, 4, 5, 3, C.dgray); disc(s, 4, 5, 2, C.dblue); px(s, 3, 4, C.lgray);
+    px(s, 5, 1, C.orange); px(s, 6, 0, C.yellow); px(s, 5, 2, C.brown);
+    return s;
+  },
+  fireArrowItem() {
+    const s = make(11, 11);
+    // стрела по диагонали с пламенем на наконечнике
+    for (let i = 0; i < 6; i++) px(s, 2 + i, 8 - i, C.brown);
+    px(s, 1, 9, C.tan); px(s, 2, 10, C.tan);
+    disc(s, 9, 1, 1, C.orange); px(s, 9, 0, C.yellow); px(s, 8, 2, C.red); px(s, 10, 2, C.red);
+    return s;
+  },
+  metalIngot() {
+    const s = make(11, 8);
+    rect(s, 1, 2, 9, 4, C.steel); rect(s, 2, 1, 7, 1, C.lgray);
+    frame(s, 1, 2, 9, 4, C.dgray);
+    px(s, 3, 3, C.white); px(s, 4, 3, C.white);
+    return s;
+  },
+  rubbleTile() {
+    const s = make(16, 16);
+    dither(s, C.dbrown, C.brown, 20, 33);
+    // обломки камней и досок
+    rect(s, 2, 3, 3, 2, C.gray); rect(s, 10, 8, 3, 2, C.steel);
+    rect(s, 5, 11, 4, 1, C.lbrown); rect(s, 11, 2, 2, 2, C.dgray);
+    px(s, 7, 6, C.lgray); px(s, 3, 13, C.gray); px(s, 13, 13, C.lbrown);
+    return s;
+  },
   shrine() {
     const s = make(16, 16);
     // менгир с кристаллом

@@ -67,6 +67,9 @@
     "enemy_skeleton":     { "pack": "d", "tx": 1, "ty": 10 },
     "enemy_dasher":       { "pack": "d", "tx": 2, "ty": 10 },
     "enemy_bat":          { "pack": "d", "tx": 0, "ty": 10 },
+    "enemy_demon":        { "pack": "d", "tx": 2, "ty": 9 },
+    "enemy_imp":          { "pack": "d", "tx": 0, "ty": 10 },
+    "npc_spirit":         { "pack": "d", "tx": 1, "ty": 10 },
 
     "proj_small":  { "pack": "s", "tx": 0, "ty": 0 },
     "fx_flash":    { "pack": "s", "tx": 4, "ty": 0 },
@@ -90,6 +93,12 @@
     "obj_dungeon_entrance": { "proc": "dungeonEntrance" },
     "obj_exit_portal":   { "proc": "exitPortal" },
     "obj_shrine":        { "proc": "shrine" },
+    "wpn_bombs":         { "proc": "bombsWeapon" },
+    "proj_bomb":         { "proc": "bombProj" },
+    "item_fire_arrow":   { "proc": "fireArrowItem" },
+    "item_metal":        { "proc": "metalIngot" },
+    "item_ammo_bomb":    { "proc": "bombProj" },
+    "tile_rubble":       { "proc": "rubbleTile" },
 
     "wpn_bow":      { "proc": "bow", "args": { "kind": "short" } },
     "wpn_bow2":     { "proc": "bow", "args": { "kind": "hunt" } },

@@ -112,6 +112,7 @@ export function makeWorld(seed) {
       crystalRich: Math.min(2, Math.floor(swamp / 5)),    // кристаллы: у болот
       project: null,        // { type, progress, need }
       wardT: 0,             // обережный ритуал: тиков защиты
+      spiritT: 0,           // призванный дух-хранитель: тиков службы
       captured: false, ruined: false,
       anchors: null, // заполнит stampSettlement: beds, works, fire, stalls
     };

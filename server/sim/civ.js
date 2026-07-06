@@ -36,6 +36,27 @@ export class CivSim {
     }
     for (const s of this.game.world.settlements) this.tickSettlement(s);
     this.tickRivalry();
+    this.tickResettlement();
+  }
+
+  // Процветающая деревня отправляет поселенцев возрождать руины
+  tickResettlement() {
+    const g = this.game;
+    if (g.rand() > 0.08) return;
+    const ruin = g.world.settlements.find(s => s.ruined);
+    if (!ruin) return;
+    const donor = g.world.settlements.find(s =>
+      !s.ruined && !s.captured && s.prosperity > 70 && s.population >= s.housingCap - 2);
+    if (!donor) return;
+    donor.population -= 2;
+    donor.prosperity -= 10;
+    g.abstract.tokens.push({
+      id: 'tok' + g.abstract.nextId++, type: 'caravan', name: 'поселенцы',
+      faction: donor.faction, units: ['npc', 'npc', 'guard'],
+      x: donor.x * TILE, y: donor.y * TILE, target: ruin.id, from: donor.id,
+      settlers: true, hydrated: null,
+    });
+    g.events.push(g.world.day, `Поселенцы из ${donor.name} отправились возрождать ${ruin.name}`);
   }
 
   say(s, text, data = {}) {
@@ -49,9 +70,15 @@ export class CivSim {
     const rand = g.rand;
     if (s.ruined) return;
     if (s.captured) {
-      // бандиты проедают запасы захваченной деревни
+      // бандиты проедают запасы и проводят тёмные ритуалы
       s.food = Math.max(0, s.food - 1);
       s.prosperity = Math.max(0, s.prosperity - 1);
+      if (rand() < 0.06) {
+        this.game.events.push(this.game.world.day,
+          `⛧ В захваченной ${s.name} провели тёмный ритуал — демоны вырвались в мир!`, { x: s.x, y: s.y });
+        this.game.fx({ t: 'toast', text: `⛧ Тёмный ритуал в ${s.name}!` }, 'over', s.x * TILE, s.y * TILE);
+        this.game.abstract.spawnDemonPack(s.x + 8, s.y + 8);
+      }
       return;
     }
 
@@ -101,6 +128,17 @@ export class CivSim {
         s.crystal -= 3;
         s.food = Math.min(140, s.food + 50);
         this.say(s, '✦ Ритуал урожая: закрома полны!');
+      } else if (s.crystal >= 5 && s.guards < 2 + s.towers && s.spiritT <= 0 && rand() < 0.3) {
+        // ритуал призыва: дух-хранитель... или прорыв из иного мира
+        s.crystal -= 5;
+        if (rand() < 0.15) {
+          this.say(s, '⛧ Ритуал призыва ВЫШЕЛ ИЗ-ПОД КОНТРОЛЯ — в мир вырвались демоны!');
+          this.game.abstract.spawnDemonPack(s.x + 6, s.y + 6);
+        } else {
+          s.spiritT = 20;
+          this.say(s, '✦ Из иного мира призван дух-хранитель');
+          this.rehydrate(s);
+        }
       } else if (s.wardT <= 0 && rand() < 0.25) {
         s.crystal -= 3;
         s.wardT = 12;
@@ -108,6 +146,7 @@ export class CivSim {
       }
     }
     if (s.wardT > 0) s.wardT--;
+    if (s.spiritT > 0) { s.spiritT--; if (s.spiritT === 0) this.rehydrate(s); }
 
     // --- строительство ---
     if (s.project) {

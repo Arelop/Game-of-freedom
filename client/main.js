@@ -155,6 +155,12 @@ net.handlers.onFx = (kind, m) => {
       cam.addTrauma(0.45);
       SFX.boom();
       break;
+    case 'rubble':
+      particles.burst(m.x, m.y, '#847e87', 10, 70, 0.45, 2);
+      particles.burst(m.x, m.y, '#8f563b', 6, 50, 0.4);
+      cam.addTrauma(0.2);
+      SFX.die();
+      break;
     case 'chain':
       chainFx.push({ pts: m.pts, t: 0.22 });
       SFX.zap();

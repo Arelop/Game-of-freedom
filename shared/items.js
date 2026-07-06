@@ -62,6 +62,10 @@ export const ITEMS = {
     id: 'swift_potion', name: 'Зелье прыти', use: { buff: 'speed', mult: 0.3, time: 45 },
     price: 35, icon: 'item_potion_green',
   },
+  fire_arrows: {
+    id: 'fire_arrows', name: 'Горящие стрелы', use: { buff: 'fireArrows', time: 60 },
+    price: 25, icon: 'item_fire_arrow',
+  },
 };
 
 export function isGear(itemId) { return !!ITEMS[itemId]?.slot; }
@@ -72,6 +76,7 @@ export function weaponIdOf(itemId) { return itemId.slice(7); }
 // Базовые цены материалов/еды (для продажи торговцу)
 export const MATERIAL_PRICES = {
   bread: 8, meat: 5, cooked_meat: 12, bandage: 15, wood: 6, hide: 9, herb: 5, coin: 1,
+  metal: 12,
 };
 
 // Цена продажи торговцу (~40% от стоимости). WEAPONS передаётся параметром,
@@ -103,6 +108,7 @@ export function describeItem(itemId) {
     if (u.heal) parts.push(`лечит ${u.heal / 2}❤`);
     if (u.mana) parts.push(`+${u.mana} маны`);
     if (u.buff === 'speed') parts.push(`+${Math.round(u.mult * 100)}% скорость на ${u.time} с`);
+    if (u.buff === 'fireArrows') parts.push(`стрелы и болты жгут и ломают стены, ${u.time} с`);
   }
   return parts.join(', ');
 }

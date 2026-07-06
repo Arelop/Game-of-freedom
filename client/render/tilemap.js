@@ -36,6 +36,7 @@ const TILE_SPRITES = {
   [T.TOWER]: ['tile_wall_stone'],
   [T.MINE]: ['tile_rock_solid'],
   [T.SHRINE]: ['tile_grass', 'obj_shrine'],
+  [T.RUBBLE]: ['tile_rubble'],
 };
 
 export class TileRenderer {

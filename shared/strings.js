@@ -49,5 +49,6 @@ export const ITEM_NAMES = {
   coin: 'Монета', meat: 'Сырое мясо', cooked_meat: 'Жареное мясо',
   bread: 'Хлеб', bandage: 'Бинт', ammo_arrow: 'Стрелы',
   ammo_bolt: 'Болты', ammo_mana: 'Кристаллы маны', ammo_knife: 'Метательные ножи',
-  wood: 'Древесина', hide: 'Шкура', herb: 'Травы',
+  ammo_bomb: 'Бомбы', wood: 'Древесина', hide: 'Шкура', herb: 'Травы',
+  metal: 'Металл',
 };

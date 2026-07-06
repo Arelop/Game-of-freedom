@@ -28,6 +28,15 @@ export class AbstractSim {
     this.timer = 0;
   }
 
+  // Демоны из тёмных/провальных ритуалов: сильная стая у точки (в тайлах)
+  spawnDemonPack(tx, ty) {
+    this.tokens.push({
+      id: 'tok' + this.nextId++, type: 'pack', name: 'демоны из иного мира',
+      faction: 'monsters', units: ['demon', 'imp', 'imp'],
+      x: tx * TILE, y: ty * TILE, hydrated: null,
+    });
+  }
+
   seedTokens() {
     const { world, rand } = this.game;
     for (let i = 0; i < 10; i++) {
@@ -53,11 +62,32 @@ export class AbstractSim {
       // блуждание / движение к цели
       if (tok.type === 'caravan' && tok.target) {
         const s = world.settlements.find(x => x.id === tok.target);
+        // поселенцы идут именно в руины — возрождать
+        if (tok.settlers && s) {
+          const dx = s.x * TILE - tok.x, dy = s.y * TILE - tok.y;
+          const d = Math.hypot(dx, dy);
+          if (d < 60) {
+            tok.dead = true;
+            if (s.ruined) {
+              s.ruined = false; s.captured = false;
+              s.faction = tok.faction; s.homeFaction = tok.faction;
+              s.population = 3; s.guards = 1; s.food = 50; s.wood = 10;
+              s.prosperity = 30;
+              events.push(world.day, `Поселенцы возродили ${s.name}! Теперь это земля ${tok.faction === 'severane' ? 'Северян' : tok.faction === 'ozerny' ? 'Озёрного союза' : 'Степняков'}`, { x: s.x, y: s.y });
+              this.game.toastAll(`★ ${s.name} возрождена поселенцами!`);
+            }
+          } else { tok.x += dx / d * 40; tok.y += dy / d * 40; }
+          continue;
+        }
         if (s && !s.ruined) {
           const dx = s.x * TILE - tok.x, dy = s.y * TILE - tok.y;
           const d = Math.hypot(dx, dy);
           if (d < 60) { // прибыл: передаёт груз, крепнут связи
             s.prosperity = Math.min(100, s.prosperity + 4);
+            // эскорт-квесты выполнены
+            for (const p of this.game.players.values()) {
+              if (p.quest?.type === 'escort' && p.quest.token === tok.id) this.game.completeQuestObjective(p);
+            }
             if (tok.cargo) {
               s[tok.cargo.res] = Math.min(140, (s[tok.cargo.res] || 0) + tok.cargo.amount);
               const from = world.settlements.find(x => x.id === tok.from);
@@ -72,15 +102,24 @@ export class AbstractSim {
             tok.dead = true;
           } else {
             tok.x += dx / d * 40; tok.y += dy / d * 40;
-            // стая рядом — грабёж каравана
+            // стая рядом — грабёж; сопровождающий игрок отпугивает
+            const escorted = [...this.game.players.values()].some(p =>
+              !p.dead && p.mapId === 'over' &&
+              (p.x - tok.x) ** 2 + (p.y - tok.y) ** 2 < 220 ** 2);
             const raider = this.tokens.find(t => t.type === 'pack' && !t.dead &&
               (t.x - tok.x) ** 2 + (t.y - tok.y) ** 2 < (TILE * 5) ** 2);
-            if (raider && rand() < 0.6) {
+            if (raider && !escorted && rand() < 0.6) {
               tok.dead = true;
               if (raider.units.length < 6) raider.units.push(raider.units[0]);
               events.push(world.day,
                 `${cap(raider.name)} разграбили караван с ${tok.cargo ? RES_NAMES[tok.cargo.res] : 'товаром'}!`,
                 { x: Math.round(tok.x / TILE), y: Math.round(tok.y / TILE) });
+              for (const p of this.game.players.values()) {
+                if (p.quest?.type === 'escort' && p.quest.token === tok.id) {
+                  p.quest = null;
+                  this.game.toast(p, '✖ Караван разграблен — задание провалено');
+                }
+              }
             }
           }
         } else tok.dead = true;
@@ -103,7 +142,7 @@ export class AbstractSim {
         const s = world.settlements.find(s => !s.ruined && !s.captured &&
           (s.x * TILE - tok.x) ** 2 + (s.y * TILE - tok.y) ** 2 < (TILE * 30) ** 2);
         if (s) {
-          const defense = s.guards * 2 + s.towers * 3 + (s.wardT > 0 ? 6 : 0);
+          const defense = s.guards * 2 + s.towers * 3 + (s.wardT > 0 ? 6 : 0) + (s.spiritT > 0 ? 5 : 0);
           const strength = tok.units.length * 2 + tok.units.filter(u => u === 'banditHeavy').length * 2;
           if (strength > defense + (rand() < 0.5 ? 2 : 0)) {
             s.prosperity = Math.max(5, s.prosperity - 12);
