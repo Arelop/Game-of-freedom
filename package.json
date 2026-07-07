@@ -1,9 +1,10 @@
 {
-  "name": "koop-shooter",
+  "name": "pogranichye",
   "version": "0.1.0",
-  "description": "Кооп топ-даун шутер в живом открытом мире",
+  "description": "Кооперативная топ-даун action RPG в живом открытом мире",
   "type": "module",
   "private": true,
+  "engines": { "node": ">=20" },
   "scripts": {
     "start": "node server/index.js",
     "assets": "node tools/fetch-assets.js && node tools/build-atlas.js",

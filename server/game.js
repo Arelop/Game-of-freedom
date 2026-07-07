@@ -4,7 +4,7 @@ import {
   HUNGER_MAX, HUNGER_RATE, DAY_LENGTH, PLAYER_RADIUS, DESTRUCTIBLE, seasonOf,
 } from '../shared/constants.js';
 import { WEAPONS } from '../shared/weapons.js';
-import { ENEMIES, tierTouchBonus, tierProjDmg } from '../shared/enemies.js';
+import { ENEMIES, tierTouchBonus, tierProjDmg, enemiesOfTier } from '../shared/enemies.js';
 import { PATTERNS, emitDirections } from '../shared/patterns.js';
 import {
   makePlayerState, stepPlayer, stepProjectile, hasIFrames, circlesOverlap, dist2,
@@ -13,7 +13,7 @@ import {
 import { mulberry32, hash2, randInt, pick } from '../shared/rng.js';
 import { makeWorld } from './world/worldgen.js';
 import { ChunkStore } from './world/chunks.js';
-import { generateDungeon, roomAt } from './world/dungeon.js';
+import { generateDungeon, roomAt, generateArena } from './world/dungeon.js';
 import { updateEnemy } from './sim/ai.js';
 import { updateNpc } from './sim/npc.js';
 import { AbstractSim } from './sim/abstract.js';
@@ -252,7 +252,7 @@ export class Game {
     p.effStats = eff;
     const sb = statBonuses(eff);
     const d = {
-      dmgMelee: 1 + sb.dmgMelee, dmgRanged: 1, dmgMagic: 1 + sb.dmgMagic,
+      dmgMelee: 1 + sb.dmgMelee, dmgRanged: 1 + sb.dmgRanged, dmgMagic: 1 + sb.dmgMagic,
       critChance: 0.03, critMult: 2, coinMult: 1 + sb.coinMult,
       atkSpeed: 1 + sb.atkSpeed, dodge: sb.dodge, manaRegen: sb.manaRegen,
       dropBonus: sb.dropBonus,
@@ -463,6 +463,7 @@ export class Game {
       this.world.time -= 1;
       this.world.day++;
       this.rollWeather();
+      this.rollDaily();
     }
     if (this.isNight() !== wasNight)
       this.toastAll(this.isNight() ? STR.night : STR.morning);
@@ -492,6 +493,7 @@ export class Game {
     this.civ.update(dt);
     this.checkDungeonRooms();
     this.checkAscensions();
+    this.checkArena();
   }
 
   isNight() { return this.world.time < 0.22 || this.world.time > 0.85; }
@@ -574,6 +576,23 @@ export class Game {
         break;
       }
     }
+  }
+
+  // ---------- задание дня: одна цель на всех, награда каждому раз в день ----------
+  rollDaily() {
+    const HUNTS = [
+      ['goblin', 'гоблинов'], ['wolf', 'волков'], ['bandit', 'бандитов'],
+      ['skeleton', 'скелетов'], ['slime', 'слизней'], ['ghoul', 'упырей'],
+    ];
+    const GATHERS = [['wood', 'древесины'], ['herb', 'трав'], ['meat', 'сырого мяса'], ['metal', 'металла']];
+    if (this.rand() < 0.5) {
+      const [kind, name] = pick(this.rand, HUNTS);
+      this.world.daily = { day: this.world.day, type: 'hunt', kind, count: 8, name: `истребить 8 ${name}`, reward: { coins: 45, xp: 60, rep: 8 } };
+    } else {
+      const [res, name] = pick(this.rand, GATHERS);
+      this.world.daily = { day: this.world.day, type: 'gather', res, count: 6, name: `принести 6 ${name}`, reward: { coins: 35, xp: 45, rep: 8 } };
+    }
+    if (this.players.size) this.toastAll(`📋 Задание дня: ${this.world.daily.name} (сдать старейшине)`);
   }
 
   // Погода нового дня: зимой — снегопады, весной/осенью — дожди
@@ -980,6 +999,12 @@ export class Game {
           cpt.name = 'Ярослава';
           cpt.hp = cpt.maxHp = 24;
           ids.push(cid);
+          // распорядитель арены зазывает бойцов
+          const aid = this.spawnNpc('arenamaster', s.id, 'over', sx - 44, sy - 20, { kind: 'npc_guard' });
+          const am = this.entities.get(aid);
+          am.name = 'Боривой';
+          am.hp = am.maxHp = 30;
+          ids.push(aid);
           // вдова Милица ждёт вестей у таверны
           const wx = (a.tavern?.x ?? s.x) * TILE, wy = (a.tavern?.y ?? s.y) * TILE;
           const wid = this.spawnNpc('widow', s.id, 'over', wx - 14, wy + 12, { kind: 'npc_villager2' });
@@ -1678,6 +1703,15 @@ export class Game {
       q.bestiary = q.bestiary || {};
       q.bestiary[e.kind] = (q.bestiary[e.kind] || 0) + 1;
     }
+    // задание дня: счёт добычи участникам
+    const D = this.world.daily;
+    if (D?.type === 'hunt' && e.kind === D.kind) {
+      for (const q of gainers) {
+        if (q.daily?.day !== D.day) q.daily = { day: D.day, n: 0, done: false };
+        if (!q.daily.done && ++q.daily.n === D.count)
+          this.toast(q, `📋 Задание дня выполнено (${D.count}/${D.count}) — сдай старейшине!`);
+      }
+    }
     // онбординг: первые победы
     for (const q of gainers) {
       if (q.hintStage === 2 && ++q.hintKills >= 3) {
@@ -1814,6 +1848,31 @@ export class Game {
     if (p.bounty >= 50 && !p.bountyWarned) {
       p.bountyWarned = true;
       this.toast(p, '💀 За тобой выйдут охотники за головой! Виру платят старейшинам');
+    }
+  }
+
+  // ---------- ранги репутации: пороги 50 и 80 дают награды ----------
+  checkRepRanks() {
+    const GIFT80 = { severane: 'war_helm@e', ozerny: 'crystal_robe@e', stepnyaki: 'elven_armor@e' };
+    for (const p of this.players.values()) {
+      p.repRanks = p.repRanks || {};
+      for (const f of ['severane', 'ozerny', 'stepnyaki']) {
+        const rep = p.rep[f] || 0;
+        const rank = rep >= 80 ? 2 : rep >= 50 ? 1 : 0;
+        const had = p.repRanks[f] || 0;
+        if (rank <= had) continue;
+        if (had < 1 && rank >= 1) {
+          p.coins += 100;
+          this.toast(p, `🎖 «${FACTIONS[f].name}»: ты теперь ЗАЩИТНИК! Дар благодарности: +100 мон.`);
+        }
+        if (rank >= 2) {
+          p.inventory[GIFT80[f]] = (p.inventory[GIFT80[f]] || 0) + 1;
+          this.toast(p, `🎖 «${FACTIONS[f].name}»: звание ГЕРОЙ! Дар: ${getItem(GIFT80[f]).name}`);
+          this.toastAll(`🎖 ${p.name} — Герой фракции «${FACTIONS[f].name}»!`);
+          this.events.push(this.world.day, `${p.name} стал Героем ${FACTIONS[f].name}`);
+        }
+        p.repRanks[f] = rank;
+      }
     }
   }
 
@@ -2116,7 +2175,7 @@ export class Game {
     // NPC рядом: приоритет «полезным» ролям над стражей/жителями
     const ROLE_PRIO = {
       elder: 3, merchant: 2, trader: 2, blacksmith: 2, priest: 2, innkeeper: 2, hunter: 2,
-      hermit: 4, wanderer: 4, captain: 4, mastersmith: 4, widow: 4, darkheart: 5, // именные важнее всех
+      hermit: 4, wanderer: 4, captain: 4, mastersmith: 4, widow: 4, arenamaster: 4, darkheart: 5,
     };
     let npc = null, bestScore = -Infinity;
     const R2 = 26 * 26; // ближе — иначе NPC перехватывают колодцы и доски
@@ -2400,6 +2459,77 @@ export class Game {
       this.toastAll(`⛧ ${p.name} ПОДЧИНИЛ Сердце Тьмы. Цитадель принадлежит смертному… Люди этого не забудут`);
       this.events.push(this.world.day, `${p.name} подчинил Сердце Тьмы — добрые фракции отвернулись от него`);
     }
+  }
+
+  // ---------- Арена-колизей: волны, ставки, рекорд сервера ----------
+  ensureArena() {
+    if (this.dungeons.has('arena')) return;
+    const s0 = this.world.settlements[0];
+    const d = generateArena();
+    this.dungeons.set('arena', { dungeon: d, poi: { entrance: { x: s0.x + 3, y: s0.y + 3 }, name: 'Арена' } });
+    this.chunks.dungeons.set('arena', d);
+  }
+
+  enterArena(p) {
+    if (p.coins < 25) { this.toast(p, STR.notEnoughCoins); return; }
+    p.coins -= 25;
+    this.ensureArena();
+    const d = this.dungeons.get('arena').dungeon;
+    p.mapId = 'arena';
+    p.x = d.entrance.x * TILE + 8;
+    p.y = (d.entrance.y - 2) * TILE + 8;
+    this.sendMapChange(p, '⚔ АРЕНА');
+    this.toast(p, '⚔ Волны начнутся через мгновение. Выход — через портал');
+  }
+
+  checkArena() {
+    const fighters = [...this.players.values()].filter(q => q.mapId === 'arena' && !q.dead);
+    if (!fighters.length) {
+      // арена опустела: фиксируем рекорд и сбрасываем
+      const A = this.world.arena;
+      if (A?.wave > 0) {
+        const rec = this.world.arenaRecord || { wave: 0, name: '—' };
+        if (A.cleared > rec.wave) {
+          this.world.arenaRecord = { wave: A.cleared, name: A.lastName || '—' };
+          this.toastAll(`🏛 НОВЫЙ РЕКОРД АРЕНЫ: волна ${A.cleared} (${A.lastName || '—'})!`);
+          this.events.push(this.world.day, `Рекорд арены: ${A.lastName} выстоял ${A.cleared} волн`);
+        }
+        for (const id of A.ids) this.entities.delete(id);
+        this.world.arena = null;
+      }
+      return;
+    }
+    const A = this.world.arena = this.world.arena || { wave: 0, cleared: 0, ids: [], spawnT: 0 };
+    A.lastName = fighters[0].name;
+    A.ids = A.ids.filter(id => this.entities.has(id));
+    if (A.ids.length) return; // волна ещё жива
+    // волна зачищена: награда сразу, следующая — после передышки
+    if (A.wave > 0 && A.cleared < A.wave) {
+      A.cleared = A.wave;
+      const prize = 8 + A.wave * 4;
+      for (const q of fighters) { q.coins += prize; this.toast(q, `🏛 Волна ${A.wave} выстояна: +${prize} мон.`); }
+    }
+    A.spawnT -= TICK_DT;
+    if (A.spawnT > 0) return;
+    A.wave++;
+    A.spawnT = 3;
+    // состав волны: тир и число растут; каждая 5-я — чемпион
+    const d = this.dungeons.get('arena').dungeon;
+    const cx = d.size / 2 * TILE, cy = d.size / 2 * TILE;
+    const champWave = A.wave % 5 === 0;
+    const maxTier = Math.min(4, 1 + Math.floor(A.wave / 3));
+    const kinds = enemiesOfTier(Math.max(1, maxTier - 1), maxTier);
+    const n = champWave ? 1 : Math.min(9, 2 + Math.ceil(A.wave * 0.8));
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const kind = champWave ? (A.wave >= 15 ? 'rockKing' : A.wave >= 10 ? 'minotaur' : 'orcWarlord') : pick(this.rand, kinds);
+      const id = this.spawnEnemy(kind, 'arena',
+        cx + Math.cos(a) * 90, cy + Math.sin(a) * 90,
+        { forceElite: champWave || this.rand() < A.wave * 0.02, noElite: false });
+      const e = this.entities.get(id);
+      if (e) { e.aggro = true; A.ids.push(id); }
+    }
+    this.toastMap('arena', champWave ? `⚔ ВОЛНА ${A.wave}: ЧЕМПИОН АРЕНЫ!` : `⚔ Волна ${A.wave} (${n} врагов)`);
   }
 
   // ---------- Вознесение: путь от смертного к богу (уровень 20) ----------
@@ -3114,6 +3244,17 @@ export class Game {
     if (npc.role === 'wanderer') { this.storyDialogWanderer(p, npc); return; }
     if (npc.role === 'mastersmith') { this.storyDialogSmith(p, npc); return; }
     if (npc.role === 'widow') { this.storyDialogWidow(p, npc); return; }
+    if (npc.role === 'arenamaster') {
+      const rec = this.world.arenaRecord;
+      this.sendDialog(p, npc.id, '🏛 Распорядитель Боривой',
+        ['«Арена ждёт храбрецов! Волны врагов — одна другой злее.',
+         'Каждая выстоянная волна — звонкая монета. Пятая, десятая,',
+         'пятнадцатая — чемпионы. Сколько выстоишь ты?»',
+         rec ? `Рекорд Пограничья: волна ${rec.wave} — ${rec.name}` : 'Рекорд пока не установлен. Стань первым!'],
+        [{ id: 'arena_enter', label: '⚔ Выйти на арену (взнос 25 мон.)' },
+         { id: 'close', label: STR.bye }]);
+      return;
+    }
     if (npc.role === 'darkheart') {
       const ch = this.world.war?.stage === 4
         ? [{ id: 'war_destroy', label: '☀ Уничтожить Сердце (Тьма падёт навсегда, слава героям)' },
@@ -3181,6 +3322,20 @@ export class Game {
         lines.push('Как продвигается дело?');
       if (s?.project && (p.inventory.wood || 0) >= 5)
         choices.push({ id: 'donate', label: 'Пожертвовать 5 древесины на стройку (+реп)' });
+      // задание дня: приём у старейшины
+      const D = this.world.daily;
+      if (D && p.daily?.day === D.day && p.daily.done) {
+        // уже сдано сегодня
+      } else if (D) {
+        if (D.type === 'hunt') {
+          const n = p.daily?.day === D.day ? p.daily.n : 0;
+          if (n >= D.count) choices.push({ id: 'daily', label: `📋 Сдать задание дня (${D.name}) — +${D.reward.coins} мон.` });
+          else lines.push(`📋 Задание дня: ${D.name} (${n}/${D.count})`);
+        } else {
+          if ((p.inventory[D.res] || 0) >= D.count) choices.push({ id: 'daily', label: `📋 Сдать задание дня (${D.name}) — +${D.reward.coins} мон.` });
+          else lines.push(`📋 Задание дня: ${D.name} (${p.inventory[D.res] || 0}/${D.count})`);
+        }
+      }
       // вира: откупиться от розыска
       if ((p.bounty || 0) > 0)
         choices.push({ id: 'payoff', label: `💀 Заплатить виру (${p.bounty * 2} мон.) — снять розыск` });
@@ -3473,6 +3628,26 @@ export class Game {
     if (choice === 'war_claim') { this.warFinale(p, false); return; }
     if (choice === 'stash') { this.openStash(p); return; }
     if (choice === 'nohouse') { this.toast(p, '«Чужакам домов не продаём. Заслужи доверие деревни (репутация 20)»'); return; }
+    if (choice === 'arena_enter') { this.enterArena(p); return; }
+    if (choice === 'daily') {
+      const D = this.world.daily;
+      const npc = this.entities.get(dialogId);
+      const s = npc && this.world.settlements.find(x => x.id === npc.home);
+      if (!D || (p.daily?.day === D.day && p.daily.done)) return;
+      if (D.type === 'hunt') {
+        if ((p.daily?.day === D.day ? p.daily.n : 0) < D.count) return;
+      } else {
+        if ((p.inventory[D.res] || 0) < D.count) return;
+        p.inventory[D.res] -= D.count;
+      }
+      p.daily = { day: D.day, n: D.count, done: true };
+      p.coins += D.reward.coins;
+      this.addXp(p, D.reward.xp);
+      if (s) p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + D.reward.rep);
+      this.toast(p, `📋✓ Задание дня сдано: +${D.reward.coins} мон., +${D.reward.xp} опыта`);
+      this.events.push(this.world.day, `${p.name} исполнил задание дня`);
+      return;
+    }
     if (choice === 'payoff') {
       const cost = (p.bounty || 0) * 2;
       if (cost <= 0) return;

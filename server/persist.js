@@ -45,9 +45,12 @@ export function saveWorld(game) {
         ascended: p.ascended || false, bestiary: p.bestiary || {},
         mana: Math.round(p.mana || 0),
         bounty: p.bounty || 0, contract: p.contract || null,
+        repRanks: p.repRanks || {}, daily: p.daily || null,
       })),
       banditsWeakT: w.banditsWeakT || 0,
       smithBoon: w.smithBoon || false,
+      arenaRecord: w.arenaRecord || null,
+      daily: w.daily || null,
     };
     writeFileSync(FILE, JSON.stringify(data));
   } catch (e) { console.warn('[save] не удалось сохранить:', e.message); }
@@ -86,6 +89,8 @@ export function loadWorld(game) {
     }
     if (data.banditsWeakT) w.banditsWeakT = data.banditsWeakT;
     if (data.smithBoon) w.smithBoon = true;
+    if (data.arenaRecord) w.arenaRecord = data.arenaRecord;
+    if (data.daily) w.daily = data.daily;
     if (data.wildChests) for (const rec of data.wildChests) {
       const c = w.wildChests?.find(x => x.x === rec.x && x.y === rec.y);
       if (c) c.opened = rec.opened;
@@ -141,6 +146,8 @@ export function applySavedPlayer(game, p) {
     if (p.ammo?.mana !== undefined) delete p.ammo.mana;
     if (rec.bounty) p.bounty = rec.bounty;
     if (rec.contract) p.contract = rec.contract;
+    if (rec.repRanks) p.repRanks = rec.repRanks;
+    if (rec.daily) p.daily = rec.daily;
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);

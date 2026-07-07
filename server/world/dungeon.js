@@ -134,6 +134,25 @@ export function generateDungeon(seed, difficulty, withBoss, depth = 1) {
   return { size: SIZE, grid: g, rooms, entrance, seed, difficulty, depth, cursed };
 }
 
+// Арена-колизей: круглый зал для волновых боёв (отдельный инстанс)
+export function generateArena() {
+  const S = 40;
+  const g = new Uint8Array(S * S).fill(T.DUNGEON_WALL);
+  const C = S / 2, R = 16;
+  for (let y = 1; y < S - 1; y++)
+    for (let x = 1; x < S - 1; x++)
+      if ((x - C) ** 2 + (y - C) ** 2 < R * R) g[y * S + x] = T.DUNGEON_FLOOR;
+  // трибуны-статуи и светящиеся кристаллы по кругу
+  for (let a = 0; a < 8; a++) {
+    const sx = Math.round(C + Math.cos(a / 8 * Math.PI * 2) * (R - 2));
+    const sy = Math.round(C + Math.sin(a / 8 * Math.PI * 2) * (R - 2));
+    g[sy * S + sx] = a % 2 ? T.STATUE : T.CRYSTAL_WALL;
+  }
+  const entrance = { x: C, y: C + R - 3 };
+  g[entrance.y * S + entrance.x] = T.DUNGEON_EXIT;
+  return { size: S, grid: g, rooms: [], entrance, seed: 1, difficulty: 1, depth: 1, cursed: false, isArena: true };
+}
+
 function nearTile(g, x, y, tile) {
   return g[(y - 1) * SIZE + x] === tile || g[(y + 1) * SIZE + x] === tile
     || g[y * SIZE + x - 1] === tile || g[y * SIZE + x + 1] === tile;

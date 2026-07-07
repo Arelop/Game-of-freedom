@@ -67,9 +67,10 @@ setInterval(() => {
 
 setInterval(() => saveWorld(game), 60000);
 process.on('SIGINT', () => { saveWorld(game); process.exit(0); });
+process.on('SIGTERM', () => { saveWorld(game); process.exit(0); }); // хостинги гасят процесс так
 
 http.listen(PORT, () => {
-  console.log(`\n=== ПОГРАНИЧЬЕ — кооп-шутер ===`);
+  console.log(`\n=== ПОГРАНИЧЬЕ — кооп action RPG ===`);
   console.log(`Локально:  http://localhost:${PORT}`);
   for (const [name, addrs] of Object.entries(networkInterfaces()))
     for (const a of addrs || [])

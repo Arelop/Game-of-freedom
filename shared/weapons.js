@@ -13,7 +13,7 @@ export const WEAPONS = {
     sprite: 'wpn_axe', sound: 'swing_heavy', swingColor: '#d9a066', price: 90,
   },
   bow: {
-    id: 'bow', name: 'Лук', school: 'ranged', damage: 3, projectilesPerShot: 1,
+    id: 'bow', name: 'Лук', school: 'ranged', damage: 4, projectilesPerShot: 1,
     spreadDeg: 3, projectileSpeed: 340, fireRate: 2.1, magSize: 12,
     reloadTime: 1.0, knockback: 25, recoilShake: 0.12,
     sprite: 'wpn_bow', projSprite: 'proj_arrow', sound: 'shot_bow',
@@ -29,7 +29,7 @@ export const WEAPONS = {
   crossbow: {
     id: 'crossbow', structDmg: 2, name: 'Арбалет', school: 'ranged', damage: 10, projectilesPerShot: 1,
     spreadDeg: 1, projectileSpeed: 420, fireRate: 0.7, magSize: 1,
-    reloadTime: 1.4, knockback: 90, recoilShake: 0.35,
+    reloadTime: 1.0, knockback: 90, recoilShake: 0.35,
     sprite: 'wpn_crossbow', projSprite: 'proj_bolt', sound: 'shot_crossbow',
     projRadius: 2, projLife: 1.9, ammoType: 'bolt', price: 120,
   },

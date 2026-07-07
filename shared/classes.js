@@ -5,7 +5,7 @@ export const STAT_KEYS = ['str', 'agi', 'int', 'lck'];
 export const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', lck: 'Удача' };
 export const STAT_DESC = {
   str: '+8% урона ближнего боя, +½ сердца за очко',
-  agi: '+4% скорость атаки, +2% шанс уворота',
+  agi: '+5% урона дальнего боя, +4% скорость атаки, +2% уворот',
   int: '+4 к запасу маны, +реген, +6% урона магии',
   lck: 'выше шанс, количество и редкость добычи',
 };
@@ -53,6 +53,7 @@ export function statBonuses(stats) {
   return {
     dmgMelee: (stats.str || 0) * 0.08,
     maxHp: (stats.str || 0),                          // +½ сердца за очко силы
+    dmgRanged: (stats.agi || 0) * 0.05,
     atkSpeed: (stats.agi || 0) * 0.04,
     dodge: Math.min(0.6, (stats.agi || 0) * 0.02),    // шанс полностью избежать урона
     dmgMagic: (stats.int || 0) * 0.06,

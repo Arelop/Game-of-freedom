@@ -783,10 +783,18 @@ export class Panels {
         else acts.push('✗ скидки — нужна репутация 20');
         if (rep >= 30) acts.push('✓ посредничество в конфликтах (старейшина)');
         else acts.push('✗ дипломатия — нужна репутация 30');
+        if (rep < 50) acts.push('✗ звание Защитник (реп. 50) — дар 100 мон.');
+        else if (rep < 80) acts.push('✓ Защитник · ✗ звание Герой (реп. 80) — эпический дар');
       }
 
+      // текущий ранг игрока во фракции
+      const rank = f === 'bandits' ? '' :
+        rep >= 80 ? ' · <span style="color:#b46ee0">ГЕРОЙ</span>' :
+        rep >= 50 ? ' · <span style="color:#5fcde4">Защитник</span>' :
+        rep >= 25 ? ' · <span style="color:#99e550">Друг</span>' : '';
+
       block.innerHTML = `
-        <div class="facname">${fname} <span style="color:${col}">${rep}</span></div>
+        <div class="facname">${fname}${rank} <span style="color:${col}">${rep}</span></div>
         <div class="facbar"><div class="facfill" style="width:${Math.round((rep + 100) / 2)}%;background:${col}"></div></div>
         ${vlist ? `<div class="facvill">Поселения: ${vlist}</div>` : ''}
         ${rels.length ? `<div class="facrel">Вражда: ${rels.join(', ')}</div>` : ''}

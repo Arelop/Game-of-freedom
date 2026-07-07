@@ -1,0 +1,13 @@
+# Render.com blueprint: бесплатный веб-сервис Node с WebSocket.
+# Деплой: https://dashboard.render.com → New → Blueprint → указать этот репозиторий.
+services:
+  - type: web
+    name: pogranichye
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: SEED
+        value: "1337"

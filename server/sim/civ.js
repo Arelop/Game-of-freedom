@@ -41,6 +41,7 @@ export class CivSim {
     this.tickResettlement();
     this.tickDarkness();
     this.game.tickBountyHunters();
+    this.game.checkRepRanks();
   }
 
   // --- Армия Тьмы: мощь Цитадели растёт, войска идут войной на всех ---
