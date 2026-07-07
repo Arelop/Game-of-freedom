@@ -56,6 +56,13 @@ let bigMap = false;
 // вид карты: измерение, центр (мировые px) и зум; cx=null — авто-центр на герое
 const mapView = { dim: 'over', cx: null, cy: null, zoom: 1 };
 let mapDrag = null;      // перетаскивание карты ЛКМ
+// раскладка карты: легенда слева + квадрат карты, вся композиция по центру
+function mapLayout() {
+  const S = Math.min(VIEW_W, VIEW_H) - 30;
+  const LW = 112;
+  const startX = Math.max(4, (VIEW_W - (LW + 22 + S)) / 2);
+  return { S, LW, panelX: startX, x0: startX + LW + 22, y0: (VIEW_H - S) / 2 };
+}
 let localMag = 0, localWeapon = '';
 let invRefresh = 0;
 let swingAnim = 0;       // анимация замаха своего игрока
@@ -145,8 +152,7 @@ screen.addEventListener('wheel', e => {
   if (!bigMap) return;
   e.preventDefault();
   // зум к курсору: точка мира под мышью остаётся на месте
-  const S = Math.min(VIEW_W, VIEW_H) - 30;
-  const x0 = (VIEW_W - S) / 2, y0 = (VIEW_H - S) / 2;
+  const { S, x0, y0 } = mapLayout();
   const worldPx = (mapView.dim === 'ash' ? (net.mapInfo.ash?.size || 160) : WORLD_TILES) * TILE;
   const r = screen.getBoundingClientRect();
   const nx = (e.clientX - r.left) / r.width * VIEW_W;
@@ -957,8 +963,7 @@ function renderLight(timeSec) {
 
 // ---------- большая карта (M) ----------
 function renderBigMap() {
-  const S = Math.min(VIEW_W, VIEW_H) - 30;
-  const x0 = (VIEW_W - S) / 2, y0 = (VIEW_H - S) / 2;
+  const { S, LW, panelX, x0, y0 } = mapLayout();
   const dim = mapView.dim === 'ash' && net.mapInfo.ash ? 'ash' : 'over';
   const worldPx = (dim === 'ash' ? net.mapInfo.ash.size : WORLD_TILES) * TILE;
   const youDim = net.you?.map === 'ash' ? 'ash' : net.you?.map === 'over' ? 'over' : null;
@@ -977,15 +982,11 @@ function renderBigMap() {
   const py = wy => y0 + (wy - vT) * k;
   const seen = (x, y) => x > x0 - 4 && x < x0 + S + 4 && y > y0 - 4 && y < y0 + S + 4;
 
-  // фон: карта + панель легенды слева единым полотном
-  const LW = 108; // ширина легенды
-  const panelX = x0 - LW - 10;
+  // карта — своё полотно; легенда — ОТДЕЛЬНОЕ меню слева в красной рамке
   ctx.fillStyle = 'rgba(14,12,20,.95)';
-  ctx.fillRect(panelX - 6, y0 - 18, LW + S + 24, S + 24);
+  ctx.fillRect(x0 - 6, y0 - 18, S + 12, S + 24);
   ctx.strokeStyle = dim === 'ash' ? '#df7126' : '#5b6ee1';
-  ctx.strokeRect(panelX - 5.5, y0 - 17.5, LW + S + 23, S + 23);
-  ctx.strokeStyle = '#2c2a38';
-  ctx.strokeRect(x0 - 2.5, y0 - 0.5, S + 4, S + 1); // внутренняя рамка самой карты
+  ctx.strokeRect(x0 - 5.5, y0 - 17.5, S + 11, S + 23);
   // вкладки измерений
   ctx.font = '8px monospace';
   ctx.textAlign = 'left';
@@ -996,16 +997,26 @@ function renderBigMap() {
     ctx.fillText('◈ Выжженные земли', x0 + 70, y0 - 9);
   }
 
-  // ---- легенда слева: шапка, обстановка, знаки, управление ----
+  // ---- меню легенды: отдельная красная панель ----
+  ctx.fillStyle = 'rgba(20,10,12,.95)';
+  ctx.fillRect(panelX - 6, y0 - 18, LW + 8, S + 24);
+  ctx.strokeStyle = '#d9574a';
+  ctx.strokeRect(panelX - 5.5, y0 - 17.5, LW + 7, S + 23);
+  ctx.strokeStyle = '#6e1e1e';
+  ctx.strokeRect(panelX - 3.5, y0 - 15.5, LW + 3, S + 19); // двойная кромка
   let ly = y0 + 2;
-  const line = (text, color = '#b8b8b8') => { ctx.fillStyle = color; ctx.fillText(text, panelX + 12, ly); ly += 10; };
+  const line = (text, color = '#d9a3a3') => { ctx.fillStyle = color; ctx.fillText(text, panelX + 12, ly); ly += 10; };
   const key = (color, text) => {
     ctx.fillStyle = color; ctx.fillRect(panelX + 2, ly - 5, 5, 5);
-    ctx.fillStyle = '#b8b8b8'; ctx.fillText(text, panelX + 12, ly); ly += 10;
+    ctx.strokeStyle = '#6e1e1e'; ctx.strokeRect(panelX + 1.5, ly - 5.5, 6, 6);
+    ctx.fillStyle = '#d9a3a3'; ctx.fillText(text, panelX + 12, ly); ly += 10;
   };
-  ctx.fillStyle = dim === 'ash' ? '#df7126' : '#fbf236';
+  ctx.fillStyle = '#d9574a';
+  ctx.fillText('▌ЛЕГЕНДА', panelX + 2, y0 - 9);
   ctx.fillText(dim === 'ash' ? 'ВЫЖЖЕННЫЕ ЗЕМЛИ' : 'ПОГРАНИЧЬЕ', panelX + 2, ly); ly += 12;
-  line(`День ${net.day} · ${['Весна', 'Лето', 'Осень', 'Зима'][Math.floor(((net.day || 1) - 1) / 3) % 4]}`, '#847e87');
+  line(`День ${net.day} · ${['Весна', 'Лето', 'Осень', 'Зима'][Math.floor(((net.day || 1) - 1) / 3) % 4]}`, '#9a5a5a');
+  ctx.strokeStyle = '#6e1e1e';
+  ctx.beginPath(); ctx.moveTo(panelX + 2, ly - 4); ctx.lineTo(panelX + LW - 4, ly - 4); ctx.stroke();
   ly += 4;
   if (dim === 'over') {
     key('#99e550', 'деревня живёт');
@@ -1029,10 +1040,12 @@ function renderBigMap() {
     key('#b06ee1', 'портал домой');
     key('#ffffff', 'ты');
   }
-  ly = y0 + S - 22;
-  line('Tab — измерение', '#696a6a');
-  line('колесо — зум', '#696a6a');
-  line('ЛКМ — тащить', '#696a6a');
+  ly = y0 + S - 24;
+  ctx.strokeStyle = '#6e1e1e';
+  ctx.beginPath(); ctx.moveTo(panelX + 2, ly - 8); ctx.lineTo(panelX + LW - 4, ly - 8); ctx.stroke();
+  line('Tab — измерение', '#9a5a5a');
+  line('колесо — зум', '#9a5a5a');
+  line('ЛКМ — тащить', '#9a5a5a');
 
   // подложка: рельеф выбранного измерения с учётом зума и сдвига
   const base = dim === 'ash' ? ashCanvas : biomeCanvas;
