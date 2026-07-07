@@ -36,6 +36,9 @@ const PACK_KINDS = [
   { name: 'нетопыри', units: ['giantBat', 'giantBat', 'giantBat', 'giantBat'], faction: 'monsters', night: true },
   { name: 'некромант со свитой', units: ['necromancer', 'skeleton', 'ghoul'], faction: 'monsters', night: true },
   { name: 'ледяной великан', units: ['frostGiant'], faction: 'monsters', winter: true },
+  // тактические стаи: лекарь и щитоносцы требуют думать, спор — не трогать вплотную
+  { name: 'орочья дружина', units: ['orcShieldbearer', 'orcWarrior', 'orcPriest'], faction: 'monsters' },
+  { name: 'блуждающие споры', units: ['gasSpore', 'gasSpore', 'gasSpore'], faction: 'monsters' },
 ];
 
 // подобрать стаю под место и время
@@ -278,12 +281,21 @@ export class AbstractSim {
 
   hydrate(tok) {
     const ids = [];
-    for (const unit of tok.units) {
-      if (unit === 'npc' || unit === 'guard') {
+    // контракт «Орда»: стаи возле контрактника в полтора раза больше
+    let units = tok.units;
+    if (tok.type === 'pack') {
+      const horde = [...this.game.players.values()].some(q =>
+        q.contract?.type === 'horde' && !q.dead && q.mapId === 'over' &&
+        (q.x - tok.x) ** 2 + (q.y - tok.y) ** 2 < 500 ** 2);
+      if (horde) units = [...tok.units, ...tok.units.slice(0, Math.ceil(tok.units.length / 2))];
+    }
+    for (const unit of units) {
+      if (unit === 'npc' || unit === 'guard' || unit === 'trader') {
         const id = this.game.spawnCaravanNpc(tok, unit);
         if (id) ids.push(id);
       } else {
-        const id = this.game.spawnEnemy(unit, 'over', tok.x + (Math.random() - 0.5) * 60, tok.y + (Math.random() - 0.5) * 60, { token: tok.id, faction: tok.faction });
+        const id = this.game.spawnEnemy(unit, 'over', tok.x + (Math.random() - 0.5) * 60, tok.y + (Math.random() - 0.5) * 60,
+          { token: tok.id, faction: tok.faction, forceElite: !!tok.hunt });
         if (id) ids.push(id);
       }
     }
@@ -304,13 +316,22 @@ export class AbstractSim {
     tok.hydrated = null;
   }
 
-  // стая уничтожена в бою
-  onTokenUnitKilled(tokId) {
+  // стая уничтожена в бою (x, y — место последнего убийства для трофеев)
+  onTokenUnitKilled(tokId, x, y) {
     const tok = this.tokens.find(t => t.id === tokId);
     if (!tok || !tok.hydrated) return;
     const anyAlive = tok.hydrated.some(id => this.game.entities.has(id));
     if (!anyAlive) {
       tok.dead = true;
+      // именной зверь: трофеи храбрецам
+      if (tok.hunt) {
+        const hx = x ?? tok.x, hy = y ?? tok.y;
+        this.game.dropRandomGear('over', hx, hy, true, 6);
+        this.game.dropRandomWeapon('over', hx + 12, hy, 6, 2);
+        this.game.spawnDrop('coin', 40 + Math.floor(this.game.rand() * 40), 'over', hx - 10, hy, 300);
+        this.game.toastAll(`🏆 «${tok.hunt}» повержен! Трофеи ждут на месте охоты`);
+        this.game.events.push(this.game.world.day, `Путники добыли зверя по кличке ${tok.hunt}`);
+      }
       if (tok.garrison && this.game.world.citadel) {
         // штурм Цитадели удался: мощь Тьмы подрублена вдвое
         const c = this.game.world.citadel;

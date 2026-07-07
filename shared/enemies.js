@@ -106,10 +106,12 @@ export const ENEMIES = {
       ]},
       { hpAbove: 0.33, steps: [
         { pattern: 'ring8', interval: 1.6, move: 'chase' },
+        { slam: { dmg: 3, radius: 50, windup: 1.1 }, interval: 3.0, move: 'chase' },
         { pattern: 'spiral', interval: 0.22, move: 'strafe' },
       ]},
       { hpAbove: 0, steps: [
         { pattern: 'spiral', interval: 0.16, move: 'strafe' },
+        { slam: { dmg: 4, radius: 56, windup: 0.9 }, interval: 2.6, move: 'chase' },
         { pattern: 'aimedTriple', interval: 1.0, move: 'chase' },
       ]},
     ],
@@ -131,10 +133,12 @@ export const ENEMIES = {
       ]},
       { hpAbove: 0.33, steps: [
         { pattern: 'spiral', interval: 0.2, move: 'strafe' },
+        { slam: { dmg: 3, radius: 52, windup: 1.2 }, interval: 3.2, move: 'chase' },
         { pattern: 'fan5', interval: 1.4, move: 'chase' },
       ]},
       { hpAbove: 0, steps: [
         { pattern: 'ring12', interval: 1.8, move: 'chase' },
+        { slam: { dmg: 3, radius: 56, windup: 1.0 }, interval: 2.8, move: 'chase' },
         { pattern: 'spiral', interval: 0.16, move: 'strafe' },
         { pattern: 'wideWave', interval: 1.3, move: 'chase' },
       ]},
@@ -186,6 +190,34 @@ export const ENEMIES = {
     id: 'orcWarlord', name: 'Орк-вождь', archetype: 'chaser', hp: 75, speed: 50, tier: 5,
     radius: 7, touchDamage: 3, lungeSpeed: 250, lungeWindup: 0.4, lungeRange: 60,
     sprite: 'enemy_orc_warlord', xp: 35, drops: { coin: [18, 30], weapon: 1 },
+  },
+
+  // --- тактические враги: особые поведения (глубина боя) ---
+  orcShieldbearer: {
+    id: 'orcShieldbearer', name: 'Орк-щитоносец', archetype: 'chaser', hp: 24, speed: 44, tier: 3,
+    radius: 6, touchDamage: 2, lungeSpeed: 190, lungeWindup: 0.45, lungeRange: 50,
+    sprite: 'enemy_shieldbearer', xp: 10, drops: { coin: [4, 9], metal: [0, 1] },
+    shielded: true, // фронтальный блок: заходи с фланга или оглушай
+  },
+  orcPriest: {
+    id: 'orcPriest', name: 'Оркский жрец', archetype: 'shooter', hp: 14, speed: 48, tier: 3,
+    radius: 5, touchDamage: 1, preferRange: [110, 170], fireInterval: 3.5,
+    pattern: 'aimedSingle', sprite: 'enemy_orc_priest', xp: 9,
+    drops: { coin: [4, 8], crystal: [0, 1] },
+    healer: { amount: 4, interval: 3, range: 120 }, // лечит стаю — убей первым!
+  },
+  demonologist: {
+    id: 'demonologist', name: 'Кобольд-демонолог', archetype: 'shooter', hp: 18, speed: 42, tier: 4,
+    radius: 5, touchDamage: 1, preferRange: [100, 160], fireInterval: 2.8,
+    pattern: 'aimedSingle', sprite: 'enemy_demonologist', xp: 13,
+    drops: { coin: [6, 12], crystal: [1, 2] },
+    summoner: { kind: 'imp', max: 3, interval: 4.5 }, // тянет бесов из иного мира
+  },
+  gasSpore: {
+    id: 'gasSpore', name: 'Блуждающий спор', archetype: 'chaser', hp: 6, speed: 30, tier: 2,
+    radius: 5, touchDamage: 0, lungeSpeed: 90, lungeWindup: 0.6, lungeRange: 30,
+    sprite: 'enemy_spore', xp: 4, drops: {},
+    explodeOnDeath: { dmg: 3, radius: 32 }, // не лопай его вплотную
   },
 
   // --- живность биомов: у каждого зверя свой дом ---
@@ -248,6 +280,7 @@ export const ENEMIES = {
       ]},
       { hpAbove: 0, steps: [
         { pattern: 'ring8', interval: 1.6, move: 'strafe' },
+        { slam: { dmg: 3, radius: 46, windup: 1.1 }, interval: 3.0, move: 'chase' },
         { pattern: 'burst3aimed', interval: 1.0, move: 'chase' },
       ]},
     ],
@@ -263,10 +296,12 @@ export const ENEMIES = {
       ]},
       { hpAbove: 0.3, steps: [
         { pattern: 'ring12', interval: 1.9, move: 'chase' },
+        { slam: { dmg: 4, radius: 60, windup: 1.3 }, interval: 3.4, move: 'chase' },
         { pattern: 'wideWave', interval: 1.4, move: 'strafe' },
       ]},
       { hpAbove: 0, steps: [
         { pattern: 'spiral', interval: 0.18, move: 'strafe' },
+        { slam: { dmg: 4, radius: 64, windup: 1.0 }, interval: 2.8, move: 'chase' },
         { pattern: 'ring12', interval: 1.6, move: 'chase' },
       ]},
     ],
@@ -347,4 +382,8 @@ export const HABITATS = {
   rockKing: 'Трон в скалах (see: карта)',
   packLeader: 'Логово в лесах (see: карта)',
   bossOgre: 'Владыка последней комнаты подземелий',
+  orcShieldbearer: 'Орочьи отряды; блокирует удары спереди — фланг или стан',
+  orcPriest: 'Лечит свою стаю издали — приоритетная цель',
+  demonologist: 'Подземелья; без конца тянет бесов из иного мира',
+  gasSpore: 'Луга и подземелья; ВЗРЫВАЕТСЯ при смерти — не лопай вплотную',
 };

@@ -22,7 +22,8 @@ export function saveWorld(game) {
         housingCap: s.housingCap, project: s.project,
         captured: s.captured, ruined: s.ruined, faction: s.faction,
       })),
-      pois: w.pois.map(o => ({ id: o.id, cleared: o.cleared })),
+      pois: w.pois.map(o => ({ id: o.id, cleared: o.cleared, pressed: o.pressed, looted: o.looted })),
+      wildChests: w.wildChests || [],
       citadel: w.citadel
         ? { power: w.citadel.power, forts: w.citadel.forts, weakened: w.citadel.weakened, dead: w.citadel.dead, owned: w.citadel.owned }
         : null,
@@ -43,6 +44,7 @@ export function saveWorld(game) {
         home: p.home || null, homeStash: p.homeStash || {}, hintStage: p.hintStage,
         ascended: p.ascended || false, bestiary: p.bestiary || {},
         mana: Math.round(p.mana || 0),
+        bounty: p.bounty || 0, contract: p.contract || null,
       })),
       banditsWeakT: w.banditsWeakT || 0,
     };
@@ -82,6 +84,10 @@ export function loadWorld(game) {
       w.citadel.owned = data.citadel.owned || false;
     }
     if (data.banditsWeakT) w.banditsWeakT = data.banditsWeakT;
+    if (data.wildChests) for (const rec of data.wildChests) {
+      const c = w.wildChests?.find(x => x.x === rec.x && x.y === rec.y);
+      if (c) c.opened = rec.opened;
+    }
     if (data.war) w.war.stage = data.war.stage;
     if (data.stash) w.stash = data.stash;
     if (data.weather) w.weather = data.weather;
@@ -131,6 +137,8 @@ export function applySavedPlayer(game, p) {
     if (rec.mana !== undefined) p.mana = rec.mana;
     else if (rec.ammo?.mana) p.mana = rec.ammo.mana;
     if (p.ammo?.mana !== undefined) delete p.ammo.mana;
+    if (rec.bounty) p.bounty = rec.bounty;
+    if (rec.contract) p.contract = rec.contract;
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);

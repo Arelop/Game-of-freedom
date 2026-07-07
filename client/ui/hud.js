@@ -90,6 +90,17 @@ export class Hud {
     ctx.fillStyle = '#eee';
     ctx.fillText(`${icon} День ${net.day} · ${SEASONS[seasonOf(net.day)]}`, VIEW_W / 2 - 36, 4);
 
+    // розыск и кровавый контракт
+    if ((you.bnt || 0) > 0) {
+      ctx.fillStyle = '#d9574a';
+      ctx.fillText(`💀 Розыск: ${you.bnt}`, VIEW_W - 130, VIEW_H - 40);
+    }
+    if (you.ctr) {
+      ctx.fillStyle = '#b06ee1';
+      const mm = Math.floor(you.ctr.t / 60), ss = String(you.ctr.t % 60).padStart(2, '0');
+      ctx.fillText(`⛧ Контракт ${mm}:${ss}`, VIEW_W - 130, VIEW_H - 32);
+    }
+
     // журнал заданий: до трёх строк (J — подробности)
     const qs = you.qs || [];
     let qy = 26;

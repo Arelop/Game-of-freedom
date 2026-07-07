@@ -152,6 +152,7 @@ export function makeWorld(seed) {
     { type: 'circle', name: 'Каменный круг', n: 2 },
     { type: 'obelisk', name: 'Древний обелиск', n: 2 },
     { type: 'spring', name: 'Целебный источник', n: 2 },
+    { type: 'barrow', name: 'Древний курган', n: 2 },
   ];
   let si = 0;
   for (const spec of SPECIALS) {
@@ -164,9 +165,25 @@ export function makeWorld(seed) {
         name: spec.name, cleared: spec.type !== 'circle', // зачищать нужно только круги
         difficulty: 2, special: true,
       };
+      // курган: загадка — 4 статуи, порядок активации задан сидом
+      if (spec.type === 'barrow') {
+        poi.order = [0, 1, 2, 3].sort(() => rand() - 0.5);
+        poi.pressed = [];
+        poi.looted = false;
+      }
       stampSpecial(world, poi, rand);
       world.pois.push(poi);
     }
+  }
+
+  // Дикие сундуки: редкие тайники в глуши — награда исследователям
+  world.wildChests = [];
+  for (let i = 0; i < 8; i++) {
+    const site = findFlatSite(seed, rand, allSites, 30);
+    if (!site) break;
+    allSites.push(site);
+    world.edits.set(site.x + ',' + site.y, T.CHEST);
+    world.wildChests.push({ x: site.x, y: site.y, opened: false });
   }
 
   // Логова боссов биомов: колдунья в болоте, король в скалах, вожак в лесу
@@ -275,6 +292,16 @@ function stampSpecial(world, poi, rand) {
     set(2, -2, T.PILLAR);
     set(-2, 2, T.PILLAR);
     set(2, 2, T.PILLAR);
+  } else if (type === 'barrow') {
+    // курган: кольцо валунов, 4 статуи по сторонам света, сундук в центре
+    for (let a = 0; a < 10; a++) {
+      const dx = Math.round(Math.cos(a / 10 * Math.PI * 2) * 5);
+      const dy = Math.round(Math.sin(a / 10 * Math.PI * 2) * 5);
+      set(dx, dy, T.ROCK_SOLID);
+    }
+    set(0, -3, T.STATUE); set(3, 0, T.STATUE); set(0, 3, T.STATUE); set(-3, 0, T.STATUE);
+    set(0, 0, T.CHEST);
+    set(1, 1, T.BLOOD);
   } else if (type === 'spring') {
     // целебный фонтан среди цветов и воды
     set(0, 0, T.FOUNTAIN);

@@ -23,6 +23,18 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
   // цель — ближайший игрок ИЛИ житель (игроки чуть приоритетнее);
   // невидимых (дымовая завеса) монстры не видят
   let target = null, bestD = Infinity;
+  // охотник за головой: преследует ТОЛЬКО свою цель и не забывает её
+  if (e.huntTarget) {
+    const prey = players.find(p => p.id === e.huntTarget && !p.dead && p.mapId === e.mapId);
+    if (prey) {
+      e.aggro = true;
+      const ang0 = Math.atan2(prey.y - e.y, prey.x - e.x);
+      e.aim = ang0;
+      return chaseTarget(e, def, prey, ang0, Math.sqrt(dist2(e.x, e.y, prey.x, prey.y)), dt, map, slowF, shots, rand);
+    }
+    wander(e, def, dt, map, rand);
+    return shots;
+  }
   for (const p of players) {
     if (p.dead || p.mapId !== e.mapId || p.invisT > 0) continue;
     const d = dist2(e.x, e.y, p.x, p.y);
@@ -107,6 +119,10 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
       if (e.stepT <= 0) {
         e.stepT = step.interval;
         e.stepIdx++;
+        if (step.slam) { // телеграфированный удар по области — обрабатывает game
+          shots.push({ slam: step.slam });
+          break;
+        }
         e.shotIndex = (e.shotIndex || 0) + 1;
         shots.push({ pattern: step.pattern, aim: ang, shotIndex: e.shotIndex });
       }
@@ -117,6 +133,37 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
         moveWithCollision(e, mv.x * def.speed * slowF * dt, mv.y * def.speed * slowF * dt, def.radius, map);
       break;
     }
+  }
+  return shots;
+}
+
+// Погоня за конкретной жертвой (охотники за головой): чейзер или стрелок
+function chaseTarget(e, def, target, ang, dist, dt, map, slowF, shots, rand) {
+  if (def.archetype === 'shooter') {
+    const [minR, maxR] = def.preferRange || [80, 140];
+    let mx = 0, my = 0;
+    if (dist > maxR) { mx = Math.cos(ang); my = Math.sin(ang); }
+    else if (dist < minR) { mx = -Math.cos(ang); my = -Math.sin(ang); }
+    moveWithCollision(e, mx * def.speed * slowF * dt, my * def.speed * slowF * dt, def.radius, map);
+    e.fireT = (e.fireT ?? def.fireInterval * rand()) - dt;
+    if (e.fireT <= 0 && dist < 240) {
+      e.fireT = def.fireInterval;
+      shots.push({ pattern: def.pattern, aim: ang });
+    }
+    return shots;
+  }
+  // чейзер с выпадом
+  if (e.state === 'windup') {
+    e.stateT -= dt;
+    if (e.stateT <= 0) { e.state = 'lunge'; e.stateT = 0.35; e.lungeA = ang; }
+  } else if (e.state === 'lunge') {
+    e.stateT -= dt;
+    moveWithCollision(e, Math.cos(e.lungeA) * def.lungeSpeed * slowF * dt, Math.sin(e.lungeA) * def.lungeSpeed * slowF * dt, def.radius, map);
+    if (e.stateT <= 0) { e.state = 'chase'; e.cd = 0.8; }
+  } else {
+    e.cd = Math.max(0, (e.cd || 0) - dt);
+    if (dist < (def.lungeRange || 45) && e.cd <= 0) { e.state = 'windup'; e.stateT = def.lungeWindup || 0.35; }
+    else moveWithCollision(e, Math.cos(ang) * def.speed * slowF * dt, Math.sin(ang) * def.speed * slowF * dt, def.radius, map);
   }
   return shots;
 }

@@ -54,6 +54,14 @@ const ANVIL_RECIPES = [
   { id: 'fire_arrows_c', name: 'Горящие стрелы (1 металл, 2 травы)', needs: { metal: 1, herb: 2 }, gives: { fire_arrows: 1 } },
 ];
 
+// Кровавые контракты: добровольная сложность за множитель наград (8 минут)
+const CONTRACTS = {
+  elite: { name: 'Элитная кровь', desc: 'Все твари вокруг тебя — элитные' },
+  glass: { name: 'Стеклянная пушка', desc: 'Получаешь ×2 урона, наносишь +30%' },
+  horde: { name: 'Орда', desc: 'Стаи в полтора раза больше' },
+};
+const CONTRACT_TIME = 480; // сек
+
 const SHOP = [
   { item: 'bread', price: 8 }, { item: 'bandage', price: 15 }, { item: 'wood', price: 6 },
   { item: 'heal_potion', price: 30 }, { item: 'swift_potion', price: 35 },
@@ -311,6 +319,7 @@ export class Game {
     if (w.school === 'magic' && p.cls === 'mage' && p.arcaneN)
       mult *= 1 + 0.04 * p.arcaneN;
     if (this.hasTalent(p, 'rage') && p.hp <= p.maxHp * 0.3) mult *= 1.4;
+    if (p.contract?.type === 'glass') mult *= 1.3; // Стеклянная пушка
     if (p.shadowT > 0 && this.hasTalent(p, 'shadow')) { mult *= 1.5; p.shadowT = 0; }
     const crit = this.rand() < d.critChance;
     if (crit) mult *= d.critMult;
@@ -485,7 +494,7 @@ export class Game {
   // ---------- мировые события ----------
   rollWorldEvent() {
     if (!this.players.size || this.world.event) return; // пустой сервер / событие уже идёт
-    const pool = ['bloodMoon', 'rift', 'meteor', 'trader'];
+    const pool = ['bloodMoon', 'rift', 'meteor', 'trader', 'hunt'];
     if (this.world.citadel?.owned) pool.push('cult', 'cult'); // узурпатору мстит культ
     const type = pick(this.rand, pool);
     const alive = this.world.settlements.filter(s => !s.ruined && !s.captured);
@@ -530,6 +539,21 @@ export class Game {
         n.name = 'Заезжий купец';
         n.dieAtTick = this.tick + 200 * 30;
         this.toastAll(`🧳 Странствующий торговец заглянул в ${s.name} (на ~3 мин)`);
+        break;
+      }
+      case 'hunt': { // странствующий именной зверь — трофей для смельчаков
+        const NAMES_H = ['Кровавый Клык', 'Старый Хрыч', 'Гроза Дорог', 'Косматый Ужас', 'Одноглазый'];
+        const KINDS_H = ['bear', 'packLeader', 'ogre', 'ironTroll', 'minotaur'];
+        const i = Math.floor(this.rand() * NAMES_H.length);
+        const hx = 60 + Math.floor(this.rand() * 390), hy = 60 + Math.floor(this.rand() * 390);
+        this.abstract.tokens.push({
+          id: 'tok' + this.abstract.nextId++, type: 'pack', name: NAMES_H[i],
+          faction: 'monsters', units: [KINDS_H[i]], hunt: NAMES_H[i],
+          x: hx * TILE, y: hy * TILE, hydrated: null,
+        });
+        for (const q of this.players.values()) this.fx({ t: 'marker', pid: q.id, x: hx, y: hy }, null);
+        this.toastAll(`🎯 ОХОТА: в глуши замечен «${NAMES_H[i]}» — награда тому, кто добудет трофей!`);
+        this.events.push(this.world.day, `Объявлена охота на зверя по кличке ${NAMES_H[i]}`, { x: hx, y: hy });
         break;
       }
       case 'cult': { // культ Тьмы мстит узурпатору Сердца
@@ -595,6 +619,17 @@ export class Game {
     if (p.abCd) for (let i = 0; i < 3; i++) p.abCd[i] = Math.max(0, (p.abCd[i] || 0) - dt);
     p.offCd = Math.max(0, (p.offCd || 0) - dt);
     if (p.shieldT > 0) { p.shieldT -= dt; if (p.shieldT <= 0) { p.shieldT = 0; p.shieldHp = 0; } }
+    // кровавый контракт: тикает; дожил до конца — сундук в награду
+    if (p.contract) {
+      p.contract.t -= dt;
+      if (p.contract.t <= 0) {
+        this.toast(p, `⛧✓ Контракт «${CONTRACTS[p.contract.type]?.name}» исполнен! Духи довольны`);
+        this.dropRandomGear(p.mapId, p.x + 12, p.y, true, (p.effStats?.lck || 0) + 3);
+        this.spawnDrop('coin', 40, p.mapId, p.x - 12, p.y);
+        this.events.push(this.world.day, `${p.name} исполнил кровавый контракт`);
+        p.contract = null;
+      }
+    }
 
     // Начало переката: Таран и Барьер
     if (p.rollT > p.prevRollT) {
@@ -837,8 +872,15 @@ export class Game {
       ...extra,
     };
     // элитные аффиксы: редкие усиленные монстры с лучшей добычей;
-    // кровавая луна и проклятые данжи резко повышают шанс
-    const eliteChance = extra.forceElite ? 1
+    // кровавая луна, проклятые данжи и контракт «Элитная кровь» повышают шанс
+    let contractElite = false;
+    if (!extra.noElite) {
+      for (const q of this.players.values()) {
+        if (q.contract?.type === 'elite' && !q.dead && q.mapId === mapId
+          && dist2(q.x, q.y, x, y) < 420 ** 2) { contractElite = true; break; }
+      }
+    }
+    const eliteChance = (extra.forceElite || contractElite) ? 1
       : this.world.event?.type === 'bloodMoon' ? 0.3 : 0.07;
     if (!extra.noElite && def.archetype !== 'boss' && def.faction !== 'darkness' && this.rand() < eliteChance) {
       const affix = pick(this.rand, ['Свирепый', 'Живучий', 'Стремительный', 'Золотой']);
@@ -1048,9 +1090,65 @@ export class Game {
             if (!this.entities.has(e.id)) continue; // дот добил
           }
         }
+        const def0 = ENEMIES[e.kind];
+        // шаман-лекарь: лечит самого раненого союзника рядом
+        if (def0.healer && (e.stunT || 0) <= 0) {
+          e.healT = (e.healT ?? def0.healer.interval * this.rand()) - dt;
+          if (e.healT <= 0) {
+            e.healT = def0.healer.interval;
+            let worst = null, worstFrac = 1;
+            for (const a of this.entities.values()) {
+              if (a === e || a.entType !== 'enemy' || a.mapId !== e.mapId) continue;
+              if (dist2(e.x, e.y, a.x, a.y) > def0.healer.range ** 2) continue;
+              const frac = a.hp / (a.maxHp || ENEMIES[a.kind].hp);
+              if (frac < worstFrac && frac < 1) { worstFrac = frac; worst = a; }
+            }
+            if (worst) {
+              worst.hp = Math.min(worst.maxHp || ENEMIES[worst.kind].hp, worst.hp + def0.healer.amount);
+              this.fx({ t: 'heal', pid: -1, x: worst.x, y: worst.y }, e.mapId, worst.x, worst.y);
+              this.fx({ t: 'chain', pts: [[e.x, e.y], [worst.x, worst.y]] }, e.mapId, e.x, e.y);
+            }
+          }
+        }
+        // призыватель: тянет миньонов, пока их меньше лимита
+        if (def0.summoner && (e.stunT || 0) <= 0 && e.aggro) {
+          e.minions = (e.minions || []).filter(id => this.entities.has(id));
+          e.sumT = (e.sumT ?? def0.summoner.interval * 0.5) - dt;
+          if (e.sumT <= 0 && e.minions.length < def0.summoner.max) {
+            e.sumT = def0.summoner.interval;
+            const a = this.rand() * Math.PI * 2;
+            const id = this.spawnEnemy(def0.summoner.kind, e.mapId,
+              e.x + Math.cos(a) * 26, e.y + Math.sin(a) * 26, { noElite: true });
+            const mob = this.entities.get(id);
+            if (mob) { mob.aggro = true; e.minions.push(id); }
+            this.fx({ t: 'summon', x: e.x, y: e.y }, e.mapId, e.x, e.y);
+          }
+        }
+        // слэм босса: телеграф идёт — стоим и караем зазевавшихся
+        if ((e.slamT || 0) > 0) {
+          e.slamT -= dt;
+          if (e.slamT <= 0) {
+            const s = e.slamSpec;
+            this.fx({ t: 'boom', x: e.x, y: e.y, r: s.radius }, e.mapId, e.x, e.y);
+            for (const p of this.players.values()) {
+              if (p.dead || p.mapId !== e.mapId) continue;
+              if (dist2(p.x, p.y, e.x, e.y) <= (s.radius + PLAYER_RADIUS) ** 2)
+                this.damagePlayer(p, s.dmg, { x: e.x, y: e.y });
+            }
+          }
+          continue; // во время замаха не двигается и не стреляет
+        }
         const npcs = [...this.entities.values()].filter(n => n.entType === 'npc' && n.mapId === e.mapId);
         const shots = updateEnemy(e, dt, map, [...this.players.values()], this.rand, npcs);
-        for (const s of shots) this.enemyFire(e, s);
+        for (const s of shots) {
+          if (s.slam) { // телеграфированный удар по области
+            e.slamT = s.slam.windup;
+            e.slamSpec = s.slam;
+            this.fx({ t: 'telegraph', x: e.x, y: e.y, r: s.slam.radius, w: s.slam.windup }, e.mapId, e.x, e.y);
+            continue;
+          }
+          this.enemyFire(e, s);
+        }
         // контактный урон
         const def = ENEMIES[e.kind];
         if (def.touchDamage > 0) {
@@ -1486,6 +1584,18 @@ export class Game {
 
   // ---------- урон ----------
   damageEnemy(e, dmg, pr) {
+    // щитоносец: гасит удары в фронтальный конус (оглушённый — нет)
+    const defS = ENEMIES[e.kind];
+    if (defS?.shielded && pr && !pr.isDot && (e.stunT || 0) <= 0) {
+      // направление ПРИХОДА атаки: от снаряда/атакующего к врагу
+      const from = Math.atan2(-(pr.vy || 0), -(pr.vx || 0)); // куда смотрит источник урона
+      let da = from - (e.aim || 0);
+      da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (Math.abs(da) < Math.PI / 3) {
+        dmg = Math.max(0.2, Math.round(dmg * 0.2 * 10) / 10);
+        this.fx({ t: 'block', pid: -1, x: e.x, y: e.y }, e.mapId, e.x, e.y);
+      }
+    }
     // таланты атакующего: казнь, засада, абсолютный ноль, яды и поджог
     const attacker = pr && !pr.isDot ? this.players.get(pr.owner) : null;
     if (attacker) {
@@ -1520,11 +1630,15 @@ export class Game {
     const killer = pr && this.players.get(pr.owner);
     this.entities.delete(e.id);
     this.fx({ t: 'die', id: e.id, kind: def.sprite, x: e.x, y: e.y }, e.mapId, e.x, e.y);
+    // взрывающиеся твари: смерть — это только начало
+    if (def.explodeOnDeath)
+      this.explodeAt(e.mapId, e.x, e.y, def.explodeOnDeath.dmg, def.explodeOnDeath.radius, null, 0);
     // опыт — всем игрокам рядом (кооп-дружелюбно), иначе убийце
     const nearby = [...this.players.values()].filter(q =>
       !q.dead && q.mapId === e.mapId && dist2(q.x, q.y, e.x, e.y) < 350 ** 2);
     const gainers = nearby.length ? nearby : (killer ? [killer] : []);
-    for (const q of gainers) this.addXp(q, Math.round(def.xp * (e.xpMult || 1)));
+    for (const q of gainers) // кровавый контракт: +50% опыта
+      this.addXp(q, Math.round(def.xp * (e.xpMult || 1) * (q.contract ? 1.5 : 1)));
     // Кровожадность: лечение за убийство в ближнем бою
     if (killer && pr.school === 'melee' && this.hasTalent(killer, 'bloodlust'))
       killer.hp = Math.min(killer.maxHp, killer.hp + 1);
@@ -1566,6 +1680,7 @@ export class Game {
       if (item === 'weapon') { this.dropRandomWeapon(e.mapId, e.x, e.y, luck, 2); continue; }
       let n = Array.isArray(range) ? randInt(this.rand, range[0], range[1]) : range;
       if (item === 'coin' && killer) n = Math.round(n * (killer.derived?.coinMult || 1));
+      if (item === 'coin' && killer?.contract) n = Math.round(n * 1.75); // кровавый контракт
       if (item === 'coin' && e.goldMult) n *= e.goldMult; // элита «Золотой»
       if (n > 0) this.spawnDrop(item, n, e.mapId, e.x + (this.rand() - 0.5) * 14, e.y + (this.rand() - 0.5) * 14);
     }
@@ -1592,7 +1707,7 @@ export class Game {
     if (e.kind === 'banditHeavy' && this.rand() < 0.25 * (1 + dropBonus)) this.dropRandomGear(e.mapId, e.x, e.y, false, luck);
     // удача: шанс дополнительной находки
     if (this.rand() < dropBonus) this.spawnDrop('coin', 2 + Math.floor(this.rand() * 3), e.mapId, e.x + 8, e.y);
-    if (e.token) this.abstract.onTokenUnitKilled(e.token);
+    if (e.token) this.abstract.onTokenUnitKilled(e.token, e.x, e.y);
     if (e.kind === 'bossOgre') {
       this.dropRandomGear(e.mapId, e.x + 12, e.y, true, luck);
       this.toastAll(STR.bossDefeated(def.name));
@@ -1623,16 +1738,73 @@ export class Game {
         s.population = Math.max(0, s.population - 1);
         if (attacker) {
           attacker.rep[s.faction] -= 20;
+          this.addBounty(attacker, 15, `убийство жителя ${s.name}`);
           this.events.push(this.world.day, `${attacker.name} убил жителя ${s.name}`, { x: s.x, y: s.y });
         } else {
           this.events.push(this.world.day, `Житель ${s.name} погиб от чудовищ`, { x: s.x, y: s.y });
         }
+      }
+      // тёмный путь: разграбление каравана — груз твой, но мир запомнит
+      if (n.caravan && attacker) {
+        const tok = this.abstract.tokens.find(t => t.id === n.caravan);
+        if (tok && !tok.dead) {
+          attacker.rep[tok.faction] = Math.max(-100, (attacker.rep[tok.faction] || 0) - 12);
+          const othersAlive = (tok.hydrated || []).some(id => id !== n.id && this.entities.has(id));
+          if (!othersAlive) {
+            tok.dead = true;
+            // груз рассыпается по земле
+            if (tok.cargo) this.spawnDrop(tok.cargo.res, Math.max(2, Math.round(tok.cargo.amount / 3)), n.mapId, n.x + 8, n.y, 300);
+            this.spawnDrop('coin', 15 + Math.floor(this.rand() * 15), n.mapId, n.x - 8, n.y, 300);
+            this.addBounty(attacker, 30, 'разбой на дороге');
+            attacker.rep[tok.faction] = Math.max(-100, (attacker.rep[tok.faction] || 0) - 13);
+            this.toastAll(`🏴 Караван разграблен разбойником ${attacker.name}!`);
+            this.events.push(this.world.day, `${attacker.name} разграбил караван ${FACTIONS[tok.faction]?.name || ''}`,
+              { x: Math.round(n.x / TILE), y: Math.round(n.y / TILE) });
+          }
+        }
+      }
+    }
+  }
+
+  // ---------- тёмный путь: розыск и охотники за головой ----------
+  addBounty(p, n, reason) {
+    p.bounty = (p.bounty || 0) + n;
+    this.toast(p, `💀 Розыск +${n} (${reason}). Награда за твою голову: ${p.bounty}`);
+    if (p.bounty >= 50 && !p.bountyWarned) {
+      p.bountyWarned = true;
+      this.toast(p, '💀 За тобой выйдут охотники за головой! Виру платят старейшинам');
+    }
+  }
+
+  // периодически: охотники приходят за головой преступника
+  tickBountyHunters() {
+    for (const p of this.players.values()) {
+      if ((p.bounty || 0) < 50 || p.dead || p.mapId !== 'over') continue;
+      p.hunterT = (p.hunterT ?? 60) - 12; // вызывается раз в цив-тик (12 с)
+      if (p.hunterT > 0) continue;
+      p.hunterT = 200 + this.rand() * 100;
+      const n = p.bounty >= 100 ? 4 : 3;
+      const ids = [];
+      for (let i = 0; i < n; i++) {
+        const a = this.rand() * Math.PI * 2;
+        const kind = i === 0 ? 'banditHeavy' : 'bandit';
+        const id = this.spawnEnemy(kind, 'over',
+          p.x + Math.cos(a) * 260, p.y + Math.sin(a) * 260,
+          { faction: 'hunters', huntTarget: p.id, forceElite: p.bounty >= 100 });
+        const h = this.entities.get(id);
+        if (h) { h.aggro = true; ids.push(id); }
+      }
+      if (ids.length) {
+        this.toast(p, '💀 Охотники за головой вышли на твой след!');
+        this.events.push(this.world.day, `Охотники настигли разбойника ${p.name}`);
       }
     }
   }
 
   damagePlayer(p, dmg, source) {
     if (p.dead || hasIFrames(p)) return;
+    // контракт «Стеклянная пушка»: входящий урон удвоен
+    if (p.contract?.type === 'glass') dmg *= 2;
     // уворот от ловкости и экипировки: урон полностью игнорируется
     if (this.rand() < (p.derived?.dodge || 0)) {
       this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
@@ -1716,6 +1888,7 @@ export class Game {
       }
       p.inventory = {};
       if (di > 0) this.toast(p, '💀 Сумка рассыпалась по земле — вернись за вещами (5 мин)');
+      if (p.contract) { p.contract = null; this.toast(p, '⛧✖ Кровавый контракт сгорел вместе с тобой'); }
       this.fx({ t: 'pdown', id: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
       this.events.push(this.world.day, `${p.name} пал в бою`);
     }
@@ -1926,7 +2099,10 @@ export class Game {
       if (t === T.ANVIL) { this.openAnvilCrafting(p); return; }
       if (t === T.BOARD) { this.openBoard(p, homeTown()); return; }
       if (t === T.CHEST && this.isAtHome(p, tx + dx, ty + dy)) { this.openStash(p, 'home'); return; }
+      if (t === T.CHEST && this.tryBarrowChest(p, tx + dx, ty + dy)) return;
+      if (t === T.CHEST && this.tryWildChest(p, tx + dx, ty + dy)) return;
       if (t === T.CHEST) { this.openChest(p, tx + dx, ty + dy); return; }
+      if (t === T.STATUE && this.tryBarrowStatue(p, tx + dx, ty + dy)) return;
       if (t === T.DUNGEON_EXIT && p.mapId !== 'over') { this.exitDungeon(p); return; }
       if (t === T.LOCKED_DOOR && p.mapId !== 'over') {
         if ((p.inventory.dungeon_key || 0) < 1) {
@@ -2537,6 +2713,72 @@ export class Game {
     }
   }
 
+  // ---------- приключения: курганы-загадки и дикие сундуки ----------
+  findBarrow(tx, ty) {
+    return this.world.pois.find(o => o.type === 'barrow' && Math.abs(o.x - tx) <= 5 && Math.abs(o.y - ty) <= 5);
+  }
+
+  // Статуя кургана: руны надо активировать в правильном порядке
+  tryBarrowStatue(p, tx, ty) {
+    const b = this.findBarrow(tx, ty);
+    if (!b) return false;
+    if (b.looted) { this.toast(p, 'Камень давно умолк. Курган разграблен'); return true; }
+    const dx = tx - b.x, dy = ty - b.y;
+    const idx = dy < -1 ? 0 : dx > 1 ? 1 : dy > 1 ? 2 : 3; // С, В, Ю, З
+    const runa = ['I', 'II', 'III', 'IV'][b.order.indexOf(idx)];
+    if (b.pressed.includes(idx)) { this.toast(p, `Руна «${runa}» уже горит`); return true; }
+    if (b.order[b.pressed.length] === idx) {
+      b.pressed.push(idx);
+      this.fx({ t: 'pickup', x: tx * TILE + 8, y: ty * TILE + 8 }, p.mapId, tx * TILE, ty * TILE);
+      this.toast(p, `✨ Руна «${runa}» вспыхнула (${b.pressed.length}/4)` +
+        (b.pressed.length === 4 ? ' — печать снята, сундук открыт!' : ''));
+    } else {
+      b.pressed = [];
+      this.toast(p, `⚠ Руна «${runa}» — порядок нарушен! Стражи кургана восстали (жми I→II→III→IV)`);
+      for (let i = 0; i < 3; i++) {
+        const a = this.rand() * Math.PI * 2;
+        const id = this.spawnEnemy('ghoul', 'over', b.x * TILE + Math.cos(a) * 40, b.y * TILE + Math.sin(a) * 40, { noElite: true });
+        const g = this.entities.get(id);
+        if (g) g.aggro = true;
+      }
+    }
+    return true;
+  }
+
+  // Сундук кургана: открывается только после загадки
+  tryBarrowChest(p, tx, ty) {
+    const b = this.findBarrow(tx, ty);
+    if (!b) return false;
+    if (b.looted) { this.toast(p, 'Пусто. Эхо древности — и только'); return true; }
+    if (b.pressed.length < 4) {
+      this.toast(p, '🔒 Сундук запечатан рунами. Зажги четыре руны статуй в порядке I→II→III→IV');
+      return true;
+    }
+    b.looted = true;
+    this.dropRandomGear(p.mapId, tx * TILE + 8, ty * TILE + 24, true, (p.effStats?.lck || 0));
+    this.spawnDrop('coin', 30 + Math.floor(this.rand() * 30), p.mapId, tx * TILE - 6, ty * TILE + 20);
+    this.spawnDrop('crystal', 2, p.mapId, tx * TILE + 20, ty * TILE + 20);
+    this.addXp(p, 60);
+    this.fx({ t: 'chest', x: tx * TILE, y: ty * TILE }, p.mapId, tx * TILE, ty * TILE);
+    this.toastAll(`⚱ ${p.name} разгадал тайну древнего кургана!`);
+    this.events.push(this.world.day, `${p.name} снял печать кургана`, { x: b.x, y: b.y });
+    return true;
+  }
+
+  // Дикий сундук в глуши: одноразовый тайник
+  tryWildChest(p, tx, ty) {
+    const wc = this.world.wildChests?.find(c => c.x === tx && c.y === ty);
+    if (!wc) return false;
+    if (wc.opened) { this.toast(p, 'Тайник пуст — кто-то успел раньше'); return true; }
+    wc.opened = true;
+    this.dropRandomGear(p.mapId, tx * TILE + 8, ty * TILE + 20, this.rand() < 0.4, (p.effStats?.lck || 0));
+    this.spawnDrop('coin', 15 + Math.floor(this.rand() * 25), p.mapId, tx * TILE - 4, ty * TILE + 20);
+    this.addXp(p, 25);
+    this.fx({ t: 'chest', x: tx * TILE, y: ty * TILE }, p.mapId, tx * TILE, ty * TILE);
+    this.toast(p, '📦 Тайник в глуши! Исследование вознаграждается');
+    return true;
+  }
+
   // Прикосновение к обелиску: вознесение, осколок для Мирославы или знания
   touchObelisk(p, tx, ty) {
     const poi = this.world.pois.find(o => o.type === 'obelisk' && Math.abs(o.x - tx) < 4 && Math.abs(o.y - ty) < 4);
@@ -2653,6 +2895,9 @@ export class Game {
         lines.push('Как продвигается дело?');
       if (s?.project && (p.inventory.wood || 0) >= 5)
         choices.push({ id: 'donate', label: 'Пожертвовать 5 древесины на стройку (+реп)' });
+      // вира: откупиться от розыска
+      if ((p.bounty || 0) > 0)
+        choices.push({ id: 'payoff', label: `💀 Заплатить виру (${p.bounty * 2} мон.) — снять розыск` });
       // свой дом: жильё в деревне для героя с репутацией
       if (s && !p.home) {
         if ((p.rep[s.faction] || 0) >= 20) choices.push({ id: 'buyhouse', label: `🏠 Купить дом в ${s.name} (150 мон.)` });
@@ -2691,8 +2936,11 @@ export class Game {
       const choices = [
         { id: 'healme', label: 'Исцеление (12 мон.)' },
         { id: 'bless', label: 'Благословение: +15% урона на 3 мин (30 мон.)' },
-        { id: 'close', label: STR.bye },
       ];
+      if (p.contract)
+        choices.push({ id: 'close2', label: `⛧ Контракт «${CONTRACTS[p.contract.type]?.name}» активен: ${Math.ceil(p.contract.t / 60)} мин` });
+      else choices.push({ id: 'contracts', label: '⛧ Кровавый контракт: риск за щедрую награду…' });
+      choices.push({ id: 'close', label: STR.bye });
       this.sendDialog(p, npc.id, `Жрец ${npc.name}`, [this.npcGreeting(p, npc), '«Духи иного мира благосклонны к тебе».'], choices);
     } else if (npc.role === 'innkeeper') {
       const hasMerc = p.mercId && this.entities.has(p.mercId);
@@ -2933,6 +3181,36 @@ export class Game {
     if (choice === 'war_claim') { this.warFinale(p, false); return; }
     if (choice === 'stash') { this.openStash(p); return; }
     if (choice === 'nohouse') { this.toast(p, '«Чужакам домов не продаём. Заслужи доверие деревни (репутация 20)»'); return; }
+    if (choice === 'payoff') {
+      const cost = (p.bounty || 0) * 2;
+      if (cost <= 0) return;
+      if (p.coins < cost) { this.toast(p, STR.notEnoughCoins); return; }
+      p.coins -= cost;
+      p.bounty = 0;
+      p.bountyWarned = false;
+      this.toast(p, '💀→✓ Вира уплачена. Охотники отозваны, но люди помнят…');
+      this.events.push(this.world.day, `${p.name} заплатил виру за свои злодеяния`);
+      return;
+    }
+    if (choice === 'contracts') {
+      const ch = Object.entries(CONTRACTS).map(([id, c]) =>
+        ({ id: 'contract:' + id, label: `⛧ «${c.name}» — ${c.desc} (8 мин, лут +75%, опыт +50%)` }));
+      ch.push({ id: 'close', label: 'Не сегодня' });
+      this.sendDialog(p, dialogId, '⛧ Кровавый контракт',
+        ['«Подпиши кровью — и духи испытают тебя.',
+         'Выстоишь — награды будут щедрее. Падёшь — контракт сгорит».'], ch);
+      return;
+    }
+    if (choice.startsWith('contract:')) {
+      const type = choice.slice(9);
+      if (!CONTRACTS[type] || p.contract) return;
+      p.contract = { type, t: CONTRACT_TIME };
+      this.fx({ t: 'bloodcast', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      this.toast(p, `⛧ Контракт «${CONTRACTS[type].name}» подписан кровью: 8 минут испытания!`);
+      this.toastAll(`⛧ ${p.name} подписал кровавый контракт «${CONTRACTS[type].name}»`);
+      this.events.push(this.world.day, `${p.name} подписал кровавый контракт`);
+      return;
+    }
     if (choice === 'ascend_start') { this.startAscension(p, String(dialogId).split(':')[1]); return; }
     if (choice === 'buyhouse') { this.buyHouse(p, dialogId); return; }
     if (choice === 'smithup') { this.openSmithUpgrade(p, dialogId); return; }

@@ -199,6 +199,22 @@
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_crystal.png",
       "down": 2
     },
+    "enemy_shieldbearer": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/blork_the_orc.png",
+      "down": 2
+    },
+    "enemy_orc_priest": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/orc_priest.png",
+      "down": 2
+    },
+    "enemy_demonologist": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/kobold_demonologist.png",
+      "down": 2
+    },
+    "enemy_spore": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/fungi_plants/giant_spore.png",
+      "down": 2
+    },
     "enemy_boar": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/hog.png",
       "down": 2

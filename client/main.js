@@ -238,6 +238,11 @@ net.handlers.onFx = (kind, m) => {
       SFX.roll();
       break;
     case 'ability': spawnAbilityFx(m); break;
+    case 'telegraph':
+      // босс замахнулся: красная зона — беги!
+      ringFx.push({ x: m.x, y: m.y, r0: 6, r1: m.r, t: 0, dur: m.w, color: '#d9574a', fill: true });
+      SFX.enemy_shot();
+      break;
     case 'bloodcast':
       particles.blood(m.x, m.y, 8);
       ringFx.push({ x: m.x, y: m.y, r0: 4, r1: 16, t: 0, dur: 0.3, color: '#d9574a' });
