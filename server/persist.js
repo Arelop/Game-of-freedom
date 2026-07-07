@@ -41,6 +41,7 @@ export function saveWorld(game) {
         weaponUp: p.weaponUp || {},
         story: p.story,
         home: p.home || null, homeStash: p.homeStash || {}, hintStage: p.hintStage,
+        ascended: p.ascended || false,
       })),
       banditsWeakT: w.banditsWeakT || 0,
     };
@@ -123,6 +124,7 @@ export function applySavedPlayer(game, p) {
     // журнал заданий (миграция старых сейвов с одиночным quest)
     if (rec.quests) p.quests = rec.quests;
     else if (rec.quest) p.quests = [rec.quest];
+    if (rec.ascended) p.ascended = true;
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);

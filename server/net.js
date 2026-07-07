@@ -149,7 +149,7 @@ export class Net {
         i: 'p' + q.id, tp: 'p', k: q.sprite, x: r1(q.x), y: r1(q.y),
         a: r2(q.aim), h: q.hp, hm: q.maxHp, nm: q.name, dn: q.dead ? 1 : 0,
         rl: q.rollT > 0 ? 1 : 0, w: game.weapon(q).id, lv: q.level,
-        bk: q.blocking ? 1 : 0, iv: q.invisT > 0 ? 1 : 0,
+        bk: q.blocking ? 1 : 0, iv: q.invisT > 0 ? 1 : 0, asc: q.ascended ? 1 : 0,
       });
     }
     for (const e of game.entities.values()) {
@@ -193,6 +193,7 @@ export class Net {
         ab: (p.abCd || []).map(v => r1(v)), blk: p.blocking ? 1 : 0, inv2: r1(p.invisT || 0),
         oc: r1(p.offCd || 0), sh: p.shieldHp || 0, cb: p.canBlock ? 1 : 0,
         hnt: p.hintStage < 5 ? p.hintStage : undefined,
+        asc: p.ascended ? 1 : 0,
       },
       ents,
     };

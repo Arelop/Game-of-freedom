@@ -27,9 +27,9 @@ export class Hud {
     ctx.fillStyle = you.hunger < 20 ? '#d9574a' : '#d9a066';
     ctx.fillRect(6, 17, Math.round(40 * you.hunger / 100), 3);
 
-    // уровень и опыт
+    // уровень и опыт (бог отмечен звездой вечности)
     ctx.fillStyle = '#fbf236';
-    ctx.fillText('Ур.' + (you.lvl || 1), 50, 8);
+    ctx.fillText(you.asc ? '✸БОГ' : 'Ур.' + (you.lvl || 1), 50, 8);
     ctx.fillStyle = '#222034';
     ctx.fillRect(5, 22, 42, 3);
     ctx.fillStyle = '#99e550';

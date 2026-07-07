@@ -237,6 +237,16 @@ net.handlers.onFx = (kind, m) => {
       SFX.roll();
       break;
     case 'ability': spawnAbilityFx(m); break;
+    case 'ascend':
+      // вознесение: столп света и золотое сияние
+      for (let i = 0; i < 3; i++)
+        ringFx.push({ x: m.x, y: m.y, r0: 6, r1: 60 + i * 30, t: -i * 0.15, dur: 0.9, color: '#fbf236' });
+      particles.burst(m.x, m.y, '#fbf236', 30, 120, 0.9, 2);
+      particles.sparkle(m.x, m.y);
+      cam.addTrauma(0.6);
+      SFX.quest();
+      if (m.pid === net.myId) addFloatText(m.x, m.y - 16, '✸ БОЖЕСТВЕННОСТЬ ✸', '#fbf236', true);
+      break;
     case 'dodge':
       if (m.pid === net.myId) addFloatText(m.x, m.y - 6, 'УВОРОТ', '#63c5ff');
       particles.dust(m.x, m.y);
@@ -647,6 +657,16 @@ function drawMe(timeSec) {
     if (you.blk && input.block) drawShield(you, s.x, s.y - 2 - bob, p.aim);
     else drawWeapon(getWeapon(you.w), s.x, s.y - 2 - bob, p.aim, flipX, swingAnim);
   }
+  // божественный нимб: золотое кольцо над головой и редкие искры
+  if (you.asc) {
+    ctx.strokeStyle = '#fbf236';
+    ctx.globalAlpha = 0.6 + Math.sin(timeSec * 3) * 0.2;
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y - 13, 5, 1.8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    if (Math.random() < 0.03) particles.sparkle(p.x + (Math.random() - 0.5) * 10, p.y - 6);
+  }
   // барьер хрустальной сферы: мерцающее кольцо
   if ((you.sh || 0) > 0) {
     ctx.strokeStyle = '#63c5ff';
@@ -707,8 +727,16 @@ function drawEntity(id, r, p, nowMs, timeSec) {
     if (flash) atlas.drawTinted(ctx, e.k, s.x, s.y, '#fff', { flipX });
     else atlas.draw(ctx, e.k, s.x, s.y, { flipX, alpha: e.iv ? 0.35 : 1 });
     drawWeapon(getWeapon(e.w), s.x, s.y - 2, p.a || 0, flipX, 0);
+    if (e.asc) { // нимб бога-союзника
+      ctx.strokeStyle = '#fbf236';
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y - 13, 5, 1.8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     ctx.font = '8px monospace';
-    ctx.fillStyle = '#99e550';
+    ctx.fillStyle = e.asc ? '#fbf236' : '#99e550';
     ctx.textAlign = 'center';
     ctx.fillText(e.nm || '', s.x, s.y - 14);
     ctx.textAlign = 'left';

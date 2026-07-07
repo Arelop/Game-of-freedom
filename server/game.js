@@ -112,6 +112,7 @@ export class Game {
     this.dungeons = new Map();   // mapId -> { dungeon, poi }
     this.hydratedSettlements = new Map(); // id -> [entIds]
     this.tileHp = new Map();     // "mapId:x,y" -> накопленный урон по тайлу
+    this.ascensions = new Map(); // pid -> состояние Ритуала Вознесения
     this.abstract.seedTokens();
     this.events.push(1, 'Мир сотворён. Говорят, в руинах слышен рык…');
   }
@@ -228,6 +229,8 @@ export class Game {
       if (!it?.stats) continue;
       for (const k of STAT_KEYS) eff[k] = (eff[k] || 0) + (it.stats[k] || 0);
     }
+    // божественность: +4 ко всем атрибутам
+    if (p.ascended) for (const k of STAT_KEYS) eff[k] = (eff[k] || 0) + 4;
     p.effStats = eff;
     const sb = statBonuses(eff);
     const d = {
@@ -237,8 +240,8 @@ export class Game {
       dropBonus: sb.dropBonus,
       arcBonus: 0, magicProj: 0, knifeProj: 0,
     };
-    let maxHp = PLAYER_MAX_HP + (C.maxHpBonus || 0) + sb.maxHp;
-    let speed = 1 + (C.speedBonus || 0);
+    let maxHp = PLAYER_MAX_HP + (C.maxHpBonus || 0) + sb.maxHp + (p.ascended ? 6 : 0);
+    let speed = 1 + (C.speedBonus || 0) + (p.ascended ? 0.08 : 0);
     let gearDmg = 1;
     let rollCd = 1;
 
@@ -461,6 +464,7 @@ export class Game {
     this.abstract.update(dt);
     this.civ.update(dt);
     this.checkDungeonRooms();
+    this.checkAscensions();
   }
 
   isNight() { return this.world.time < 0.22 || this.world.time > 0.85; }
@@ -567,6 +571,11 @@ export class Game {
     }
     p.shadowT = Math.max(0, p.shadowT - dt);
     p.invisT = Math.max(0, (p.invisT || 0) - dt);
+    // божественная аура: полсердца каждые 10 секунд
+    if (p.ascended && p.hp < p.maxHp) {
+      p.ascRegenT = (p.ascRegenT ?? 10) - dt;
+      if (p.ascRegenT <= 0) { p.ascRegenT = 10; p.hp = Math.min(p.maxHp, p.hp + 1); }
+    }
     if (p.abCd) for (let i = 0; i < 3; i++) p.abCd[i] = Math.max(0, (p.abCd[i] || 0) - dt);
     p.offCd = Math.max(0, (p.offCd || 0) - dt);
     if (p.shieldT > 0) { p.shieldT -= dt; if (p.shieldT <= 0) { p.shieldT = 0; p.shieldHp = 0; } }
@@ -1054,8 +1063,8 @@ export class Game {
     if ((p.abCd[slot] || 0) > 0) return;
     if (ab.mana > 0 && (p.ammo.mana || 0) < ab.mana) { this.toast(p, 'Не хватает маны'); return; }
     if (ab.mana > 0) p.ammo.mana -= ab.mana;
-    // Ледяные жилы: способности перезаряжаются быстрее
-    p.abCd[slot] = ab.cd * (this.hasTalent(p, 'cdr') ? 0.8 : 1);
+    // Ледяные жилы и божественность: способности перезаряжаются быстрее
+    p.abCd[slot] = ab.cd * (this.hasTalent(p, 'cdr') ? 0.8 : 1) * (p.ascended ? 0.75 : 1);
     const aim = p.aim || 0;
     const d = p.derived || {};
     const map = this.mapFor(p.mapId);
@@ -2045,6 +2054,81 @@ export class Game {
     }
   }
 
+  // ---------- Вознесение: путь от смертного к богу (уровень 20) ----------
+  // Ритуал у Древнего обелиска: дорогие компоненты + три волны стражей.
+  startAscension(p, poiId) {
+    if (p.level < MAX_LEVEL || p.ascended || this.ascensions.has(p.id)) return;
+    const poi = this.world.pois.find(o => o.id === poiId) || this.world.pois.find(o => o.type === 'obelisk');
+    if (!poi) return;
+    if ((p.inventory.crystal || 0) < 20) { this.toast(p, `✸ Нужно 20 кристаллов (есть ${p.inventory.crystal || 0})`); return; }
+    if ((p.inventory.metal || 0) < 10) { this.toast(p, `✸ Нужно 10 металла (есть ${p.inventory.metal || 0})`); return; }
+    if (p.coins < 500) { this.toast(p, `✸ Нужно 500 монет (есть ${p.coins})`); return; }
+    p.inventory.crystal -= 20;
+    p.inventory.metal -= 10;
+    p.coins -= 500;
+    this.ascensions.set(p.id, { poi, wave: 0, ids: [] });
+    this.fx({ t: 'boom', x: poi.x * TILE, y: poi.y * TILE, r: 40 }, 'over', poi.x * TILE, poi.y * TILE);
+    this.toastAll(`✸ ${p.name} начал Ритуал Вознесения — древние стражи пробуждаются!`);
+    this.events.push(this.world.day, `${p.name} бросил вызов Вечности у обелиска`);
+    this.nextAscWave(p);
+  }
+
+  nextAscWave(p) {
+    const asc = this.ascensions.get(p.id);
+    if (!asc) return;
+    asc.wave++;
+    const WAVES = [
+      ['golem', 'golem', 'ghoul'],
+      ['minotaur', 'orcKnight', 'orcKnight'],
+      ['rockKing'],
+    ];
+    const kinds = WAVES[asc.wave - 1];
+    if (!kinds) return;
+    const ox = asc.poi.x * TILE, oy = asc.poi.y * TILE;
+    asc.ids = kinds.map((k, i) => {
+      const a = (i / kinds.length) * Math.PI * 2;
+      return this.spawnEnemy(k, 'over', ox + Math.cos(a) * 60, oy + Math.sin(a) * 60,
+        { forceElite: kinds.length > 1, noElite: kinds.length === 1, ascFor: p.id });
+    });
+    for (const id of asc.ids) { const e = this.entities.get(id); if (e) e.aggro = true; }
+    this.toast(p, `✸ Волна ${asc.wave}/3: ${kinds.length > 1 ? 'стражи идут!' : 'ПОСЛЕДНИЙ СТРАЖ!'}`);
+  }
+
+  // вызывается каждый тик: следим за волнами и провалом
+  checkAscensions() {
+    for (const [pid, asc] of this.ascensions) {
+      const p = this.players.get(pid);
+      // смерть или уход — ритуал сорван, дары сгорели
+      if (!p || p.dead || p.mapId !== 'over' ||
+        dist2(p.x, p.y, asc.poi.x * TILE, asc.poi.y * TILE) > 600 ** 2) {
+        for (const id of asc.ids) this.entities.delete(id);
+        this.ascensions.delete(pid);
+        if (p) this.toast(p, '✸ Ритуал сорван. Обелиск умолк, дары обращены в пепел…');
+        this.events.push(this.world.day, `Ритуал Вознесения ${p?.name || '…'} провалился`);
+        continue;
+      }
+      if (asc.ids.some(id => this.entities.has(id))) continue; // волна ещё жива
+      if (asc.wave < 3) this.nextAscWave(p);
+      else {
+        this.ascensions.delete(pid);
+        this.ascend(p);
+      }
+    }
+  }
+
+  // БОЖЕСТВЕННОСТЬ: +4 ко всем атрибутам, +3 сердца, скорость, реген,
+  // способности перезаряжаются на четверть быстрее
+  ascend(p) {
+    p.ascended = true;
+    this.recomputeStats(p);
+    p.hp = p.maxHp;
+    this.addXp(p, 0);
+    this.fx({ t: 'ascend', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+    this.toastAll(`✸✸✸ ${p.name} ВОЗНЁССЯ! Смертный стал богом Пограничья ✸✸✸`);
+    this.toast(p, '✸ Божественная мощь: +4 ко всем атрибутам, +3 сердца, реген, быстрые способности');
+    this.events.push(this.world.day, `${p.name} прошёл Ритуал Вознесения и обрёл божественность`);
+  }
+
   // ---------- сюжетные цепочки именных NPC ----------
   // Радогост (отшельник): кристаллы -> зачистить каменный круг -> ВЫБОР:
   // ритуал света (Тьма слабеет) или потребовать силу себе (бой с тенью).
@@ -2331,9 +2415,21 @@ export class Game {
     }
   }
 
-  // Прикосновение к обелиску: осколок для Мирославы или крупица знаний
+  // Прикосновение к обелиску: вознесение, осколок для Мирославы или знания
   touchObelisk(p, tx, ty) {
     const poi = this.world.pois.find(o => o.type === 'obelisk' && Math.abs(o.x - tx) < 4 && Math.abs(o.y - ty) < 4);
+    // герой 20 уровня слышит зов божественной силы
+    if (p.level >= MAX_LEVEL && !p.ascended && poi) {
+      if (this.ascensions.has(p.id)) { this.toast(p, '✸ Испытание уже идёт — срази стражей!'); return; }
+      this.sendDialog(p, 'ascend:' + poi.id, '✸ Зов Вечности',
+        ['Обелиск гудит, узнав тебя. Смертный предел достигнут —',
+         'дальше лишь БОЖЕСТВЕННОСТЬ. Ритуал потребует всего:',
+         '20 кристаллов, 10 металла, 500 монет — и победы над',
+         'тремя волнами древних стражей. Падёшь — дары сгорят.'],
+        [{ id: 'ascend_start', label: '✸ Начать Ритуал Вознесения (20 крист., 10 мет., 500 мон.)' },
+         { id: 'close', label: 'Я ещё не готов…' }]);
+      return;
+    }
     if (p.story?.mira === 1 && poi && !(p.story.shards || []).includes(poi.id)) {
       p.story.shards.push(poi.id);
       this.fx({ t: 'pickup', x: p.x, y: p.y }, p.mapId, p.x, p.y);
@@ -2715,6 +2811,7 @@ export class Game {
     if (choice === 'war_claim') { this.warFinale(p, false); return; }
     if (choice === 'stash') { this.openStash(p); return; }
     if (choice === 'nohouse') { this.toast(p, '«Чужакам домов не продаём. Заслужи доверие деревни (репутация 20)»'); return; }
+    if (choice === 'ascend_start') { this.startAscension(p, String(dialogId).split(':')[1]); return; }
     if (choice === 'buyhouse') { this.buyHouse(p, dialogId); return; }
     if (choice === 'smithup') { this.openSmithUpgrade(p, dialogId); return; }
     if (choice === 'smithbrk') { this.openSmithBreak(p, dialogId); return; }
