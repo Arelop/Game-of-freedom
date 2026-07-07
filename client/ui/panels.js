@@ -103,6 +103,54 @@ export class Panels {
     if (this.toastsEl.children.length > 5) this.toastsEl.firstChild.remove();
   }
 
+  // ---------- летопись (L): все вести копятся здесь, мировые — только здесь ----------
+  logMsg(text, world) {
+    this.log = this.log || [];
+    this.log.push({ text, w: !!world, day: this.net.day });
+    if (this.log.length > 120) this.log.shift();
+    if (this.logOpen) this.renderLog();
+  }
+
+  toggleLog() {
+    this.logOpen = !this.logOpen;
+    let el = document.getElementById('worldlog');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'worldlog';
+      document.body.appendChild(el);
+    }
+    el.style.display = this.logOpen ? 'block' : 'none';
+    if (this.logOpen) this.renderLog();
+  }
+
+  renderLog() {
+    const el = document.getElementById('worldlog');
+    if (!el || !this.logOpen) return;
+    el.innerHTML = '<h3>🕮 Летопись</h3>';
+    const log = this.log || [];
+    if (!log.length) {
+      const e = document.createElement('div');
+      e.className = 'lgempty';
+      e.textContent = 'Пока тихо. Здесь копятся вести мира и твои события.';
+      el.appendChild(e);
+    }
+    let lastDay = null;
+    for (let i = log.length - 1; i >= 0; i--) { // свежее — сверху
+      const m = log[i];
+      if (m.day !== lastDay) {
+        lastDay = m.day;
+        const d = document.createElement('div');
+        d.className = 'lgday';
+        d.textContent = `— день ${m.day} —`;
+        el.appendChild(d);
+      }
+      const row = document.createElement('div');
+      row.className = 'lgrow' + (m.w ? ' world' : '');
+      row.textContent = m.text;
+      el.appendChild(row);
+    }
+  }
+
   showDialog(m) {
     const d = this.dialogEl;
     d.innerHTML = '';

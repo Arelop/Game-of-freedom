@@ -3988,7 +3988,7 @@ export class Game {
   }
 
   toast(p, text) { this.fx({ t: 'toast', pid: p.id, text }, null); }
-  toastAll(text) { this.fx({ t: 'toast', text }, null); }
+  toastAll(text) { this.fx({ t: 'toast', text, w: 1 }, null); } // w: мировая весть — клиент кладёт в летопись, не на экран
   toastMap(mapId, text) { this.fx({ t: 'toast', mapId, text }, null); }
 }
 

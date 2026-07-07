@@ -208,7 +208,10 @@ net.handlers.onFx = (kind, m) => {
     case 'shop': panels.showShop(m); break;
     case 'stash': panels.showStash(m); break;
     case 'bestiary': panels.showBestiary(m); break;
-    case 'toast': panels.toast(m.text); break;
+    case 'toast':
+      panels.logMsg(m.text, m.w);
+      if (!m.w) panels.toast(m.text); // мировые вести не мельтешат на экране — они в летописи (L)
+      break;
     case 'dialog': panels.showDialog(m); break;
     case 'marker': net.mapInfo.markers = net.mapInfo.markers || []; net.mapInfo.markers.push(m); break;
     case 'block':
@@ -280,6 +283,7 @@ input.onKey = k => {
   if (k === 'KeyP') panels.toggleFactions();
   if (k === 'KeyM') bigMap = !bigMap;
   if (k === 'KeyJ') panels.toggleJournal();
+  if (k === 'KeyL') panels.toggleLog();
   if (k === 'KeyB') {
     if (panels.beOpen) panels.hideBestiary();
     else net.send({ t: MSG.BESTIARY });
