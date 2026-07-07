@@ -16,6 +16,7 @@ export const MSG = {
   LEARN_TALENT: 'learnTalent', // { id } изучить талант
   SELL_ITEM: 'sellItem',       // { item } продать торговцу рядом
   ABILITY: 'ability',          // { slot: 0..2 } применить способность Q/X/R
+  SET_ABILITY: 'setAbility',   // { slot: 0..2, id } назначить способность на слот (Книга, K)
   OFFHAND: 'offhand',          // активировать предмет в левой руке (ПКМ)
   STASH: 'stash',              // { op: 'put'|'take', item } общий сундук отряда
   GIVE: 'give',                // { item } передать предмет союзнику рядом

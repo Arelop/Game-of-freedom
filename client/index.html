@@ -140,6 +140,22 @@
   #journal .jrquest.done .jrtitle { color: #99e550; }
   #journal .jrstate { font-size: 11px; color: #847e87; margin-top: 3px; }
   #journal .jrempty { font-size: 11px; color: #696a6a; padding: 3px 0; }
+  #spellbook { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 430px; max-height: 84vh; overflow-y: auto; background: rgba(18,15,24,.97); border: 12px solid transparent; border-image: url(/assets/ui/panel-violet.png) 16 round; background-clip: padding-box; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 12px 14px; z-index: 7; display: none; font-family: 'Courier New', monospace; color: #eee; }
+  #spellbook h3 { color: #b57edc; margin-bottom: 4px; font-size: 15px; }
+  #spellbook .sbhint { font-size: 10px; color: #847e87; margin-bottom: 10px; }
+  #spellbook .sbrow { display: flex; gap: 10px; align-items: center; border: 1px solid #45444f; padding: 7px 9px; margin-bottom: 7px; }
+  #spellbook .sbrow.locked { opacity: 0.5; }
+  #spellbook .sbicon { image-rendering: pixelated; flex-shrink: 0; background: #1a1826; border: 1px solid #45444f; }
+  #spellbook .sbinfo { flex: 1; }
+  #spellbook .sbname { font-size: 13px; color: #eee; }
+  #spellbook .sbslot { color: #fbf236; font-size: 11px; }
+  #spellbook .sbmeta { font-size: 10px; color: #847e87; margin: 2px 0; }
+  #spellbook .sbdesc { font-size: 11px; color: #b8b8b8; }
+  #spellbook .sbbtns { display: flex; flex-direction: column; gap: 3px; }
+  #spellbook .sbbtns button { background: #222034; color: #99e550; border: 1px solid #45444f; width: 26px; padding: 3px 0; font-family: inherit; font-size: 11px; cursor: pointer; }
+  #spellbook .sbbtns button:hover:not(:disabled) { border-color: #fbf236; }
+  #spellbook .sbbtns button.active { background: #3a3413; color: #fbf236; border-color: #fbf236; }
+  #spellbook .sbbtns button:disabled { opacity: 0.4; cursor: default; }
   #worldlog { position: absolute; right: 12px; top: 60px; width: 330px; max-height: 70vh; overflow-y: auto; background: rgba(18,15,24,.96); border: 12px solid transparent; border-image: url(/assets/ui/panel-violet.png) 16 round; background-clip: padding-box; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 12px 14px; z-index: 6; display: none; font-family: 'Courier New', monospace; color: #eee; }
   #worldlog h3 { color: #b57edc; margin-bottom: 8px; font-size: 14px; }
   #worldlog .lgday { font-size: 10px; color: #696a6a; text-align: center; margin: 6px 0 3px; }

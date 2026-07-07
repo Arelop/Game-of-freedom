@@ -42,7 +42,10 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
   }
   for (const n of npcs) {
     if (n.mapId !== e.mapId) continue;
-    const d = dist2(e.x, e.y, n.x, n.y) * 1.3; // лёгкий приоритет игрокам
+    // боевые призывы (элементаль, наёмник) ПРИТЯГИВАЮТ агро — работают танком;
+    // мирных жителей монстры замечают неохотнее, чем игроков
+    const mult = n.role === 'elemental' || n.role === 'mercenary' ? 0.6 : 1.3;
+    const d = dist2(e.x, e.y, n.x, n.y) * mult;
     if (d < bestD) { bestD = d; target = n; }
   }
   if (target && bestD < AGGRO_R2) e.aggro = true;

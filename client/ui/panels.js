@@ -8,6 +8,7 @@ import { CLASSES, STAT_KEYS, STAT_NAMES, STAT_DESC, xpNeed, MAX_LEVEL } from '..
 import { ENEMIES, HABITATS, ARCHETYPE_NAMES, tierTouchBonus, tierProjDmg } from '../../shared/enemies.js';
 import { TALENTS, TIER_REQ, SPECS, specPoints, talentRank } from '../../shared/talents.js';
 import { SETS, SET_PIECES } from '../../shared/sets.js';
+import { abilitiesOf } from '../../shared/abilities.js';
 import { SFX } from '../sfx.js';
 
 const USABLE_FOOD = new Set(['bread', 'meat', 'cooked_meat', 'bandage']);
@@ -113,6 +114,67 @@ export class Panels {
     this.toastsEl.appendChild(el);
     setTimeout(() => el.remove(), 3200);
     if (this.toastsEl.children.length > 4) this.toastsEl.firstChild.remove();
+  }
+
+  // ---------- Книга способностей (K): описания и раскладка Q/X/R ----------
+  toggleSpellbook() {
+    this.sbOpen = !this.sbOpen;
+    let el = document.getElementById('spellbook');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'spellbook';
+      document.body.appendChild(el);
+    }
+    el.style.display = this.sbOpen ? 'block' : 'none';
+    if (this.sbOpen) this.renderSpellbook();
+  }
+
+  renderSpellbook() {
+    const el = document.getElementById('spellbook');
+    const you = this.net.you;
+    if (!el || !you || !this.sbOpen) return;
+    const abs = abilitiesOf(you.cls);
+    const loadout = you.abl || abs.slice(0, 3).map(a => a.id);
+    el.innerHTML = '<h3>📖 Книга способностей</h3>'
+      + '<div class="sbhint">Клик по Q / X / R в строке — повесить способность на клавишу</div>';
+    for (const ab of abs) {
+      const locked = (you.lvl || 1) < ab.lvl;
+      const slot = loadout.indexOf(ab.id);
+      const row = document.createElement('div');
+      row.className = 'sbrow' + (locked ? ' locked' : '');
+      // иконка
+      const icon = document.createElement('canvas');
+      icon.width = icon.height = 36;
+      icon.className = 'sbicon';
+      const c = icon.getContext('2d');
+      c.imageSmoothingEnabled = false;
+      const spr = this.atlas.map[ab.icon];
+      if (spr) c.drawImage(this.atlas.img, spr.x, spr.y, spr.w, spr.h, 2, 2, 32, 32);
+      row.appendChild(icon);
+      const info = document.createElement('div');
+      info.className = 'sbinfo';
+      info.innerHTML = `<div class="sbname">${ab.name}${slot >= 0 ? ` <span class="sbslot">— на ${['Q', 'X', 'R'][slot]}</span>` : ''}</div>
+        <div class="sbmeta">${locked ? `🔒 уровень ${ab.lvl}` : `уровень ${ab.lvl}`} · перезарядка ${ab.cd} с${ab.mana ? ` · мана ${ab.mana}` : ''}</div>
+        <div class="sbdesc">${ab.desc}</div>`;
+      row.appendChild(info);
+      const btns = document.createElement('div');
+      btns.className = 'sbbtns';
+      ['Q', 'X', 'R'].forEach((k, i) => {
+        const b = document.createElement('button');
+        b.textContent = k;
+        if (slot === i) b.className = 'active';
+        b.disabled = locked;
+        b.onclick = () => {
+          SFX.ui();
+          this.net.send({ t: MSG.SET_ABILITY, slot: i, id: ab.id });
+          setTimeout(() => this.renderSpellbook(), 150); // дождаться снапшота
+          setTimeout(() => this.renderSpellbook(), 400);
+        };
+        btns.appendChild(b);
+      });
+      row.appendChild(btns);
+      el.appendChild(row);
+    }
   }
 
   // ---------- летопись (L): все вести копятся здесь, мировые — только здесь ----------

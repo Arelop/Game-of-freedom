@@ -117,6 +117,7 @@ export class Net {
       case MSG.LEARN_TALENT: game.learnTalent(p, String(m.id || '')); break;
       case MSG.SELL_ITEM: game.sellItem(p, String(m.item || '')); break;
       case MSG.ABILITY: game.useAbility(p, Math.max(0, Math.min(2, m.slot | 0))); break;
+      case MSG.SET_ABILITY: game.setAbility(p, Math.max(0, Math.min(2, m.slot | 0)), String(m.id || '')); break;
       case MSG.OFFHAND: game.useOffhand(p); break;
       case MSG.STASH: game.stashOp(p, m.op === 'take' ? 'take' : 'put', String(m.item || ''), m.box === 'home' ? 'home' : 'team'); break;
       case MSG.GIVE: game.giveItem(p, String(m.item || '')); break;
@@ -210,7 +211,7 @@ export class Net {
         q: p.quests?.[0] ? { title: p.quests[0].title, done: p.quests[0].done, tx: p.quests[0].tx, ty: p.quests[0].ty } : null,
         qs: (p.quests || []).map(q => ({ title: q.title, done: q.done ? 1 : 0, tx: q.tx, ty: q.ty, d: q.desc })),
         rep: p.rep,
-        ab: (p.abCd || []).map(v => r1(v)), blk: p.blocking ? 1 : 0, inv2: r1(p.invisT || 0),
+        ab: (p.abCd || []).map(v => r1(v)), abl: p.abilities, blk: p.blocking ? 1 : 0, inv2: r1(p.invisT || 0),
         oc: r1(p.offCd || 0), sh: p.shieldHp || 0, cb: p.canBlock ? 1 : 0,
         mp: Math.floor(p.mana), mpm: p.manaMax, arc: p.arcaneN || 0,
         bnt: p.bounty || 0,

@@ -395,6 +395,7 @@ input.onKey = k => {
   }
   if (k === 'KeyJ') panels.toggleJournal();
   if (k === 'KeyL') panels.toggleLog();
+  if (k === 'KeyK') panels.toggleSpellbook();
   if (k === 'KeyB') {
     if (panels.beOpen) panels.hideBestiary();
     else net.send({ t: MSG.BESTIARY });
@@ -461,7 +462,7 @@ function spawnAbilityFx(m) {
 function useAbility(slot) {
   const you = net.you;
   if (!you || you.dead || panels.dialogOpen) return;
-  const ab = abilitiesOf(you.cls)[slot];
+  const ab = abilitiesOf(you.cls).find(a => a.id === you.abl?.[slot]) || abilitiesOf(you.cls)[slot];
   if (!ab) return;
   if (you.lvl < ab.lvl) { panels.toast(`«${ab.name}» откроется на уровне ${ab.lvl}`); return; }
   if ((you.ab?.[slot] || 0) > 0.2) return;

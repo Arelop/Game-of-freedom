@@ -29,7 +29,7 @@ import { AMMO_NAMES } from '../shared/weapons.js';
 import { CLASSES, STAT_KEYS, statBonuses, xpNeed, MAX_LEVEL } from '../shared/classes.js';
 import { TALENTS, findTalent, canLearn } from '../shared/talents.js';
 import { getWeapon, getItem, splitId, rollRarity, withRarity, sellPriceR } from '../shared/rarity.js';
-import { abilitiesOf } from '../shared/abilities.js';
+import { abilitiesOf, abilityById, defaultLoadout } from '../shared/abilities.js';
 
 const NPC_NAMES = [
   'Радомир', 'Всеслав', 'Милана', 'Ярина', 'Добрыня', 'Горазд', 'Любава',
@@ -214,6 +214,7 @@ export class Game {
       combatT: 0,                 // сек с последнего каста/выстрела — реген вне боя быстрее
       arcaneN: 0, arcaneT: 0,     // Чародейские заряды мага
       abCd: [0, 0, 0], invisT: 0, offCd: 0, shieldHp: 0, shieldT: 0,
+      abilities: defaultLoadout(cls), // раскладка Q/X/R — настраивается в Книге способностей (K)
       coins: 20, hunger: HUNGER_MAX,
       rep: makeReputation(), aggroFactions: new Set(),
       dead: false, downT: 0,
@@ -371,6 +372,7 @@ export class Game {
     if (this.hasTalent(p, 'rage') && p.hp <= p.maxHp * 0.3) mult *= 1.4;
     if (p.contract?.type === 'glass') mult *= 1.3; // Стеклянная пушка
     if (p.shadowT > 0 && this.hasTalent(p, 'shadow')) { mult *= 1.5; p.shadowT = 0; }
+    if ((p.stepBonusT || 0) > 0) { mult *= 1.5; p.stepBonusT = 0; } // Шаг сквозь тень
     const crit = this.rand() < d.critChance;
     if (crit) mult *= d.critMult;
     return { dmg: Math.round(w.damage * mult * 10) / 10, crit };
@@ -538,6 +540,17 @@ export class Game {
     this.civ.update(dt);
     this.checkDungeonRooms();
     this.checkAscensions();
+    // метеоры мага: телеграф догорел — удар с неба
+    if (this.meteors?.length) {
+      for (const m of this.meteors) {
+        m.t -= dt;
+        if (m.t <= 0) {
+          this.explodeAt(m.mapId, m.x, m.y, m.dmg, 44, m.owner, 2);
+          this.fx({ t: 'boom', x: m.x, y: m.y, r: 44 }, m.mapId, m.x, m.y);
+        }
+      }
+      this.meteors = this.meteors.filter(m => m.t > 0);
+    }
     this.checkArena();
     this.stepAsh();
   }
@@ -693,6 +706,7 @@ export class Game {
     p.offCd = Math.max(0, (p.offCd || 0) - dt);
     // ---- реликвии-проки ----
     p.blT = Math.max(0, (p.blT || 0) - dt); // заряды «Жажды крови» тают
+    p.stepBonusT = Math.max(0, (p.stepBonusT || 0) - dt); // бонус Шага сквозь тень
     // «Гнев небес»: в бою молния сама находит ближайшего врага
     if (p.procs?.smite && p.combatT < 5) {
       p.smiteT = (p.smiteT ?? 0) - dt;
@@ -1061,13 +1075,17 @@ export class Game {
     this.entities.set(id, { id, entType: 'drop', item, count, mapId, x, y, hp: 1, ttl });
   }
 
-  // гидратация поселений: NPC существуют только рядом с игроками
+  // гидратация поселений: NPC существуют только рядом с игроками.
+  // Гистерезис: появляются в 400px, исчезают лишь дальше 560px —
+  // на границе радиуса жители не мерцают и не «телепортируются»
   hydrateSettlements() {
     for (const s of this.world.settlements) {
       const sx = s.x * TILE, sy = s.y * TILE;
+      const wasHyd = this.hydratedSettlements.has(s.id);
+      const R = wasHyd ? SETTLEMENT_HYDRATE_R * 1.4 : SETTLEMENT_HYDRATE_R;
       let near = false;
       for (const p of this.players.values()) {
-        if (p.mapId === 'over' && dist2(p.x, p.y, sx, sy) < SETTLEMENT_HYDRATE_R ** 2) { near = true; break; }
+        if (p.mapId === 'over' && dist2(p.x, p.y, sx, sy) < R ** 2) { near = true; break; }
       }
       const hyd = this.hydratedSettlements.get(s.id);
       if (s.ruined) { // руины пусты
@@ -1161,8 +1179,21 @@ export class Game {
           ent.work = pick(this.rand, a.works);
           ids.push(npc);
         }
+        // жители возвращаются ТУДА, где их видели в прошлый раз (никакой телепортации)
+        if (s.savedNpcPos) {
+          ids.forEach((id, i) => {
+            const pos = s.savedNpcPos[i];
+            const e = this.entities.get(id);
+            if (pos && e) { e.x = pos.x; e.y = pos.y; }
+          });
+        }
         this.hydratedSettlements.set(s.id, ids);
       } else if (!near && hyd) {
+        // запоминаем, где кто стоял — вернутся на свои места
+        s.savedNpcPos = hyd.map(id => {
+          const e = this.entities.get(id);
+          return e ? { x: e.x, y: e.y } : null;
+        });
         for (const id of hyd) this.entities.delete(id);
         this.hydratedSettlements.delete(s.id);
       }
@@ -1282,6 +1313,15 @@ export class Game {
             this.fx({ t: 'summon', x: e.x, y: e.y }, e.mapId, e.x, e.y);
           }
         }
+        // «Живая бомба» мага: таймер догорел — взрыв на носителе
+        if ((e.bombT || 0) > 0) {
+          e.bombT -= dt;
+          if (e.bombT <= 0) {
+            this.explodeAt(e.mapId, e.x, e.y, e.bombDmg || 5, 40, e.bombOwner, 0);
+            this.fx({ t: 'boom', x: e.x, y: e.y, r: 40 }, e.mapId, e.x, e.y);
+            e.bombT = 0;
+          }
+        }
         // слэм босса: телеграф идёт — стоим и караем зазевавшихся
         if ((e.slamT || 0) > 0) {
           e.slamT -= dt;
@@ -1362,6 +1402,17 @@ export class Game {
             if (circlesOverlap(e.x, e.y, def.radius, p.x, p.y, PLAYER_RADIUS))
               this.damagePlayer(p, touch, e);
           }
+          // призывы игрока — законная добыча: враг кусает элементаля и наёмника
+          for (const n of this.entities.values()) {
+            if (n.entType !== 'npc' || n.mapId !== e.mapId) continue;
+            if (n.role !== 'elemental' && n.role !== 'mercenary') continue;
+            if (!circlesOverlap(e.x, e.y, def.radius + 2, n.x, n.y, 5)) continue;
+            n.hurtCd = (n.hurtCd || 0) - dt;
+            if (n.hurtCd <= 0) {
+              n.hurtCd = 0.8;
+              this.damageNpc(n, touch, null);
+            }
+          }
           // стража дерётся с врагами
           for (const n of this.entities.values()) {
             if (n.entType !== 'npc' || n.mapId !== e.mapId) continue;
@@ -1426,9 +1477,23 @@ export class Game {
   }
 
   // ---------- активные способности (Q/E/R) ----------
+  // назначить способность на слот Q/X/R (Книга способностей)
+  setAbility(p, slot, id) {
+    if (slot < 0 || slot > 2) return;
+    const ab = abilityById(p.cls, id);
+    if (!ab || p.level < ab.lvl) { this.toast(p, ab ? `«${ab.name}» откроется на уровне ${ab.lvl}` : 'Нет такой способности'); return; }
+    p.abilities = p.abilities || defaultLoadout(p.cls);
+    const other = p.abilities.indexOf(id);
+    if (other >= 0 && other !== slot) p.abilities[other] = p.abilities[slot]; // обмен слотами
+    p.abilities[slot] = id;
+    p.abCd[slot] = Math.max(p.abCd[slot] || 0, 1); // маленькая пауза после перестановки
+    this.toast(p, `📖 «${ab.name}» — на клавише ${['Q', 'X', 'R'][slot]}`);
+  }
+
   useAbility(p, slot) {
     if (p.dead || p.rollT > 0) return;
-    const ab = abilitiesOf(p.cls)[slot];
+    p.abilities = p.abilities || defaultLoadout(p.cls);
+    const ab = abilityById(p.cls, p.abilities[slot]) || abilitiesOf(p.cls)[slot];
     if (!ab || p.level < ab.lvl) return;
     p.abCd = p.abCd || [0, 0, 0];
     if ((p.abCd[slot] || 0) > 0) return;
@@ -1631,6 +1696,106 @@ export class Game {
         }
         break;
       }
+      case 'heroic_charge': { // воин: бросок к прицелу, стан и урон на пути
+        for (let i = 0; i < 10; i++) {
+          moveWithCollision(p, Math.cos(aim) * 130 / 10, Math.sin(aim) * 130 / 10, PLAYER_RADIUS, map);
+          for (const e of this.entities.values()) {
+            if (e.entType !== 'enemy' || e.mapId !== p.mapId || e.chargeHitBy === p.id) continue;
+            if (dist2(p.x, p.y, e.x, e.y) < 26 * 26) {
+              e.chargeHitBy = p.id;
+              e.stunT = Math.max(e.stunT || 0, 0.8);
+              const wDmg = this.weapon(p).melee ? this.weapon(p).damage : 4;
+              this.damageEnemy(e, Math.round(wDmg * (d.dmgMelee || 1) * 2 * 10) / 10,
+                { vx: Math.cos(aim), vy: Math.sin(aim), knockback: 120, owner: p.id, school: 'melee' });
+            }
+          }
+        }
+        for (const e of this.entities.values()) if (e.chargeHitBy === p.id) delete e.chargeHitBy;
+        p.hurtT = Math.max(p.hurtT, 0.4);
+        break;
+      }
+      case 'unbreakable': { // воин: каменная кожа
+        p.shieldHp = Math.max(p.shieldHp || 0, 6);
+        p.shieldT = Math.max(p.shieldT || 0, 6);
+        this.fx({ t: 'barrier', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'meteor': { // маг: телеграф у прицела, через миг — удар с неба
+        const tx = p.x + Math.cos(aim) * 130, ty = p.y + Math.sin(aim) * 130;
+        this.meteors = this.meteors || [];
+        this.meteors.push({ mapId: p.mapId, x: tx, y: ty, t: 0.8, dmg: Math.round(6 * (d.dmgMagic || 1) * 10) / 10, owner: p.id });
+        this.fx({ t: 'telegraph', x: tx, y: ty, r: 44, w: 0.8 }, p.mapId, tx, ty);
+        break;
+      }
+      case 'living_bomb': { // маг: бомба на враге у прицела
+        const tx = p.x + Math.cos(aim) * 110, ty = p.y + Math.sin(aim) * 110;
+        let best = null, bd = 90 * 90;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          const d2 = dist2(tx, ty, e.x, e.y);
+          if (d2 < bd) { bd = d2; best = e; }
+        }
+        if (!best) { p.abCd[slot] = 1; this.toast(p, 'Некому вешать бомбу'); break; }
+        best.bombT = 2;
+        best.bombDmg = Math.round(5 * (d.dmgMagic || 1) * 10) / 10;
+        best.bombOwner = p.id;
+        best.aggro = true;
+        this.fx({ t: 'telegraph', x: best.x, y: best.y, r: 20, w: 2 }, p.mapId, best.x, best.y);
+        break;
+      }
+      case 'shadowstep': { // вор: за спину врага у прицела
+        const tx = p.x + Math.cos(aim) * 140, ty = p.y + Math.sin(aim) * 140;
+        let best = null, bd = 110 * 110;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          const d2 = dist2(tx, ty, e.x, e.y);
+          if (d2 < bd) { bd = d2; best = e; }
+        }
+        if (!best) { p.abCd[slot] = 1; this.toast(p, 'Тени не нашли жертву'); break; }
+        const back = e => Math.atan2(e.y - p.y, e.x - p.x); // встать за спиной по линии подхода
+        const a = back(best);
+        p.x = best.x + Math.cos(a) * 14;
+        p.y = best.y + Math.sin(a) * 14;
+        p.aim = Math.atan2(best.y - p.y, best.x - p.x);
+        p.stepBonusT = 1.5; // следующая атака ×1.5
+        p.hurtT = Math.max(p.hurtT, 0.3);
+        this.fx({ t: 'poof', x: best.x, y: best.y }, p.mapId, best.x, best.y);
+        break;
+      }
+      case 'caltrops': { // вор: ковёр шипов вокруг
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) > 70 * 70) continue;
+          e.slowT = Math.max(e.slowT || 0, 3); e.slowMult = 0.5;
+          e.dotT = 2; e.dotDmg = 1; e.dotSrc = p.id; e.dotKind = 'venom';
+          e.aggro = true;
+        }
+        this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'consecration': { // жрец: святой огонь у ног
+        hitAround(p.x, p.y, 75, Math.round(2 * (d.dmgMagic || 1) * 2 * 10) / 10, 30);
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) > 75 * 75) continue;
+          e.dotT = 3; e.dotDmg = 1; e.dotSrc = p.id; e.dotKind = 'ignite';
+        }
+        for (const q of this.players.values()) {
+          if (q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > 75 * 75) continue;
+          if (q.hp < q.maxHp) { q.hp = Math.min(q.maxHp, q.hp + 1); this.fx({ t: 'heal', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y); }
+        }
+        this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'guardian': { // жрец: дух-хранитель бережёт отряд
+        for (const q of this.players.values()) {
+          if (q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > 95 * 95) continue;
+          q.buffs.guarded = { mult: 0.3, t: 8 };
+          this.fx({ t: 'barrier', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
+          this.toast(q, '👁 Дух-хранитель осеняет тебя: −30% урона (8 с)');
+        }
+        break;
+      }
     }
     this.fx({ t: 'ability', pid: p.id, id: ab.id, x: p.x, y: p.y, aim }, p.mapId, p.x, p.y);
   }
@@ -1819,6 +1984,15 @@ export class Game {
           if (p.dead || p.mapId !== pr.mapId) continue;
           if (circlesOverlap(pr.x, pr.y, pr.radius, p.x, p.y, PLAYER_RADIUS)) {
             this.damagePlayer(p, pr.dmg, null);
+            hit = true; break;
+          }
+        }
+        // вражеские снаряды сбивают и призывов игрока
+        if (!hit) for (const n of this.entities.values()) {
+          if (n.entType !== 'npc' || n.mapId !== pr.mapId) continue;
+          if (n.role !== 'elemental' && n.role !== 'mercenary') continue;
+          if (circlesOverlap(pr.x, pr.y, pr.radius, n.x, n.y, 5)) {
+            this.damageNpc(n, pr.dmg, null);
             hit = true; break;
           }
         }
@@ -2175,6 +2349,8 @@ export class Game {
     if (p.dead || hasIFrames(p)) return;
     // контракт «Стеклянная пушка»: входящий урон удвоен
     if (p.contract?.type === 'glass') dmg *= 2;
+    // Дух-хранитель жреца бережёт от боли
+    if (p.buffs.guarded) dmg *= 1 - p.buffs.guarded.mult;
     // уворот от ловкости и экипировки: урон полностью игнорируется
     if (this.rand() < (p.derived?.dodge || 0)) {
       this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);

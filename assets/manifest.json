@@ -1070,6 +1070,30 @@
     },
     "ab_faith_shield": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/deflect_missiles.png"
+    },
+    "ab_heroic_charge": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/swiftness.png"
+    },
+    "ab_unbreakable": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/earth/stoneskin.png"
+    },
+    "ab_meteor": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/fire/fire_storm.png"
+    },
+    "ab_living_bomb": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/fire/sticky_flame.png"
+    },
+    "ab_shadowstep": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/translocation/controlled_blink.png"
+    },
+    "ab_caltrops": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/poison/olgrebs_toxic_radiance.png"
+    },
+    "ab_consecration": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/fire/ring_of_flames.png"
+    },
+    "ab_guardian": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/extension.png"
     }
   }
 }

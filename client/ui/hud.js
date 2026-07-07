@@ -151,8 +151,10 @@ export class Hud {
 
   // панель способностей Q/E/R с кулдаунами (снизу по центру)
   renderAbilities(ctx, you) {
-    const abs = abilitiesOf(you.cls);
-    if (!abs.length) return;
+    const all = abilitiesOf(you.cls);
+    // раскладка игрока из Книги способностей (K); дефолт — первые три
+    const abs = (you.abl || []).map(id => all.find(a => a.id === id)).filter(Boolean);
+    if (!abs.length) abs.push(...all.slice(0, 3));
     const KEYS = ['Q', 'X', 'R'];
     const S = 18, GAP = 3;
     const x0 = Math.round(VIEW_W / 2 - (S * 3 + GAP * 2) / 2), y0 = VIEW_H - S - 5;

@@ -54,6 +54,7 @@ export function saveWorld(game) {
         mana: Math.round(p.mana || 0),
         bounty: p.bounty || 0, contract: p.contract || null,
         repRanks: p.repRanks || {}, daily: p.daily || null,
+        abilities: p.abilities || null,
       })),
       banditsWeakT: w.banditsWeakT || 0,
       smithBoon: w.smithBoon || false,
@@ -175,6 +176,7 @@ export function applySavedPlayer(game, p) {
     if (rec.contract) p.contract = rec.contract;
     if (rec.repRanks) p.repRanks = rec.repRanks;
     if (rec.daily) p.daily = rec.daily;
+    if (rec.abilities) p.abilities = rec.abilities;
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);
