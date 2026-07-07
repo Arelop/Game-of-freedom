@@ -64,6 +64,7 @@ export class Net {
           settlements: game.world.settlements.map(s => ({ x: s.x, y: s.y, name: s.name, faction: s.faction })),
           pois: game.world.pois.map(o => ({ x: o.x, y: o.y, name: o.name, type: o.type, cleared: o.cleared })),
           biomes: rleEncode(Array.from(this.biomeMap ??= buildBiomeMap(game.world))),
+          biomesN: 256,
           ash: (this.ashMap ??= buildAshMap(game.world.seed)) && {
             size: this.ashMap.size, camp: this.ashMap.camp, lair: this.ashMap.lair,
             portal: this.ashMap.portal, rle: rleEncode(Array.from(this.ashMap.tiles)),
@@ -207,7 +208,7 @@ export class Net {
         cls: p.cls, lvl: p.level, xp: p.xp, xpn: xpNeed(p.level),
         sp: p.statPts, tp2: p.talentPts, st: p.stats, tl: p.talents,
         q: p.quests?.[0] ? { title: p.quests[0].title, done: p.quests[0].done, tx: p.quests[0].tx, ty: p.quests[0].ty } : null,
-        qs: (p.quests || []).map(q => ({ title: q.title, done: q.done ? 1 : 0, tx: q.tx, ty: q.ty })),
+        qs: (p.quests || []).map(q => ({ title: q.title, done: q.done ? 1 : 0, tx: q.tx, ty: q.ty, d: q.desc })),
         rep: p.rep,
         ab: (p.abCd || []).map(v => r1(v)), blk: p.blocking ? 1 : 0, inv2: r1(p.invisT || 0),
         oc: r1(p.offCd || 0), sh: p.shieldHp || 0, cb: p.canBlock ? 1 : 0,

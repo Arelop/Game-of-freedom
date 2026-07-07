@@ -371,8 +371,8 @@ function stampRoad(world, a, b, rand) {
 
 // Карта биомов для клиентской карты мира: 128x128 (шаг 4 тайла), коды 0..6
 export function buildBiomeMap(world) {
-  const N = 128;
-  const step = WORLD_TILES / N; // карта-миниатюра 128×128 при любом размере мира
+  const N = 256;
+  const step = WORLD_TILES / N; // карта-миниатюра 256×256 при любом размере мира
   const out = new Uint8Array(N * N);
   const CODE = {
     [T.DEEP_WATER]: 0, [T.WATER]: 1, [T.SAND]: 2, [T.GRASS]: 3,

@@ -85,6 +85,24 @@ export class Admin {
     const p = m.pid ? g.players.get(+m.pid) : null;
     const chronicle = text => g.events.push(g.world.day, `Рука судьбы: ${text}`);
     switch (m.type) {
+      case 'level': { // рука судьбы двигает героя по лестнице уровней
+        if (!p) return { error: 'игрок не найден' };
+        const d = m.delta > 0 ? 1 : -1;
+        if (d > 0 && p.level < 20) {
+          p.level++; p.statPts++; p.talentPts++;
+          p.xp = 0;
+          g.toast(p, `✨ Судьба возвысила тебя: уровень ${p.level} (+очко характеристики и талант)`);
+        } else if (d < 0 && p.level > 1) {
+          p.level--;
+          p.statPts = Math.max(0, p.statPts - 1);
+          p.talentPts = Math.max(0, p.talentPts - 1);
+          p.xp = 0;
+          g.toast(p, `⬇ Судьба смирила тебя: уровень ${p.level}`);
+        } else return { error: d > 0 ? 'уже 20 уровень' : 'уже 1 уровень' };
+        g.recomputeStats(p);
+        chronicle(`изменила судьбу ${p.name} (уровень ${p.level})`);
+        return { ok: true, level: p.level };
+      }
       case 'heal': {
         if (!p) return { error: 'игрок не найден' };
         p.hp = p.maxHp; p.mana = p.manaMax; p.hunger = 100;

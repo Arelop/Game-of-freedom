@@ -144,7 +144,23 @@ window.addEventListener('mouseup', () => { mapDrag = null; });
 screen.addEventListener('wheel', e => {
   if (!bigMap) return;
   e.preventDefault();
-  mapView.zoom = Math.max(1, Math.min(6, mapView.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+  // зум к курсору: точка мира под мышью остаётся на месте
+  const S = Math.min(VIEW_W, VIEW_H) - 30;
+  const x0 = (VIEW_W - S) / 2, y0 = (VIEW_H - S) / 2;
+  const worldPx = (mapView.dim === 'ash' ? (net.mapInfo.ash?.size || 160) : WORLD_TILES) * TILE;
+  const r = screen.getBoundingClientRect();
+  const nx = (e.clientX - r.left) / r.width * VIEW_W;
+  const ny = (e.clientY - r.top) / r.height * VIEW_H;
+  const oldZoom = mapView.zoom;
+  const k = S * oldZoom / worldPx;
+  const cx = mapView.cx ?? worldPx / 2, cy = mapView.cy ?? worldPx / 2;
+  const wx = cx - worldPx / (2 * oldZoom) + (nx - x0) / k;  // мир под курсором
+  const wy = cy - worldPx / (2 * oldZoom) + (ny - y0) / k;
+  const zoom = Math.max(1, Math.min(10, oldZoom * (e.deltaY < 0 ? 1.25 : 1 / 1.25)));
+  const k2 = S * zoom / worldPx;
+  mapView.zoom = zoom;
+  mapView.cx = wx - (nx - x0) / k2 + worldPx / (2 * zoom);
+  mapView.cy = wy - (ny - y0) / k2 + worldPx / (2 * zoom);
 }, { passive: false });
 
 // ---------- карта мира: биомная подложка ----------
@@ -173,11 +189,12 @@ let biomeCanvas = null;
 function buildBiomeCanvas() {
   const b = net.mapInfo.biomes;
   if (!b) return;
-  const data = rleDecode(b, 128 * 128);
+  const N = net.mapInfo.biomesN || 128;
+  const data = rleDecode(b, N * N);
   biomeCanvas = document.createElement('canvas');
-  biomeCanvas.width = 128; biomeCanvas.height = 128;
+  biomeCanvas.width = N; biomeCanvas.height = N;
   const bctx = biomeCanvas.getContext('2d');
-  const img = bctx.createImageData(128, 128);
+  const img = bctx.createImageData(N, N);
   for (let i = 0; i < data.length; i++) {
     const c = BIOME_COLORS[data[i]] || '#4e7c3a';
     img.data[i * 4] = parseInt(c.slice(1, 3), 16);
@@ -294,6 +311,10 @@ net.handlers.onFx = (kind, m) => {
       ringFx.push({ x: m.x, y: m.y, r0: 55, r1: 40, t: 0, dur: 0.5, color: '#9badb7', fill: true });
       particles.burst(m.x, m.y, '#847e87', 12, 60, 0.35);
       SFX.roll();
+      break;
+    case 'loot': // подбор: летящий текст у героя вместо тоста
+      addFloatText(m.x, m.y - 12, '+ ' + m.text, '#fbf236');
+      if (m.pid === net.myId) SFX.ui();
       break;
     case 'nova': // ледяная/огненная нова реликвий и сетов
       ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 46, t: 0, dur: 0.4, color: '#df7126' });

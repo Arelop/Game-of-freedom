@@ -61,15 +61,52 @@ export function generateDungeon(seed, difficulty, withBoss, depth = 1) {
       spawns: [],
     };
     if (lockedTiles) room.lockedTiles = lockedTiles;
-    const n = isBoss ? 1 : randInt(rand, 3, 4 + difficulty);
-    // спавн по таблице тиров: сложность данжа задаёт диапазон монстров
-    const kinds = isBoss ? ['bossOgre'] : enemiesOfTier(1, Math.min(4, difficulty + 1));
+    // ТЕМА комнаты: у каждого зала своё лицо, население и находки
+    if (!isBoss && rand() < 0.75) {
+      const pool = ['barracks', 'crypt', 'shrine'];
+      if (!rooms.some(r => r.theme === 'prison')) pool.push('prison', 'prison'); // тюрьма — не чаще одной
+      room.theme = pick(rand, pool);
+    }
+    const n = isBoss ? 1 : Math.max(2, randInt(rand, 3, 4 + difficulty) - (room.theme === 'prison' ? 1 : 0));
+    // спавн по таблице тиров; тема отбирает жильцов под себя
+    const base = isBoss ? ['bossOgre'] : enemiesOfTier(1, Math.min(4, difficulty + 1));
+    const THEME_KINDS = {
+      crypt: ['skeleton', 'ghoul', 'necromancer', 'imp'],
+      barracks: ['bandit', 'banditHeavy', 'archer', 'orcWarrior', 'orcShieldbearer', 'hobgoblin', 'gnollRaider', 'orcKnight'],
+      shrine: ['imp', 'demonologist', 'demon', 'orcPriest'],
+      prison: ['bandit', 'banditHeavy', 'hobgoblin', 'orcWarrior'],
+    };
+    const themed = room.theme ? base.filter(k => THEME_KINDS[room.theme].includes(k)) : base;
+    const kinds = themed.length ? themed : base;
     for (let k = 0; k < n; k++) {
       room.spawns.push({
         kind: isBoss ? 'bossOgre' : pick(rand, kinds),
         x: nx + randInt(rand, -Math.floor(rw / 2) + 1, Math.floor(rw / 2) - 1),
         y: ny + randInt(rand, -Math.floor(rh / 2) + 1, Math.floor(rh / 2) - 1),
       });
+    }
+    // тематический декор и особые обитатели
+    const set = (dx, dy, t) => {
+      const xx = nx + dx, yy = ny + dy;
+      if (xx > 0 && yy > 0 && xx < SIZE - 1 && yy < SIZE - 1 && g[yy * SIZE + xx] === T.DUNGEON_FLOOR)
+        g[yy * SIZE + xx] = t;
+    };
+    if (room.theme === 'barracks') {         // казарма: столы, кровь и оружейная стойка
+      set(-2, -1, T.TABLE); set(2, 1, T.TABLE); set(0, 2, T.BLOOD); set(-1, 1, T.BLOOD);
+      room.lootWeapon = true;                // за зачистку — трофей со стойки
+    } else if (room.theme === 'crypt') {     // склеп: статуи древних и старые кости
+      set(-2, 0, T.STATUE); set(2, 0, T.STATUE); set(0, -2, T.BLOOD); set(1, 2, T.BLOOD); set(-1, -1, T.RUBBLE);
+    } else if (room.theme === 'shrine') {    // осквернённое святилище: кровавый алтарь
+      set(0, 0, T.DARK_ALTAR);
+      room.altar = { x: nx, y: ny };
+    } else if (room.theme === 'prison') {    // тюрьма: клетка с пленником
+      const px2 = nx + rw - 2, py2 = ny - rh + 2;
+      for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) {
+        const xx = px2 + dx, yy = py2 + dy;
+        if (xx > 0 && yy > 0 && xx < SIZE - 1 && yy < SIZE - 1 && g[yy * SIZE + xx] === T.DUNGEON_FLOOR)
+          g[yy * SIZE + xx] = T.FENCE;
+      }
+      room.prisoner = { x: px2, y: py2 };
     }
     rooms.push(room);
     prev = { x: nx, y: ny };

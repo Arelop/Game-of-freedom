@@ -111,8 +111,8 @@ export class Panels {
     el.className = 'toast';
     el.textContent = text;
     this.toastsEl.appendChild(el);
-    setTimeout(() => el.remove(), 4200);
-    if (this.toastsEl.children.length > 5) this.toastsEl.firstChild.remove();
+    setTimeout(() => el.remove(), 3200);
+    if (this.toastsEl.children.length > 4) this.toastsEl.firstChild.remove();
   }
 
   // ---------- летопись (L): все вести копятся здесь, мировые — только здесь ----------
@@ -317,6 +317,7 @@ export class Panels {
       const row = document.createElement('div');
       row.className = 'jrquest' + (q.done ? ' done' : '');
       row.innerHTML = `<div class="jrtitle">${q.done ? '✓' : '•'} ${q.title}</div>
+        ${q.d ? `<div class="jrstate" style="font-style:italic;color:#9a9285">${q.d}</div>` : ''}
         <div class="jrstate">${q.done ? 'Выполнено — вернись к заказчику за наградой' : 'В работе' + (q.tx ? ' · цель отмечена на карте (M)' : '')}</div>`;
       el.appendChild(row);
     }

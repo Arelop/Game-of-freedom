@@ -84,6 +84,8 @@ export class TileRenderer {
       for (let x = 0; x < CHUNK; x++) {
         const t = tiles[y * CHUNK + x];
         let spec = TILE_SPRITES[t] || ['tile_grass'];
+        // решётка в подземелье стоит на каменном полу, не на траве
+        if (t === T.FENCE && mapId !== 'over') spec = ['tile_dungeon_floor', 'tile_fence'];
         // вариативность травы по хэшу
         if (t === T.GRASS) {
           const h = hash2(11, cx * CHUNK + x, cy * CHUNK + y) % 100;

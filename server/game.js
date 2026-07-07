@@ -428,7 +428,7 @@ export class Game {
     if (prev) p.inventory[prev] = (p.inventory[prev] || 0) + 1;
     p.equipment[slot] = itemId;
     this.recomputeStats(p);
-    this.toast(p, `Надето: ${it.name}`);
+    this.fx({ t: 'loot', pid: p.id, x: p.x, y: p.y, text: `надето: ${it.name}` }, p.mapId, p.x, p.y);
   }
 
   equipWeapon(p, itemId) {
@@ -708,6 +708,14 @@ export class Game {
           this.damageEnemy(best, p.procs.smite.dmg, { vx: 0, vy: 0, knockback: 20, owner: p.id, school: 'magic' });
           this.fx({ t: 'chain', pts: [[p.x, p.y - 12], [best.x, best.y]] }, p.mapId, p.x, p.y);
         }
+      }
+    }
+    // паломничество: дошёл до святыни — поклонился
+    if (this.tick % 30 === 0 && p.mapId === 'over') {
+      for (const q of p.quests) {
+        if (q.type !== 'visit' || q.done) continue;
+        const dx = p.x / TILE - q.tx, dy = p.y / TILE - q.ty;
+        if (dx * dx + dy * dy < 16) this.completeQuestObjective(p, q);
       }
     }
     // Аура света: жрец лечит союзников одним присутствием
@@ -1965,6 +1973,12 @@ export class Game {
     }
     // элита: щедрый дроп экипировки
     if (e.elite && this.rand() < 0.45) this.dropRandomGear(e.mapId, e.x, e.y, false, luck + 4);
+    // именной зверь из заказа старейшины
+    if (e.slayFor) {
+      const owner = this.players.get(e.slayFor);
+      const sq = owner?.quests.find(q => q.type === 'slay' && q.eid === e.id && !q.done);
+      if (sq) this.completeQuestObjective(owner, sq);
+    }
     // «Жажда крови»: убийства копят заряды ярости
     if (killer?.procs?.bloodlust) {
       killer.blStacks = Math.min(5, (killer.blT > 0 ? killer.blStacks || 0 : 0) + 1);
@@ -2292,10 +2306,11 @@ export class Game {
       } else if (drop.item.startsWith('ammo_')) {
         const type = drop.item.slice(5);
         p.ammo[type] = (p.ammo[type] || 0) + drop.count * 6;
-        this.toast(p, STR.pickup(ITEM_NAMES[drop.item] || drop.item));
+        this.fx({ t: 'loot', pid: p.id, x: p.x, y: p.y, text: ITEM_NAMES[drop.item] || drop.item }, p.mapId, p.x, p.y);
       } else {
         p.inventory[drop.item] = (p.inventory[drop.item] || 0) + drop.count;
-        this.toast(p, STR.pickup(ITEMS[drop.item]?.name || ITEM_NAMES[drop.item] || drop.item));
+        // подбор — летящий текст у героя, а не тост: меньше мельтешения
+        this.fx({ t: 'loot', pid: p.id, x: p.x, y: p.y, text: this.itemName(drop.item) + (drop.count > 1 ? ` ×${drop.count}` : '') }, p.mapId, p.x, p.y);
       }
       this.entities.delete(drop.id);
       this.fx({ t: 'pickup', x: drop.x, y: drop.y }, drop.mapId, drop.x, drop.y);
@@ -2348,6 +2363,13 @@ export class Game {
       const d = generateDungeon(hash2(this.world.seed, poi.x, poi.y), poi.difficulty, poi.boss);
       this.dungeons.set(mapId, { dungeon: d, poi });
       this.chunks.dungeons.set(mapId, d);
+      // пленники в тюремных клетках ждут спасителя
+      for (const room of d.rooms) {
+        if (!room.prisoner) continue;
+        const id = this.spawnNpc('prisoner', null, mapId, room.prisoner.x * TILE + 8, room.prisoner.y * TILE + 8);
+        const n = this.entities.get(id);
+        if (n) { n.name = pick(this.rand, NPC_NAMES); n.hp = n.maxHp = 8; }
+      }
     }
     const { dungeon } = this.dungeons.get(mapId);
     p.mapId = mapId;
@@ -2413,6 +2435,11 @@ export class Game {
           room.cleared = true; room.sealed = false;
           for (const d of room.doors) this.setDungeonDoor(mapId, d, false);
           this.toastMap(mapId, STR.roomCleared);
+          // казарма: с оружейной стойки падает трофей
+          if (room.lootWeapon && this.rand() < 0.5) {
+            this.dropRandomWeapon(mapId, room.x * TILE + 8, room.y * TILE + 8, 2, 1);
+            this.toastMap(mapId, '⚔ На оружейной стойке казармы что-то блеснуло');
+          }
           if (!dungeon.rooms.some(r => !r.cleared)) {
             poi.cleared = true;
             this.events.push(this.world.day, `Путники зачистили ${poi.name}`, { x: poi.x, y: poi.y });
@@ -2555,6 +2582,18 @@ export class Game {
       }
       if (t === T.OBELISK) { this.touchObelisk(p, tx + dx, ty + dy); return; }
       if (t === T.DARK_ALTAR) {
+        // кровавый алтарь святилища в данже: жертва ради силы или добычи
+        if (p.mapId !== 'over') {
+          const inst = this.dungeons.get(p.mapId);
+          if (inst?.dungeon.altarUsed) { this.toast(p, '⛧ Алтарь насытился и молчит'); return; }
+          this.sendDialog(p, 'altar', '⛧ Кровавый алтарь',
+            ['Камень тёплый на ощупь. Желоба алтаря ждут крови.',
+             'Отдай 1 сердце — и тьма заплатит за него…'],
+            [{ id: 'altar_power', label: '🗡 Кровь за силу (+20% урона, 90 с)' },
+             { id: 'altar_gift', label: '💰 Кровь за добычу (вещь из тайника)' },
+             { id: 'close', label: 'Не сегодня' }]);
+          return;
+        }
         const circle = this.world.pois.find(o => o.type === 'circle' && Math.abs(o.x - tx) < 3 && Math.abs(o.y - ty) < 3);
         if (circle && !circle.cleared) this.toast(p, '⛧ Идол сочится тьмой. Сначала перебей его стражей!');
         else this.toast(p, 'Идол мёртв и молчит. Отшельник Радогост знал бы, что это значит…');
@@ -3703,6 +3742,13 @@ export class Game {
       this.sendDialog(p, npc.id, '🔥 ' + npc.name, lines, choices);
       return;
     }
+    if (npc.role === 'prisoner') {
+      this.sendDialog(p, npc.id, `⛓ ${npc.name}, пленник`,
+        ['«Хвала небесам, живая душа! Меня схватили и бросили в клетку.',
+         'Вытащи меня отсюда — родня отблагодарит, клянусь!»'],
+        [{ id: 'free_prisoner', label: '⛓ Освободить пленника' }, { id: 'close', label: STR.close }]);
+      return;
+    }
     if (npc.role === 'hermit') { this.storyDialogHermit(p, npc); return; }
     if (npc.role === 'captain') { this.storyDialogCaptain(p, npc); return; }
     if (npc.role === 'wanderer') { this.storyDialogWanderer(p, npc); return; }
@@ -4093,6 +4139,39 @@ export class Game {
     if (choice === 'stash') { this.openStash(p); return; }
     if (choice === 'nohouse') { this.toast(p, '«Чужакам домов не продаём. Заслужи доверие деревни (репутация 20)»'); return; }
     if (choice === 'arena_enter') { this.enterArena(p); return; }
+    if (choice === 'free_prisoner') {
+      const npc = this.entities.get(dialogId);
+      if (!npc || npc.role !== 'prisoner' || npc.mapId !== p.mapId) return;
+      this.entities.delete(npc.id);
+      this.fx({ t: 'poof', x: npc.x, y: npc.y }, p.mapId, npc.x, npc.y);
+      const coins = 25 + Math.floor(this.rand() * 25);
+      p.coins += coins;
+      this.addXp(p, 35);
+      for (const f of ['severane', 'ozerny', 'stepnyaki'])
+        p.rep[f] = Math.min(100, (p.rep[f] || 0) + 3);
+      if (this.rand() < 0.3) this.dropRandomGear(p.mapId, npc.x, npc.y, false, p.effStats?.lck || 0);
+      this.toast(p, `⛓ ${npc.name} свободен! Благодарность родни: +${coins} мон., +3 репутации всех фракций`);
+      this.events.push(this.world.day, `${p.name} вызволил пленника ${npc.name} из подземелья`);
+      return;
+    }
+    if (choice === 'altar_power' || choice === 'altar_gift') {
+      const inst = this.dungeons.get(p.mapId);
+      if (!inst || inst.dungeon.altarUsed) return;
+      if (p.hp <= 2) { this.toast(p, 'Алтарь требует крови, но твоя почти иссякла'); return; }
+      inst.dungeon.altarUsed = true;
+      p.hp -= 2;
+      this.fx({ t: 'bloodcast', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      if (choice === 'altar_power') {
+        p.buffs.blessed = { mult: 0.2, t: 90 };
+        this.recomputeStats(p);
+        this.toast(p, '⛧ Кровь принята: +20% урона на 90 с');
+      } else {
+        this.dropRandomGear(p.mapId, p.x + 14, p.y, true, (p.effStats?.lck || 0) + 3);
+        this.toast(p, '⛧ Кровь принята: алтарь отдаёт добычу прежних жертв');
+      }
+      this.events.push(this.world.day, `${p.name} принёс жертву тёмному алтарю`);
+      return;
+    }
     if (choice.startsWith('ench:')) {
       const id = choice.slice(5);
       const it = getItem(id);
@@ -4178,7 +4257,7 @@ export class Game {
       p.coins -= price;
       if (it.item.startsWith('ammo_')) p.ammo[it.item.slice(5)] = (p.ammo[it.item.slice(5)] || 0) + (it.count || 1);
       else p.inventory[it.item] = (p.inventory[it.item] || 0) + 1;
-      this.toast(p, STR.pickup(this.itemName(it.item)));
+      this.fx({ t: 'loot', pid: p.id, x: p.x, y: p.y, text: this.itemName(it.item) }, p.mapId, p.x, p.y);
       if (s) { p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + 1); }
       if (p.hintStage === 4) { p.hintStage = 5; this.toast(p, '🎓 Азы освоены — Пограничье твоё! (M — карта, P — дипломатия)'); }
       return;
@@ -4382,7 +4461,7 @@ export class Game {
       }, ' (держись рядом с караваном!)');
       return;
     }
-    if (roll < 0.45) {
+    if (roll < 0.4) {
       // ближайший незачищенный данж, на который ЕЩЁ нет задания в журнале
       const poi = this.world.pois
         .filter(x => !x.cleared && !p.quests.some(q => q.poi === x.id))
@@ -4390,16 +4469,68 @@ export class Game {
       if (poi) quest = {
         type: 'clear', poi: poi.id, giver: s.id, done: false,
         title: `Зачистить: ${poi.name}`, tx: poi.x, ty: poi.y,
+        desc: pick(this.rand, [
+          '«Оттуда всё чаще слышен вой — караванщики стали объезжать дорогу»',
+          '«Дети видели там огни. Никто не решается сходить и проверить»',
+          '«Пропали двое наших. Следы вели туда…»',
+        ]),
         reward: { coins: 40 + poi.difficulty * 25, rep: 15, xp: 40 + poi.difficulty * 20 },
       };
-    } else if (roll < 0.75) {
+    } else if (roll < 0.58) {
       const tok = this.abstract.tokens
         .filter(t => t.type === 'pack' && !p.quests.some(q => q.token === t.id))
         .sort((a, b) => dist2(a.x, a.y, sx, sy) - dist2(b.x, b.y, sx, sy))[0];
       if (tok) quest = {
         type: 'kill', token: tok.id, giver: s.id, done: false,
         title: `Истребить: ${tok.name}`, tx: Math.round(tok.x / TILE), ty: Math.round(tok.y / TILE),
+        desc: pick(this.rand, [
+          '«Эта стая режет скот по ночам. Пастухи боятся выйти за ворота»',
+          '«Кочуют всё ближе к полям. Ударь первым, пока не поздно»',
+        ]),
         reward: { coins: 35, rep: 12, xp: 45 },
+      };
+    } else if (roll < 0.72) {
+      // именной зверь: элитная тварь появляется в глуши лично для героя
+      const SLAY = [
+        ['bear', 'Гроза Пастухов'], ['ogre', 'Костолом'], ['ironTroll', 'Ржавый'],
+        ['orcWarlord', 'Хмурый Клык'], ['minotaur', 'Старая Беда'],
+      ];
+      const [kind, name] = pick(this.rand, SLAY);
+      let spot = null;
+      for (let tries = 0; tries < 20 && !spot; tries++) {
+        const a = this.rand() * Math.PI * 2, r = 50 + this.rand() * 60;
+        const tx = Math.round(s.x + Math.cos(a) * r), ty = Math.round(s.y + Math.sin(a) * r);
+        if (tx < 20 || ty < 20 || tx > WORLD_TILES - 20 || ty > WORLD_TILES - 20) continue;
+        if (!SOLID.has(this.chunks.tileAt('over', tx, ty))) spot = { tx, ty };
+      }
+      if (spot) {
+        const eid = this.spawnEnemy(kind, 'over', spot.tx * TILE + 8, spot.ty * TILE + 8, { forceElite: true });
+        const e = this.entities.get(eid);
+        if (e) { e.name = name; e.slayFor = p.id; }
+        quest = {
+          type: 'slay', eid, giver: s.id, done: false,
+          title: `Убить зверя: «${name}»`, tx: spot.tx, ty: spot.ty,
+          desc: pick(this.rand, [
+            `«${name} задрал лучшую корову старосты. Принеси нам покой»`,
+            `«Охотники видели след — огромный. Народ шепчется про ${name}»`,
+          ]),
+          reward: { coins: 55, rep: 14, xp: 60 },
+        };
+      }
+    } else if (roll < 0.85) {
+      // паломничество: дойти до святого места и поклониться
+      const spots = this.world.pois.filter(o =>
+        ['spring', 'obelisk', 'barrow', 'circle'].includes(o.type)
+        && !p.quests.some(q => q.type === 'visit' && q.poi === o.id));
+      const spot = spots.length ? pick(this.rand, spots) : null;
+      if (spot) quest = {
+        type: 'visit', poi: spot.id, giver: s.id, done: false,
+        title: `Паломничество: ${spot.name}`, tx: spot.x, ty: spot.y,
+        desc: pick(this.rand, [
+          '«Старики говорят, место силы держит округу. Сходи, поклонись — и расскажи, что видел»',
+          '«Дурной сон приснился старейшине. Проверь, всё ли спокойно у святыни»',
+        ]),
+        reward: { coins: 20, rep: 8, xp: 30 },
       };
     }
     if (!quest) {
@@ -4408,6 +4539,10 @@ export class Game {
       if (to) quest = {
         type: 'deliver', to: to.id, giver: s.id, done: false,
         title: `Доставить письмо в ${to.name}`, tx: to.x, ty: to.y,
+        desc: pick(this.rand, [
+          '«Запечатано воском. Не читай — и не отдавай никому, кроме старейшины»',
+          '«Дорога неспокойна, гонцы не возвращаются. Вся надежда на тебя»',
+        ]),
         reward: { coins: 25, rep: 10, xp: 30 },
       };
     }

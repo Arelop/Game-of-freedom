@@ -173,6 +173,8 @@ async function refresh() {
       <td>${CLS[p.cls] || p.cls}</td><td>${p.level}</td><td>${p.hp}/${p.maxHp}</td><td>${p.coins}</td>
       <td>${p.mapId === 'over' ? p.x + ',' + p.y : esc(p.mapId)}</td>
       <td style="white-space:nowrap">
+        <button title="уровень +1" onclick="act({type:'level',pid:${p.id},delta:1})">⬆</button>
+        <button title="уровень −1" onclick="act({type:'level',pid:${p.id},delta:-1})">⬇</button>
         <button title="исцелить" onclick="act({type:'heal',pid:${p.id}})">✨</button>
         <button title="выдать" onclick="giveDlg(${p.id},'${esc(p.name)}')">🎁</button>
         <button title="в деревню" onclick="act({type:'tp',pid:${p.id}})">🏘</button>
