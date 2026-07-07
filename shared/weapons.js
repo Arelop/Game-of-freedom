@@ -137,6 +137,22 @@ export const WEAPONS = {
     sprite: 'wpn_halberd', sound: 'swing', swingColor: '#d9a066', price: 125,
   },
 
+  // --- арсенал Выжженных земель ---
+  obsidianblade: {
+    id: 'obsidianblade', structDmg: 6, name: 'Обсидиановый клинок', melee: true, school: 'melee',
+    damage: 11, fireRate: 1.0, range: 32, arcDeg: 120, knockback: 150, recoilShake: 0.4,
+    infiniteAmmo: true, burn: { time: 3, dmg: 1 }, // раны от вулканического стекла горят
+    sprite: 'wpn_obsidian', sound: 'swing_heavy', swingColor: '#df7126', price: 220,
+  },
+  ashstaff: {
+    id: 'ashstaff', structDmg: 4, name: 'Жезл пепла', school: 'magic', damage: 7,
+    projectilesPerShot: 1, spreadDeg: 3, projectileSpeed: 240, fireRate: 1.6, manaCost: 3,
+    knockback: 30, recoilShake: 0.25,
+    sprite: 'wpn_ashstaff', projSprite: 'proj_fireball', sound: 'shot_fire',
+    projRadius: 3, projLife: 1.3, price: 210,
+    explode: { radius: 22 },
+  },
+
   // --- ЛЕГЕНДАРНОЕ оружие: не выпадает в мире — только награда за
   // финал «Войны с Тьмой». Выдаётся с суффиксом @l. У каждого — уникальное свойство.
   sunblade: {

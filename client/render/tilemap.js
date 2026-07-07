@@ -50,6 +50,13 @@ const TILE_SPRITES = {
   [T.TRAP]: ['tile_dungeon_floor', 'obj_trap'],
   [T.LOCKED_DOOR]: ['tile_dungeon_floor', 'obj_door_locked'],
   [T.STAIRS]: ['tile_dungeon_floor', 'obj_stairs'],
+  // Выжженные земли
+  [T.ASH]: ['tile_ash'],
+  [T.LAVA]: ['tile_lava_0'],            // мерцание — анимированный оверлей
+  [T.OBSIDIAN]: ['tile_obsidian'],
+  [T.BURNT_TREE]: ['tile_ash', 'obj_burnt_tree'],
+  [T.EMBER]: ['tile_ash', 'obj_ember'],
+  [T.PORTAL]: ['tile_ash'],             // пламя портала — оверлей
 };
 
 export class TileRenderer {
@@ -85,7 +92,8 @@ export class TileRenderer {
         this.atlas.blit(ctx, spec[0], x * TILE, y * TILE);
         if (spec[1]) this.atlas.blit(ctx, spec[1], x * TILE, y * TILE);
         if (t === T.CAMPFIRE || t === T.DUNGEON_EXIT || t === T.BOARD
-          || t === T.CRYSTAL_WALL || t === T.FOUNTAIN) // кристаллы и источники светятся в темноте
+          || t === T.CRYSTAL_WALL || t === T.FOUNTAIN // кристаллы и источники светятся в темноте
+          || t === T.LAVA || t === T.PORTAL || t === T.EMBER)
           animated.push({ x: cx * CHUNK + x, y: cy * CHUNK + y, tile: t });
       }
     }
@@ -126,6 +134,13 @@ export class TileRenderer {
         // доска заказов гильдии зовёт героев
         const bob = Math.sin(timeSec * 3) * 1.5;
         this.atlas.draw(ctx, 'ui_quest_mark', s.x, s.y - 14 + bob);
+      } else if (a.tile === T.LAVA) {
+        // лава дышит: мерцающий второй кадр (стабильная фаза по координате)
+        if (Math.floor(timeSec * 3 + a.x * 0.7 + a.y * 1.3) % 2)
+          this.atlas.draw(ctx, 'tile_lava_1', s.x, s.y);
+      } else if (a.tile === T.PORTAL) {
+        const sc = 1 + Math.sin(timeSec * 5) * 0.1;
+        this.atlas.draw(ctx, 'obj_flame_portal', s.x, s.y, { scale: sc });
       }
     }
   }

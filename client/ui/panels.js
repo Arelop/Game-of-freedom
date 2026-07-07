@@ -7,6 +7,7 @@ import { getWeapon, getItem, rarityOf, sellPriceR, RARITIES } from '../../shared
 import { CLASSES, STAT_KEYS, STAT_NAMES, STAT_DESC, xpNeed, MAX_LEVEL } from '../../shared/classes.js';
 import { ENEMIES, HABITATS, ARCHETYPE_NAMES, tierTouchBonus, tierProjDmg } from '../../shared/enemies.js';
 import { TALENTS, TIER_REQ, SPECS, specPoints, talentRank } from '../../shared/talents.js';
+import { SETS, SET_PIECES } from '../../shared/sets.js';
 import { SFX } from '../sfx.js';
 
 const USABLE_FOOD = new Set(['bread', 'meat', 'cooked_meat', 'bandage']);
@@ -65,9 +66,20 @@ export class Panels {
     const lines = stats ? stats.split(', ').map(s => `<div class="tstat">${s}</div>`).join('') : '';
     const blockLine = it?.block ? '<div class="tinfo">Блок на ПКМ: гасит удары спереди</div>' : '';
     const activeLine = it?.activeDesc ? `<div class="tinfo" style="color:#df7126">${it.activeDesc}</div>` : '';
+    const procLine = it?.procDesc ? `<div class="tinfo" style="color:#df7126">★ ${it.procDesc}</div>` : '';
+    // сет: перечень бонусов, активные — подсвечены
+    let setBlock = '';
+    if (it?.set && SETS[it.set]) {
+      const S = SETS[it.set];
+      const worn = Object.values(this.net.you?.eq || {})
+        .filter(id => id && getItem(id)?.set === it.set).length;
+      setBlock = `<div class="tinfo" style="color:${S.color}">${S.name} (${worn}/${SET_PIECES[it.set].length})</div>`
+        + Object.entries(S.bonuses).map(([n, b]) =>
+          `<div class="tstat" style="color:${worn >= +n ? S.color : '#696a6a'}">(${n}) ${b.desc}</div>`).join('');
+    }
     return `<div class="tname" style="color:${r.color}">${name}</div>`
       + `<div class="ttype">${type}${rarLabel}</div>`
-      + lines + blockLine + activeLine
+      + lines + blockLine + activeLine + procLine + setBlock
       + (price ? `<div class="tprice">Цена продажи: ${sellPriceR(itemId)} мон.</div>` : '')
       + (action ? `<div class="tact">клик — ${action}</div>` : '');
   }

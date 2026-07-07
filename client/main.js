@@ -240,6 +240,11 @@ net.handlers.onFx = (kind, m) => {
       particles.burst(m.x, m.y, '#847e87', 12, 60, 0.35);
       SFX.roll();
       break;
+    case 'nova': // ледяная/огненная нова реликвий и сетов
+      ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 46, t: 0, dur: 0.4, color: '#df7126' });
+      particles.burst(m.x, m.y, '#df7126', 14, 90, 0.35);
+      SFX.hit();
+      break;
     case 'ability': spawnAbilityFx(m); break;
     case 'telegraph':
       // босс замахнулся: красная зона — беги!

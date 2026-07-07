@@ -612,6 +612,70 @@ const GEN = {
     px(s, 3, 14, C.gray); px(s, 12, 14, C.gray);
     return s;
   },
+
+  // ---------- Выжженные земли ----------
+  ashFloor() {
+    const s = make(16, 16);
+    dither(s, C.dgray, C.gray, 14, 41);
+    px(s, 4, 6, C.black); px(s, 11, 3, C.black); px(s, 8, 12, C.black);
+    px(s, 13, 9, [80, 44, 32]); // тлеющий уголёк в пепле
+    return s;
+  },
+  lava0() {
+    const s = make(16, 16);
+    dither(s, C.orange, C.red, 26, 42);
+    px(s, 3, 4, C.yellow); px(s, 4, 4, C.yellow); px(s, 11, 10, C.yellow);
+    px(s, 8, 7, C.dred); px(s, 13, 3, C.dred); px(s, 2, 12, C.dred);
+    return s;
+  },
+  lava1() {
+    const s = make(16, 16);
+    dither(s, C.orange, C.dred, 24, 43);
+    px(s, 10, 5, C.yellow); px(s, 5, 11, C.yellow); px(s, 6, 12, C.yellow);
+    px(s, 12, 12, C.red); px(s, 3, 3, C.red);
+    return s;
+  },
+  obsidianWall() {
+    const s = make(16, 16);
+    dither(s, C.dblue, C.black, 30, 44);
+    // острые сколы вулканического стекла с бликами
+    px(s, 4, 3, C.purple); px(s, 5, 4, C.navy); px(s, 11, 8, C.purple);
+    px(s, 12, 9, C.navy); px(s, 7, 12, C.navy); px(s, 3, 9, [60, 52, 84]);
+    rect(s, 0, 14, 16, 2, C.black);
+    return s;
+  },
+  burntTree() {
+    const s = make(16, 16);
+    // чёрный обгорелый ствол с обломанными сучьями
+    rect(s, 7, 5, 2, 10, C.black);
+    rect(s, 7, 4, 2, 2, [40, 30, 28]);
+    px(s, 5, 6, C.black); px(s, 6, 6, C.black);   // левый сук
+    px(s, 10, 8, C.black); px(s, 11, 7, C.black); // правый сук
+    px(s, 8, 3, [110, 30, 30]); // тлеющий скол
+    px(s, 6, 15, C.dgray); px(s, 10, 15, C.dgray);
+    return s;
+  },
+  emberNode() {
+    const s = make(16, 16);
+    // жила тлеющего кристалла: тёмный камень, оранжевые прожилки
+    disc(s, 8, 9, 6, C.dgray);
+    disc(s, 8, 9, 5, [58, 52, 60]);
+    px(s, 6, 7, C.orange); px(s, 7, 8, C.orange); px(s, 8, 9, C.yellow);
+    px(s, 10, 10, C.orange); px(s, 11, 11, C.red); px(s, 5, 11, C.red);
+    px(s, 9, 6, C.orange); px(s, 10, 7, C.yellow);
+    return s;
+  },
+  flamePortal() {
+    const s = make(16, 16);
+    // огненное кольцо на обсидиановом основании
+    rect(s, 3, 13, 10, 2, C.dblue);
+    ring(s, 8, 7, 5, C.orange);
+    ring(s, 8, 7, 4, C.red);
+    disc(s, 8, 7, 3, [40, 12, 40]);       // жерло иного мира
+    px(s, 6, 3, C.yellow); px(s, 10, 3, C.yellow); px(s, 8, 2, C.orange);
+    px(s, 4, 10, C.yellow); px(s, 12, 10, C.yellow);
+    return s;
+  },
 };
 
 export function genSprite(procName, args) {

@@ -251,6 +251,114 @@ export const ITEMS = {
     stats: { str: 1, agi: 1, int: 1, lck: 1 }, price: 500, icon: 'item_seal_dark',
   },
 
+  // --- СЕТЫ: части комплектов (бонусы 2/4 частей — shared/sets.js) ---
+  // «Волчья стая» — ближний бой
+  pack_helm: {
+    id: 'pack_helm', name: 'Клыкастый шлем', slot: 'head', set: 'wolfpack',
+    stats: { str: 1 }, price: 120, icon: 'item_pack_helm',
+  },
+  pack_armor: {
+    id: 'pack_armor', name: 'Доспех волчьей стаи', slot: 'chest', set: 'wolfpack',
+    stats: { maxHp: 3, str: 1 }, price: 160, icon: 'item_pack_armor',
+  },
+  pack_legs: {
+    id: 'pack_legs', name: 'Поножи стаи', slot: 'legs', set: 'wolfpack',
+    stats: { speed: 0.05 }, price: 110, icon: 'item_pack_legs',
+  },
+  pack_ring: {
+    id: 'pack_ring', name: 'Кольцо вожака', slot: 'ring', set: 'wolfpack',
+    stats: { maxHp: 2 }, price: 100, icon: 'item_pack_ring',
+  },
+  // «Ледяной чертог» — магия
+  frost_hood: {
+    id: 'frost_hood', name: 'Капюшон инея', slot: 'head', set: 'icehall',
+    stats: { int: 1 }, price: 120, icon: 'item_frost_hood',
+  },
+  frost_robe: {
+    id: 'frost_robe', name: 'Мантия чертога', slot: 'chest', set: 'icehall',
+    stats: { int: 2 }, price: 160, icon: 'item_frost_robe',
+  },
+  frost_legs: {
+    id: 'frost_legs', name: 'Ледяные поножи', slot: 'legs', set: 'icehall',
+    stats: { manaRegen: 1 }, price: 110, icon: 'item_frost_legs',
+  },
+  frost_amulet: {
+    id: 'frost_amulet', name: 'Амулет стужи', slot: 'acc', set: 'icehall',
+    stats: { int: 1, manaRegen: 1 }, price: 120, icon: 'item_frost_amulet',
+  },
+  // «Ночная тень» — ловкость
+  night_hood: {
+    id: 'night_hood', name: 'Капюшон тени', slot: 'head', set: 'nightshade',
+    stats: { agi: 1 }, price: 120, icon: 'item_night_hood',
+  },
+  night_cloak: {
+    id: 'night_cloak', name: 'Плащ ночи', slot: 'chest', set: 'nightshade',
+    stats: { agi: 1, speed: 0.04 }, price: 160, icon: 'item_night_cloak',
+  },
+  night_legs: {
+    id: 'night_legs', name: 'Тихие поножи', slot: 'legs', set: 'nightshade',
+    stats: { agi: 1 }, price: 110, icon: 'item_night_legs',
+  },
+  night_ring: {
+    id: 'night_ring', name: 'Кольцо сумрака', slot: 'ring', set: 'nightshade',
+    stats: { dodge: 0.03 }, price: 100, icon: 'item_night_ring',
+  },
+  // «Пепельный орден» — Выжженные земли
+  ash_helm: {
+    id: 'ash_helm', name: 'Шлем огнеходца', slot: 'head', set: 'ashorder',
+    stats: { maxHp: 2 }, price: 140, icon: 'item_ash_helm',
+  },
+  ash_armor: {
+    id: 'ash_armor', name: 'Панцирь ордена', slot: 'chest', set: 'ashorder',
+    stats: { maxHp: 4 }, price: 180, icon: 'item_ash_armor',
+  },
+  ash_legs: {
+    id: 'ash_legs', name: 'Обсидиановые поножи', slot: 'legs', set: 'ashorder',
+    stats: { maxHp: 1, speed: 0.03 }, price: 130, icon: 'item_ash_legs',
+  },
+  ash_amulet: {
+    id: 'ash_amulet', name: 'Уголёк ордена', slot: 'acc', set: 'ashorder',
+    stats: { str: 1, int: 1 }, price: 140, icon: 'item_ash_amulet',
+  },
+
+  // --- РЕЛИКВИИ: уникальные свойства (proc). Выпадают и куются только эпиками ---
+  storm_amulet: {
+    id: 'storm_amulet', name: 'Гнев небес', slot: 'acc',
+    stats: { int: 1 }, price: 280, icon: 'item_storm_amulet',
+    proc: { type: 'smite', dmg: 5, cd: 8 },
+    procDesc: 'в бою раз в 8 с молния бьёт ближайшего врага',
+  },
+  phoenix_amulet: {
+    id: 'phoenix_amulet', name: 'Перо феникса', slot: 'acc',
+    stats: { maxHp: 2 }, price: 320, icon: 'item_phoenix_amulet',
+    proc: { type: 'phoenix', cd: 240 },
+    procDesc: 'раз в 4 минуты спасает от смерти (3 hp)',
+  },
+  rime_ring: {
+    id: 'rime_ring', name: 'Кольцо инея', slot: 'ring',
+    stats: { int: 1 }, price: 260, icon: 'item_rime_ring',
+    proc: { type: 'frostroll' },
+    procDesc: 'перекат окатывает врагов вокруг ледяной новой',
+  },
+  blood_ring: {
+    id: 'blood_ring', name: 'Жажда крови', slot: 'ring',
+    stats: { str: 1 }, price: 280, icon: 'item_blood_ring',
+    proc: { type: 'bloodlust' },
+    procDesc: 'убийство: +4% урона на 6 с (до 5 зарядов)',
+  },
+  thorn_armor: {
+    id: 'thorn_armor', name: 'Шипастый панцирь', slot: 'chest',
+    stats: { maxHp: 3 }, price: 300, icon: 'item_thorn_armor',
+    proc: { type: 'thorns', dmg: 2 },
+    procDesc: 'враги ранят себя об шипы (2 урона в ближнем бою)',
+  },
+  wind_legs: {
+    id: 'wind_legs', name: 'Сапоги ветра', slot: 'legs',
+    stats: { agi: 1, speed: 0.04 }, price: 260, icon: 'item_wind_legs',
+    proc: { type: 'windrush' },
+    procDesc: 'после переката +35% скорости на 2 с',
+  },
+
   // --- зелья ---
   heal_potion: {
     id: 'heal_potion', name: 'Зелье лечения', use: { heal: 3 },

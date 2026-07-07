@@ -50,6 +50,13 @@ export const T = {
   TRAP: 42,          // ловушка с лезвиями — ранит наступившего
   LOCKED_DOOR: 43,   // запертая дверь босса — нужен ключ мини-босса
   STAIRS: 44,        // лестница на нижний этаж подземелья
+  // Выжженные земли
+  ASH: 45,           // пепельная пустошь — земля региона
+  LAVA: 46,          // лава: жжёт стоящего, перекатом можно проскочить
+  OBSIDIAN: 47,      // обсидиановая скала — стены региона
+  BURNT_TREE: 48,    // обугленное дерево
+  EMBER: 49,         // тлеющая кристальная жила — богатая добыча кристаллов
+  PORTAL: 50,        // обсидиановый портал между мирами
 };
 
 // Разрушаемые тайлы: прочность, во что превращаются, дроп.
@@ -70,6 +77,9 @@ export const DESTRUCTIBLE = {
   [T.STATUE]: { hp: 20, becomes: T.RUBBLE, drops: {} },
   [T.PILLAR]: { hp: 8, becomes: T.RUBBLE, drops: {} },
   [T.CRYSTAL_WALL]: { hp: 12, becomes: T.DUNGEON_FLOOR, drops: { crystal: 1 } },
+  [T.BURNT_TREE]: { hp: 2, becomes: T.ASH, drops: { wood: 0.6 } },
+  [T.OBSIDIAN]: { hp: 18, becomes: T.ASH, drops: { metal: 0.5 } },
+  [T.EMBER]: { hp: 14, becomes: T.ASH, drops: { crystal: 1.6 } },
 };
 
 // Сезоны: 3 игровых дня каждый. Влияют на урожай и агрессию монстров.
@@ -84,10 +94,11 @@ export const SOLID = new Set([
   T.DUNGEON_WALL, T.STALL, T.WELL, T.CHEST, T.TABLE, T.BED, T.TOWER,
   T.MINE, T.SHRINE, T.FENCE, T.ANVIL,
   T.OBELISK, T.STATUE, T.FOUNTAIN, T.DARK_ALTAR, T.CRYSTAL_WALL, T.PILLAR,
-  T.LOCKED_DOOR,
+  T.LOCKED_DOOR, T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
 ]);
 // Блокирует пули (стены — да, вода — нет)
 export const BULLET_SOLID = new Set([
   T.WALL, T.TREE, T.ROCK_SOLID, T.DUNGEON_WALL, T.STALL, T.WELL, T.TOWER,
   T.MINE, T.OBELISK, T.STATUE, T.CRYSTAL_WALL, T.PILLAR, T.LOCKED_DOOR,
+  T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
 ]);

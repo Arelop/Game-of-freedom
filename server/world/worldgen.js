@@ -154,6 +154,7 @@ export function makeWorld(seed) {
     { type: 'spring', name: 'Целебный источник', n: 2 },
     { type: 'barrow', name: 'Древний курган', n: 2 },
     { type: 'oldwell', name: 'Заброшенный колодец', n: 1 },
+    { type: 'ashportal', name: 'Обсидиановый портал', n: 1 },
   ];
   let si = 0;
   for (const spec of SPECIALS) {
@@ -172,6 +173,7 @@ export function makeWorld(seed) {
         poi.pressed = [];
         poi.looted = false;
       }
+      if (spec.type === 'ashportal') world.ashPortal = { x: site.x, y: site.y };
       stampSpecial(world, poi, rand);
       world.pois.push(poi);
     }
@@ -293,6 +295,13 @@ function stampSpecial(world, poi, rand) {
     set(2, -2, T.PILLAR);
     set(-2, 2, T.PILLAR);
     set(2, 2, T.PILLAR);
+  } else if (type === 'ashportal') {
+    // врата в Выжженные земли: обсидиановая арка среди выжженной травы
+    set(0, 0, T.PORTAL);
+    set(-1, -1, T.OBSIDIAN); set(1, -1, T.OBSIDIAN);
+    set(-2, 0, T.OBSIDIAN); set(2, 0, T.OBSIDIAN);
+    set(-1, 2, T.BURNT_TREE); set(2, 2, T.BURNT_TREE); set(0, -2, T.RUBBLE);
+    set(-2, 1, T.ASH); set(2, 1, T.ASH); set(0, 1, T.ASH); set(1, 1, T.ASH); set(-1, 1, T.ASH);
   } else if (type === 'oldwell') {
     // забытый колодец: из глубины шепчет голос
     set(0, 0, T.WELL);

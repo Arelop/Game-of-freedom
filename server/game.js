@@ -4,7 +4,7 @@ import {
   HUNGER_MAX, HUNGER_RATE, DAY_LENGTH, PLAYER_RADIUS, DESTRUCTIBLE, seasonOf,
 } from '../shared/constants.js';
 import { WEAPONS } from '../shared/weapons.js';
-import { ENEMIES, tierTouchBonus, tierProjDmg, enemiesOfTier } from '../shared/enemies.js';
+import { ENEMIES, tierTouchBonus, tierProjDmg, enemiesOfTier, ASH_KINDS } from '../shared/enemies.js';
 import { PATTERNS, emitDirections } from '../shared/patterns.js';
 import {
   makePlayerState, stepPlayer, stepProjectile, hasIFrames, circlesOverlap, dist2,
@@ -14,6 +14,8 @@ import { mulberry32, hash2, randInt, pick } from '../shared/rng.js';
 import { makeWorld } from './world/worldgen.js';
 import { ChunkStore } from './world/chunks.js';
 import { generateDungeon, roomAt, generateArena } from './world/dungeon.js';
+import { generateAshlands } from './world/ashlands.js';
+import { SETS, SET_PIECES } from '../shared/sets.js';
 import { updateEnemy } from './sim/ai.js';
 import { updateNpc } from './sim/npc.js';
 import { AbstractSim } from './sim/abstract.js';
@@ -90,6 +92,21 @@ function ammoUsers(type) {
 }
 
 // Плавающие цены: дефицит в деревне делает товар дороже, избыток — дешевле.
+// зачарователь куёт реликвии по слоту исходника
+const RELIC_BY_SLOT = {
+  chest: ['thorn_armor'], legs: ['wind_legs'],
+  ring: ['rime_ring', 'blood_ring'], acc: ['storm_amulet', 'phoenix_amulet'],
+};
+
+// прилавок огнеходцев: снаряжение для жизни среди лавы (цены суровые — доставка!)
+const ASH_SHOP = [
+  { item: 'heal_potion', price: 40 }, { item: 'mana_potion', price: 36 },
+  { item: 'bread', price: 14 }, { item: 'bandage', price: 22 },
+  { item: 'ash_helm', price: 140 }, { item: 'ash_legs', price: 130 },
+  { item: 'weapon:obsidianblade', price: 220 }, { item: 'weapon:ashstaff', price: 210 },
+  { item: 'ammo_arrow', price: 16, count: 20 }, { item: 'ammo_bolt', price: 22, count: 8 },
+];
+
 // mode 'buy' — покупка игроком, 'sell' — продажа игроком (дефицит платит больше).
 function scarcityMult(s, item, mode) {
   if (!s) return 1;
@@ -263,9 +280,14 @@ export class Game {
     let gearDmg = 1;
     let rollCd = 1;
 
+    let manaBonus = 0;
+    p.setCounts = {}; p.setFlags = {}; p.procs = {};
     for (const slot of GEAR_SLOTS) {
       const it = getItem(p.equipment[slot]);
-      if (!it?.stats) continue;
+      if (!it) continue;
+      if (it.set) p.setCounts[it.set] = (p.setCounts[it.set] || 0) + 1;
+      if (it.proc) p.procs[it.proc.type] = it.proc;
+      if (!it.stats) continue;
       maxHp += it.stats.maxHp || 0;
       speed += it.stats.speed || 0;
       gearDmg += it.stats.damage || 0;
@@ -273,6 +295,19 @@ export class Game {
       d.dodge += it.stats.dodge || 0;
       d.manaRegen += it.stats.manaRegen || 0;
       d.coinMult += it.stats.coinMult || 0;
+    }
+    // сетовые бонусы: 2 и 4 части комплекта
+    for (const [sid, n] of Object.entries(p.setCounts)) {
+      for (const [need, b] of Object.entries(SETS[sid]?.bonuses || {})) {
+        if (n < +need) continue;
+        if (b.flag) p.setFlags[b.flag] = true;
+        if (!b.stats) continue;
+        maxHp += b.stats.maxHp || 0;
+        speed += b.stats.speed || 0;
+        manaBonus += b.stats.mana || 0;
+        d.dodge += b.stats.dodge || 0;
+        d.manaRegen += b.stats.manaRegen || 0;
+      }
     }
     for (const id of p.talents) {
       const t = findTalent(p.cls, id);
@@ -308,8 +343,8 @@ export class Game {
     p.hp = Math.min(p.hp, maxHp);
     p.speedMult = Math.max(0.4, speed);
     p.rollCdMult = Math.max(0.2, rollCd);
-    // запас маны: база класса + 4 за очко интеллекта (+20 богу)
-    p.manaMax = (C.manaBase || 20) + (eff.int || 0) * 4 + (p.ascended ? 20 : 0);
+    // запас маны: база класса + 4 за очко интеллекта (+20 богу, + сетовые бонусы)
+    p.manaMax = (C.manaBase || 20) + (eff.int || 0) * 4 + (p.ascended ? 20 : 0) + manaBonus;
     p.mana = Math.min(p.mana ?? p.manaMax, p.manaMax);
     // блок на ПКМ возможен только со щитом в левой руке
     p.canBlock = !!getItem(p.equipment.offhand)?.block;
@@ -494,6 +529,7 @@ export class Game {
     this.checkDungeonRooms();
     this.checkAscensions();
     this.checkArena();
+    this.stepAsh();
   }
 
   isNight() { return this.world.time < 0.22 || this.world.time > 0.85; }
@@ -642,6 +678,40 @@ export class Game {
     }
     if (p.abCd) for (let i = 0; i < 3; i++) p.abCd[i] = Math.max(0, (p.abCd[i] || 0) - dt);
     p.offCd = Math.max(0, (p.offCd || 0) - dt);
+    // ---- реликвии-проки ----
+    p.blT = Math.max(0, (p.blT || 0) - dt); // заряды «Жажды крови» тают
+    // «Гнев небес»: в бою молния сама находит ближайшего врага
+    if (p.procs?.smite && p.combatT < 5) {
+      p.smiteT = (p.smiteT ?? 0) - dt;
+      if (p.smiteT <= 0) {
+        let best = null, bd = 130 * 130;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          const d2 = dist2(p.x, p.y, e.x, e.y);
+          if (d2 < bd) { bd = d2; best = e; }
+        }
+        if (best) {
+          p.smiteT = p.procs.smite.cd;
+          this.damageEnemy(best, p.procs.smite.dmg, { vx: 0, vy: 0, knockback: 20, owner: p.id, school: 'magic' });
+          this.fx({ t: 'chain', pts: [[p.x, p.y - 12], [best.x, best.y]] }, p.mapId, p.x, p.y);
+        }
+      }
+    }
+    // перекат-реликвии: срабатывают в момент кувырка
+    if (p.rollT > 0 && !p.rolledProc) {
+      p.rolledProc = true;
+      if (p.procs?.frostroll) { // «Кольцо инея»: нова стужи
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) < 50 * 50) { e.slowT = 1.6; e.slowMult = 0.5; }
+        }
+        this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      }
+      if (p.procs?.windrush) { // «Сапоги ветра»: рывок скорости
+        p.buffs.speed = { mult: 0.35, t: 2 };
+        this.recomputeStats(p);
+      }
+    } else if (p.rollT <= 0) p.rolledProc = false;
     if (p.shieldT > 0) { p.shieldT -= dt; if (p.shieldT <= 0) { p.shieldT = 0; p.shieldHp = 0; } }
     // кровавый контракт: тикает; дожил до конца — сундук в награду
     if (p.contract) {
@@ -691,7 +761,15 @@ export class Game {
     // ловушки подземелий: лезвия под ногами (перекат проскакивает)
     if (p.mapId !== 'over' && p.rollT <= 0) {
       const ttx = Math.floor(p.x / TILE), tty = Math.floor(p.y / TILE);
-      if (this.chunks.tileAt(p.mapId, ttx, tty) === T.TRAP) {
+      const tHere = this.chunks.tileAt(p.mapId, ttx, tty);
+      // лава Выжженных земель: жжёт стоящего, перекат проносит невредимым
+      if (tHere === T.LAVA && (p.lavaT || 0) <= this.tick) {
+        p.lavaT = this.tick + 24; // ожог раз в 0.8 с
+        this.damagePlayer(p, p.setFlags?.set_ashwalk ? 1 : 2, null);
+        this.fx({ t: 'hit', kind: 'wall', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        if (!p.lavaHinted) { p.lavaHinted = true; this.toast(p, '🔥 ЛАВА! Перекатом можно проскочить реку огня'); }
+      }
+      if (tHere === T.TRAP) {
         const key = p.mapId + ':' + ttx + ',' + tty;
         this.trapCd = this.trapCd || new Map();
         if ((this.trapCd.get(key) || 0) <= this.tick) {
@@ -1646,7 +1724,28 @@ export class Game {
       if (e.hp >= e.maxHp && this.hasTalent(attacker, 'ambush')) dmg *= 1.4;          // Засада
       if (e.hp / (e.maxHp || 1) <= 0.25 && this.hasTalent(attacker, 'execute')) dmg *= 1.5; // Палач
       if ((e.slowT || 0) > 0 && this.hasTalent(attacker, 'deepfreeze')) dmg *= 1.35;  // Абсолютный ноль
+      // сет «Ночная тень» (4): удар в спину — враг смотрит прочь от атакующего
+      if (attacker.setFlags?.set_backstab) {
+        let da = Math.atan2(e.y - attacker.y, e.x - attacker.x) - (e.aim || 0);
+        da = Math.atan2(Math.sin(da), Math.cos(da));
+        if (Math.abs(da) < Math.PI / 3) dmg *= 1.4;
+      }
+      // «Жажда крови»: заряды недавних убийств
+      if (attacker.blT > 0 && attacker.blStacks) dmg *= 1 + 0.04 * attacker.blStacks;
       dmg = Math.round(dmg * 10) / 10;
+      // сет «Ледяной чертог» (4): магия студит врагов
+      if (pr.school === 'magic' && attacker.setFlags?.set_chill && (e.slowT || 0) <= 0) {
+        e.slowT = 1.4; e.slowMult = 0.65;
+      }
+      // обсидиановое оружие: раны горят
+      const aw = this.weapon(attacker);
+      if (aw?.burn && pr.school === aw.school) {
+        e.dotT = aw.burn.time; e.dotDmg = aw.burn.dmg; e.dotSrc = attacker.id; e.dotKind = 'ignite';
+      }
+      // сет «Волчья стая» (4): ближний бой пускает кровь
+      if (pr.school === 'melee' && attacker.setFlags?.set_bleed && (e.dotT || 0) <= 0) {
+        e.dotT = 3; e.dotDmg = 1; e.dotSrc = attacker.id; e.dotKind = 'venom';
+      }
       // Отравленные клинки / Поджог: навешиваем дот
       if (pr.school !== 'magic' && this.hasTalent(attacker, 'venom')) {
         e.dotT = 4; e.dotDmg = 1; e.dotSrc = attacker.id; e.dotKind = 'venom';
@@ -1739,6 +1838,36 @@ export class Game {
     }
     // элита: щедрый дроп экипировки
     if (e.elite && this.rand() < 0.45) this.dropRandomGear(e.mapId, e.x, e.y, false, luck + 4);
+    // «Жажда крови»: убийства копят заряды ярости
+    if (killer?.procs?.bloodlust) {
+      killer.blStacks = Math.min(5, (killer.blT > 0 ? killer.blStacks || 0 : 0) + 1);
+      killer.blT = 6;
+    }
+    // сеты: боссы и чемпионы арены носят части комплектов
+    if (def.archetype === 'boss') {
+      this.dropSetPiece(e.mapId, e.x + 6, e.y + 6, luck);
+      if (this.rand() < 0.25) this.dropRelic(e.mapId, e.x - 8, e.y + 6);
+    }
+    if (e.arenaChamp) this.dropSetPiece(e.mapId, e.x, e.y, luck);
+    // Выжженные земли: элита щеголяет «Пепельным орденом», всякая тварь — оружием огня
+    if (e.mapId === 'ash') {
+      if (e.elite && this.rand() < 0.35) this.dropSetPiece('ash', e.x, e.y, luck, 'ashorder');
+      if (this.rand() < 0.04) this.dropRandomWeapon('ash', e.x, e.y, luck, 1, ['obsidianblade', 'ashstaff']);
+      for (const q of gainers) {
+        if (q.story?.ash === 1 && e.kind === 'salamander') {
+          q.story.ashN = (q.story.ashN || 0) + 1;
+          if (q.story.ashN >= 6) { q.story.ash = 2; this.toast(q, '🔥 Саламандры усмирены (6/6) — Огневзор ждёт'); }
+        }
+      }
+    }
+    // Старший голем повержен — испытание огнеходцев пройдено
+    if (e.ashElder) {
+      this.ashElderDead = true;
+      for (const q of this.players.values())
+        if (q.story?.ash === 3) { q.story.ash = 4; this.toast(q, '🗿 Старший голем пал! Огневзор ждёт с наградой'); }
+      this.toastAll('🗿 Старший голем Выжженных земель повержен!');
+      this.events.push(this.world.day, 'Пал Старший голем Выжженных земель');
+    }
     // сюжет Творимира: Сердце горы из груди Каменного короля
     if (e.kind === 'rockKing' && gainers.some(q => q.story?.smith === 2)) {
       this.spawnDrop('mountain_heart', 1, e.mapId, e.x, e.y, 300);
@@ -1954,11 +2083,18 @@ export class Game {
       if (source.entType === 'enemy') {
         const def = ENEMIES[source.kind];
         moveWithCollision(source, -Math.cos(a) * 10, -Math.sin(a) * 10, def?.radius || 5, map);
-        // Шипастый доспех (и Живая крепость): возмездие за удар вблизи
-        if (this.hasTalent(p, 'thorns') || this.hasTalent(p, 'thorns3'))
-          this.damageEnemy(source, this.hasTalent(p, 'thorns3') ? 3 : 1,
+        // Шипастый доспех (талант/реликвия): возмездие за удар вблизи
+        const thorn = (this.hasTalent(p, 'thorns3') ? 3 : this.hasTalent(p, 'thorns') ? 1 : 0)
+          + (p.procs?.thorns?.dmg || 0);
+        if (thorn > 0)
+          this.damageEnemy(source, thorn,
             { vx: -Math.cos(a), vy: -Math.sin(a), knockback: 30, owner: p.id, school: 'melee', isDot: true });
       }
+    }
+    // сет «Пепельный орден» (4): боль отвечает огненной новой
+    if (p.setFlags?.set_flamenova && this.rand() < 0.2) {
+      this.explodeAt(p.mapId, p.x, p.y, 3, 42, p.id, 0);
+      this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
     }
     // Последний рубеж: смертельный удар оставляет 1 ХП (раз в 60 с)
     if (p.hp <= 0 && this.hasTalent(p, 'laststand') && (p.lastStandT || 0) <= this.tick) {
@@ -1967,6 +2103,14 @@ export class Game {
       p.hurtT = 1.2;
       this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
       this.toast(p, '🛡 Последний рубеж: ты устоял на ногах!');
+    }
+    // «Перо феникса»: раз в 4 минуты вырывает из лап смерти
+    if (p.hp <= 0 && p.procs?.phoenix && (p.phoenixT || 0) <= this.tick) {
+      p.hp = 3;
+      p.phoenixT = this.tick + (p.procs.phoenix.cd || 240) * 30;
+      p.hurtT = 1.5;
+      this.fx({ t: 'ascend', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      this.toast(p, '🪶 Перо феникса вспыхнуло — ты восстал из пепла!');
     }
     this.fx({ t: 'phurt', id: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
     if (p.hp <= 0) {
@@ -2033,12 +2177,25 @@ export class Game {
   }
 
   // Дроп оружия: редкость зависит от удачи убийцы и источника (boost)
-  dropRandomWeapon(mapId, x, y, luck = 0, boost = 0) {
-    const pool = ['axe', 'huntbow', 'crossbow', 'knives', 'firestaff', 'froststaff',
+  dropRandomWeapon(mapId, x, y, luck = 0, boost = 0, customPool = null) {
+    const pool = customPool || ['axe', 'huntbow', 'crossbow', 'knives', 'firestaff', 'froststaff',
       'fireball', 'stormstaff', 'spear', 'warhammer', 'dagger', 'taxes', 'venomstaff', 'bombs',
       'mace', 'flail', 'morningstar', 'greatsword', 'halberd'];
     const rar = rollRarity(this.rand, luck, boost);
     this.spawnDrop('weapon:' + withRarity(pick(this.rand, pool), rar), 1, mapId, x, y);
+  }
+
+  // Часть сета (минимум редкая): с боссов, чемпионов и элиты Выжженных земель
+  dropSetPiece(mapId, x, y, luck = 0, setId = null) {
+    const sid = setId || pick(this.rand, Object.keys(SET_PIECES));
+    const piece = pick(this.rand, SET_PIECES[sid]);
+    this.spawnDrop(withRarity(piece, rollRarity(this.rand, luck, 2)), 1, mapId, x, y, 300);
+  }
+
+  // Реликвия с уникальным свойством — всегда эпик
+  dropRelic(mapId, x, y) {
+    const RELICS = ['storm_amulet', 'phoenix_amulet', 'rime_ring', 'blood_ring', 'thorn_armor', 'wind_legs'];
+    this.spawnDrop(pick(this.rand, RELICS) + '@e', 1, mapId, x, y, 300);
   }
 
   dropRandomGear(mapId, x, y, elite = false, luck = 0) {
@@ -2206,7 +2363,9 @@ export class Game {
       if (t === T.CHEST && this.isAtHome(p, tx + dx, ty + dy)) { this.openStash(p, 'home'); return; }
       if (t === T.CHEST && this.tryBarrowChest(p, tx + dx, ty + dy)) return;
       if (t === T.CHEST && this.tryWildChest(p, tx + dx, ty + dy)) return;
+      if (t === T.CHEST && p.mapId === 'ash') { this.openAshChest(p, tx + dx, ty + dy); return; }
       if (t === T.CHEST) { this.openChest(p, tx + dx, ty + dy); return; }
+      if (t === T.PORTAL) { this.usePortal(p); return; }
       if (t === T.STATUE && this.tryBarrowStatue(p, tx + dx, ty + dy)) return;
       if (t === T.DUNGEON_EXIT && p.mapId !== 'over') { this.exitDungeon(p); return; }
       if (t === T.LOCKED_DOOR && p.mapId !== 'over') {
@@ -2482,6 +2641,111 @@ export class Game {
     this.toast(p, '⚔ Волны начнутся через мгновение. Выход — через портал');
   }
 
+  // ---------- Выжженные земли: регион за обсидиановым порталом ----------
+  ensureAsh() {
+    if (this.dungeons.has('ash')) return;
+    const d = generateAshlands(this.world.seed);
+    this.dungeons.set('ash', { dungeon: d, poi: { entrance: this.world.ashPortal || { x: 60, y: 60 }, name: 'Выжженные земли' } });
+    this.chunks.dungeons.set('ash', d);
+  }
+
+  usePortal(p) {
+    this.ensureAsh();
+    const d = this.dungeons.get('ash').dungeon;
+    if (p.mapId === 'ash') { // домой
+      const back = this.world.ashPortal || { x: 60, y: 60 };
+      p.mapId = 'over';
+      p.x = back.x * TILE + 8; p.y = (back.y + 2) * TILE + 8;
+      this.sendMapChange(p, null);
+      return;
+    }
+    // печать огня: первая настройка стоит 10 кристаллов
+    if (!p.story.ashAttuned) {
+      if ((p.inventory.crystal || 0) < 10) {
+        this.toast(p, '🔥 Портал спит. Печать огня требует 10 кристаллов (единожды)');
+        return;
+      }
+      p.inventory.crystal -= 10;
+      p.story.ashAttuned = true;
+      this.toast(p, '🔥 Печать настроена! Портал отныне признаёт тебя');
+      this.events.push(this.world.day, `${p.name} пробудил обсидиановый портал`);
+    }
+    p.mapId = 'ash';
+    p.x = d.entrance.x * TILE + 8; p.y = (d.entrance.y - 2) * TILE + 8;
+    this.sendMapChange(p, '🔥 ВЫЖЖЕННЫЕ ЗЕМЛИ');
+    if (!p.story.ashSeen) {
+      p.story.ashSeen = true;
+      this.toast(p, 'Пепел скрипит под ногами. Лагерь огнеходцев — рядом, дальше — только огонь');
+    }
+  }
+
+  // сундук ордена в логове големов: реликвия — раз на мир
+  openAshChest(p, tx, ty) {
+    if (this.world.ashLooted) { this.toast(p, 'Сундук ордена пуст — реликвию уже забрали'); return; }
+    this.world.ashLooted = true;
+    this.dropRelic('ash', tx * TILE + 8, ty * TILE + 20);
+    this.spawnDrop('coin', randInt(this.rand, 30, 50), 'ash', tx * TILE - 4, ty * TILE + 20);
+    this.toastAll(`🗿 ${p.name} вскрыл сундук Пепельного ордена!`);
+    this.events.push(this.world.day, `${p.name} добыл реликвию из логова големов`);
+  }
+
+  // живность региона: держим пустоши населёнными, пока внутри есть герои
+  stepAsh() {
+    const fighters = [...this.players.values()].filter(q => q.mapId === 'ash' && !q.dead);
+    if (!fighters.length) return;
+    this.ensureAsh();
+    const d = this.dungeons.get('ash').dungeon;
+    this.hydrateAshCamp(d);
+    if (this.tick % 75 !== 0) return; // примерка раз в 2.5 с
+    const cap = 12 + 4 * fighters.length;
+    let n = 0;
+    for (const e of this.entities.values())
+      if (e.entType === 'enemy' && e.mapId === 'ash') n++;
+    if (n >= cap) return;
+    // спавн подальше от глаз, не у лагеря
+    const q = pick(this.rand, fighters);
+    for (let tries = 0; tries < 12; tries++) {
+      const a = this.rand() * Math.PI * 2;
+      const r = 220 + this.rand() * 160;
+      const tx = Math.floor((q.x + Math.cos(a) * r) / TILE);
+      const ty = Math.floor((q.y + Math.sin(a) * r) / TILE);
+      if (tx < 3 || ty < 3 || tx > d.size - 3 || ty > d.size - 3) continue;
+      if ((tx - d.camp.x) ** 2 + (ty - d.camp.y) ** 2 < 24 * 24) continue;
+      if (this.chunks.tileAt('ash', tx, ty) !== T.ASH) continue;
+      // взвешенный выбор твари
+      const total = ASH_KINDS.reduce((s, [, w]) => s + w, 0);
+      let roll = this.rand() * total, kind = ASH_KINDS[0][0];
+      for (const [k, w] of ASH_KINDS) { roll -= w; if (roll <= 0) { kind = k; break; } }
+      this.spawnEnemy(kind, 'ash', tx * TILE + 8, ty * TILE + 8, { forceElite: this.rand() < 0.07 });
+      break;
+    }
+  }
+
+  // лагерь огнеходцев: люди появляются, когда рядом герой
+  hydrateAshCamp(d) {
+    if (this.ashCampIds?.some(id => this.entities.has(id))) return;
+    const near = [...this.players.values()].some(q =>
+      q.mapId === 'ash' && dist2(q.x, q.y, d.camp.x * TILE, d.camp.y * TILE) < 500 * 500);
+    if (!near) return;
+    const cx = d.camp.x * TILE, cy = d.camp.y * TILE;
+    this.ashCampIds = [
+      this.spawnNpc('ashtrader', null, 'ash', cx - 4 * TILE, cy - 1 * TILE, { kind: 'npc_merchant' }),
+      this.spawnNpc('enchanter', null, 'ash', cx + 4 * TILE, cy - 1 * TILE, { kind: 'npc_priest' }),
+      this.spawnNpc('firewalker', null, 'ash', cx, cy - 3 * TILE, { kind: 'npc_guard' }),
+    ];
+    const names = ['Жарох', 'Искра', 'Огневзор'];
+    this.ashCampIds.forEach((id, i) => { const n = this.entities.get(id); if (n) { n.name = names[i]; n.hp = n.maxHp = 40; } });
+    // логово: Старший голем ждёт бросивших вызов (возрождается с перезапуском мира)
+    if (!this.ashElderDead && !this.ashElderSpawned) {
+      this.ashElderSpawned = true;
+      const gid = this.spawnEnemy('magmaGolem', 'ash', d.lair.x * TILE, d.lair.y * TILE, { forceElite: true });
+      const g = this.entities.get(gid);
+      if (g) { g.ashElder = true; g.name = 'Старший голем'; g.hp = g.maxHp = Math.round(g.maxHp * 1.6); }
+      for (let i = 0; i < 2; i++)
+        this.spawnEnemy('magmaGolem', 'ash', (d.lair.x - 4 + i * 8) * TILE, (d.lair.y + 3) * TILE, { noElite: true });
+    }
+  }
+
   checkArena() {
     const fighters = [...this.players.values()].filter(q => q.mapId === 'arena' && !q.dead);
     if (!fighters.length) {
@@ -2527,7 +2791,7 @@ export class Game {
         cx + Math.cos(a) * 90, cy + Math.sin(a) * 90,
         { forceElite: champWave || this.rand() < A.wave * 0.02, noElite: false });
       const e = this.entities.get(id);
-      if (e) { e.aggro = true; A.ids.push(id); }
+      if (e) { e.aggro = true; if (champWave) e.arenaChamp = true; A.ids.push(id); }
     }
     this.toastMap('arena', champWave ? `⚔ ВОЛНА ${A.wave}: ЧЕМПИОН АРЕНЫ!` : `⚔ Волна ${A.wave} (${n} врагов)`);
   }
@@ -2851,6 +3115,30 @@ export class Game {
   storyChoice(p, key, dialogId) {
     const S = p.story;
     switch (key) {
+      // испытания огнеходцев (Выжженные земли)
+      case 'ash_accept':
+        if (!S.ash) { S.ash = 1; S.ashN = 0; this.toast(p, '🔥 Первое испытание: усмири 6 саламандр'); }
+        break;
+      case 'ash_give':
+        if (S.ash === 2 && (p.inventory.crystal || 0) >= 8) {
+          p.inventory.crystal -= 8;
+          S.ash = 3;
+          this.addXp(p, 60);
+          this.toast(p, '🔥 Второе испытание пройдено. Осталось последнее: Старший голем на севере');
+        }
+        break;
+      case 'ash_done':
+        if ((S.ash === 4) || (S.ash === 3 && this.ashElderDead)) {
+          S.ash = 10;
+          p.coins += 150;
+          this.addXp(p, 120);
+          const piece = pick(this.rand, SET_PIECES.ashorder) + '@r';
+          p.inventory[piece] = (p.inventory[piece] || 0) + 1;
+          this.toast(p, `🔥 Ты — огнеходец! Дар ордена: ${getItem(piece).name} и 150 монет`);
+          this.toastAll(`🔥 ${p.name} прошёл испытания огня и принят в огнеходцы!`);
+          this.events.push(this.world.day, `${p.name} стал огнеходцем Выжженных земель`);
+        }
+        break;
       case 'rado_accept':
         if (S.rado === 0) { S.rado = 1; this.toast(p, '✦ Радогост: принеси 5 кристаллов'); }
         break;
@@ -3239,6 +3527,55 @@ export class Game {
   openDialog(p, npc) {
     const s = this.world.settlements.find(x => x.id === npc.home);
     const fname = s ? (FACTIONS[s.faction]?.name || '') : '';
+    if (npc.role === 'ashtrader') {
+      const items = ASH_SHOP.map((it, i) => ({ i, item: it.item, count: it.count || 0, price: it.price, trend: 0, need: null }));
+      this.fx({ t: 'shop', pid: p.id, id: npc.id, name: `${npc.name}, торговец огнеходцев`, greet: '«Огонь всё дорожает, путник. Но и товар — жаркий»', items }, null);
+      return;
+    }
+    if (npc.role === 'enchanter') {
+      const lines = ['Искра, зачарователь огнеходцев',
+        '«Неси ЭПИЧЕСКУЮ вещь из сумки, 6 кристаллов и 120 монет —',
+        'перекую её в реликвию с истинным даром»'];
+      const choices = [];
+      for (const [id, n] of Object.entries(p.inventory)) {
+        if (n <= 0 || !isGear(id)) continue;
+        const it = getItem(id);
+        if (it?.rarity !== 'e' || it.proc || it.set) continue;
+        if (!RELIC_BY_SLOT[it.slot]) continue;
+        choices.push({ id: 'ench:' + id, label: `⚗ ${it.name} → реликвия` });
+        if (choices.length >= 6) break;
+      }
+      if (!choices.length) lines.push('(подойдёт эпический доспех, поножи, кольцо или амулет — не надетые)');
+      choices.push({ id: 'close', label: STR.close });
+      this.sendDialog(p, npc.id, '⚗ ' + npc.name, lines, choices);
+      return;
+    }
+    if (npc.role === 'firewalker') {
+      const st = p.story.ash || 0;
+      const lines = ['Огневзор, старший огнеходец'];
+      const choices = [];
+      if (st === 0) {
+        lines.push('«Пустоши испытывают всякого пришельца. Хочешь стать',
+          'своим у огня — пройди три испытания. Начнём с малого»');
+        choices.push({ id: 'story:ash_accept', label: '🔥 Принять испытания огня' });
+      } else if (st === 1) {
+        lines.push(`«Усмири саламандр — шесть хвостов (${p.story.ashN || 0}/6).`, 'Они гнездятся в пепле за лагерем»');
+      } else if (st === 2) {
+        if ((p.inventory.crystal || 0) >= 8) choices.push({ id: 'story:ash_give', label: '💎 Отдать 8 кристаллов' });
+        else lines.push(`«Второе: разбей тлеющие жилы и принеси 8 кристаллов (${p.inventory.crystal || 0}/8)»`);
+      } else if (st === 3) {
+        lines.push('«Последнее: Старший голем. Север, кольцо обсидиана.', 'Бей с фланга — корку спереди не проломить»');
+        if (this.ashElderDead) choices.push({ id: 'story:ash_done', label: '🗿 Голем повержен' });
+      } else if (st === 4) {
+        choices.push({ id: 'story:ash_done', label: '🗿 Испытание пройдено — за наградой' });
+      } else {
+        lines.push('«Ты — огнеходец, брат огня. Пустоши признали тебя».',
+          'Говорят, на севере пустует трон. Кто-то ещё придёт занять его…');
+      }
+      choices.push({ id: 'close', label: STR.close });
+      this.sendDialog(p, npc.id, '🔥 ' + npc.name, lines, choices);
+      return;
+    }
     if (npc.role === 'hermit') { this.storyDialogHermit(p, npc); return; }
     if (npc.role === 'captain') { this.storyDialogCaptain(p, npc); return; }
     if (npc.role === 'wanderer') { this.storyDialogWanderer(p, npc); return; }
@@ -3629,6 +3966,24 @@ export class Game {
     if (choice === 'stash') { this.openStash(p); return; }
     if (choice === 'nohouse') { this.toast(p, '«Чужакам домов не продаём. Заслужи доверие деревни (репутация 20)»'); return; }
     if (choice === 'arena_enter') { this.enterArena(p); return; }
+    if (choice.startsWith('ench:')) {
+      const id = choice.slice(5);
+      const it = getItem(id);
+      if (!it || (p.inventory[id] || 0) < 1 || it.rarity !== 'e' || it.proc || it.set) return;
+      const pool = RELIC_BY_SLOT[it.slot];
+      if (!pool) return;
+      if ((p.inventory.crystal || 0) < 6 || p.coins < 120) {
+        this.toast(p, 'Нужно 6 кристаллов и 120 монет'); return;
+      }
+      p.inventory[id]--; if (!p.inventory[id]) delete p.inventory[id];
+      p.inventory.crystal -= 6; p.coins -= 120;
+      const relic = pick(this.rand, pool) + '@e';
+      p.inventory[relic] = (p.inventory[relic] || 0) + 1;
+      this.fx({ t: 'levelup', pid: -1, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      this.toast(p, `⚗ Перековано: ${getItem(relic).name} — ${getItem(relic).procDesc}`);
+      this.events.push(this.world.day, `${p.name} выковал реликвию у зачарователя`);
+      return;
+    }
     if (choice === 'daily') {
       const D = this.world.daily;
       const npc = this.entities.get(dialogId);
@@ -3685,11 +4040,13 @@ export class Game {
     if (choice.startsWith('smithup:')) { this.smithUpgrade(p, choice.slice(8), dialogId); return; }
     if (choice.startsWith('smithbrk:')) { this.smithBreak(p, choice.slice(9), dialogId); return; }
     if (choice.startsWith('buy:')) {
-      const it = SHOP[+choice.split(':')[1]];
-      if (!it) return;
       const npc = this.entities.get(dialogId);
+      const stock = npc?.role === 'ashtrader' ? ASH_SHOP : SHOP;
+      const it = stock[+choice.split(':')[1]];
+      if (!it) return;
       const s = npc && this.world.settlements.find(x => x.id === npc.home);
-      const price = Math.ceil(it.price * priceMultiplier(s ? p.rep[s.faction] : 0) * scarcityMult(s, it.item, 'buy'));
+      const price = npc?.role === 'ashtrader' ? it.price
+        : Math.ceil(it.price * priceMultiplier(s ? p.rep[s.faction] : 0) * scarcityMult(s, it.item, 'buy'));
       if (p.coins < price) { this.toast(p, STR.notEnoughCoins); return; }
       p.coins -= price;
       if (it.item.startsWith('ammo_')) p.ammo[it.item.slice(5)] = (p.ammo[it.item.slice(5)] || 0) + (it.count || 1);

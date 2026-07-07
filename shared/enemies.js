@@ -268,6 +268,50 @@ export const ENEMIES = {
     sprite: 'enemy_frost_giant', xp: 40, drops: { coin: [20, 35], crystal: [2, 4] },
   },
 
+  // --- Выжженные земли: огненное племя за обсидиановым порталом ---
+  salamander: {
+    id: 'salamander', name: 'Саламандра', archetype: 'chaser', hp: 34, speed: 78, tier: 5,
+    radius: 6, touchDamage: 3, lungeSpeed: 280, lungeWindup: 0.3, lungeRange: 55,
+    sprite: 'enemy_salamander', xp: 26, drops: { coin: [8, 14], hide: [0, 1] },
+    region: 'ash',
+  },
+  ashHound: {
+    id: 'ashHound', name: 'Пепельный гончий', archetype: 'chaser', hp: 22, speed: 94, tier: 4,
+    radius: 5, touchDamage: 2, lungeSpeed: 300, lungeWindup: 0.25, lungeRange: 60,
+    sprite: 'enemy_ash_hound', xp: 16, drops: { coin: [5, 10], meat: [0, 1] },
+    region: 'ash',
+  },
+  fireElemental: {
+    id: 'fireElemental', name: 'Огненный элементаль', archetype: 'shooter', hp: 26, speed: 55, tier: 5,
+    radius: 6, touchDamage: 2, preferRange: [80, 140], fireInterval: 2.0,
+    pattern: 'aimedTriple', sprite: 'enemy_fire_elemental', xp: 28,
+    drops: { coin: [8, 15], crystal: [0, 2] },
+    explodeOnDeath: { dmg: 4, radius: 36 }, // гаснет со взрывом — отходи
+    region: 'ash',
+  },
+  efreet: {
+    id: 'efreet', name: 'Ифрит', archetype: 'shooter', hp: 40, speed: 48, tier: 5,
+    radius: 6, touchDamage: 2, preferRange: [100, 160], fireInterval: 2.4,
+    pattern: 'fan5', sprite: 'enemy_efreet', xp: 40,
+    drops: { coin: [14, 24], crystal: [1, 2] },
+    summoner: { kind: 'imp', max: 3, interval: 5 }, // рвёт завесу, зовёт бесов
+    region: 'ash',
+  },
+  magmaGolem: {
+    id: 'magmaGolem', name: 'Магмовый голем', archetype: 'chaser', hp: 72, speed: 30, tier: 5,
+    radius: 8, touchDamage: 5, lungeSpeed: 170, lungeWindup: 0.6, lungeRange: 50,
+    sprite: 'enemy_magma_golem', xp: 46, drops: { coin: [16, 28], metal: [2, 4], crystal: [0, 2] },
+    shielded: true, // раскалённая корка: бей с фланга или оглушай
+    region: 'ash',
+  },
+  lavaWyrm: {
+    id: 'lavaWyrm', name: 'Лавовый змей', archetype: 'shooter', hp: 30, speed: 60, tier: 5,
+    radius: 6, touchDamage: 3, preferRange: [110, 170], fireInterval: 2.2,
+    pattern: 'burst3aimed', sprite: 'enemy_lava_wyrm', xp: 30,
+    drops: { coin: [10, 18], crystal: [0, 1] },
+    region: 'ash',
+  },
+
   // --- боссы биомов: живут в логовах на карте ---
   swampWitch: {
     id: 'swampWitch', name: 'Болотная колдунья', archetype: 'boss', hp: 130, speed: 38, tier: 5,
@@ -324,12 +368,20 @@ export const ENEMIES = {
 export function tierTouchBonus(tier) { return Math.floor(((tier || 1) - 1) / 2); }
 export function tierProjDmg(tier) { return 1 + Math.floor(((tier || 1) - 1) / 3); }
 
-// Монстры тира min..max — для спавна по сложности (без боссов и войск Тьмы)
+// Монстры тира min..max — для спавна по сложности (без боссов, войск Тьмы
+// и жителей особых регионов — те встречаются только у себя дома)
 export function enemiesOfTier(min, max) {
   return Object.values(ENEMIES)
-    .filter(e => e.tier >= min && e.tier <= max && e.archetype !== 'boss' && e.faction !== 'darkness')
+    .filter(e => e.tier >= min && e.tier <= max && e.archetype !== 'boss'
+      && e.faction !== 'darkness' && !e.region)
     .map(e => e.id);
 }
+
+// обитатели Выжженных земель: [вид, вес спавна]
+export const ASH_KINDS = [
+  ['ashHound', 3], ['salamander', 3], ['fireElemental', 2],
+  ['lavaWyrm', 2], ['efreet', 1], ['magmaGolem', 1],
+];
 
 // войско Тьмы для фортов и рейдов
 export const DARK_KINDS = ['darkSoldier', 'darkSoldier', 'darkArcher', 'darkMage', 'darkKnight'];
@@ -386,4 +438,10 @@ export const HABITATS = {
   orcPriest: 'Лечит свою стаю издали — приоритетная цель',
   demonologist: 'Подземелья; без конца тянет бесов из иного мира',
   gasSpore: 'Луга и подземелья; ВЗРЫВАЕТСЯ при смерти — не лопай вплотную',
+  salamander: 'Выжженные земли; молниеносные броски из пепла',
+  ashHound: 'Выжженные земли; стаи гончих быстрее любого зверя',
+  fireElemental: 'Выжженные земли; гаснет со ВЗРЫВОМ — отходи',
+  efreet: 'Выжженные земли; рвёт завесу и зовёт бесов',
+  magmaGolem: 'Выжженные земли; раскалённая корка блокирует удары спереди',
+  lavaWyrm: 'Выжженные земли; плюётся лавой с дальней дистанции',
 };
