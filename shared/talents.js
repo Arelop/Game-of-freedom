@@ -38,7 +38,7 @@ export const TALENTS = {
     { id: 'w_stunhit', spec: 'berserk', tier: 2, ranks: 1, name: 'Оглушающий удар', desc: '15% шанс оглушить ударом на 0.6 с', flag: 'stunhit' },
     { id: 'w_powerburn', spec: 'berserk', tier: 3, ranks: 1, name: 'Сокрушение', desc: 'Мощный удар: +40% урона', flag: 'ab_power' },
     { id: 'w_execute', spec: 'berserk', tier: 3, ranks: 1, name: 'Палач', desc: '+50% урона по врагам ниже 25% здоровья', flag: 'execute' },
-    { id: 'w_rage', spec: 'berserk', tier: 4, ranks: 1, name: 'Ярость', desc: 'Ниже 30% здоровья — +40% урона', flag: 'rage' },
+    { id: 'w_rage', spec: 'berserk', tier: 4, ranks: 1, name: 'Ярость', desc: 'Ниже 30% здоровья — +40% урона. УЛЬТА (F) «Кровавая жатва»: 8 с буйства — +40% урона мили, +30% скорости, удары лечат', flag: 'rage', ult: 'rage_ult' },
     { id: 'w_whirl', spec: 'berserk', tier: 4, ranks: 1, name: 'Вихрь стали', desc: 'Удары бьют по кругу (360°)', flag: 'whirl' },
     // ═══ СТРАЖ ═══
     { id: 'w_skin', spec: 'guard', tier: 1, ranks: 3, name: 'Стальная кожа', desc: '+1 сердце за ранг', effects: { maxHp: 2 } },
@@ -46,9 +46,10 @@ export const TALENTS = {
     { id: 'w_tough', spec: 'guard', tier: 2, ranks: 2, name: 'Стойкость', desc: '+3% уворота за ранг', effects: { dodge: 0.03 } },
     { id: 'w_thorns', spec: 'guard', tier: 2, ranks: 1, name: 'Шипастый доспех', desc: 'Враги, ударившие вблизи, получают 1 урона', flag: 'thorns' },
     { id: 'w_bulwark', spec: 'guard', tier: 2, ranks: 1, name: 'Мастер щита', desc: 'Блок щитом гасит удары в вдвое более широком секторе', flag: 'blockwide' },
+    { id: 'w_bash2', spec: 'guard', tier: 3, ranks: 1, name: 'Тяжёлый щит', desc: 'Удар щитом: стан 2 с и ×2 урона', flag: 'ab_bash' },
     { id: 'w_fortress', spec: 'guard', tier: 3, ranks: 1, name: 'Бастион', desc: '+3 сердца', effects: { maxHp: 6 } },
     { id: 'w_laststand', spec: 'guard', tier: 3, ranks: 1, name: 'Последний рубеж', desc: 'Смертельный удар оставляет 1 ХП (раз в 60 с)', flag: 'laststand' },
-    { id: 'w_citadel', spec: 'guard', tier: 4, ranks: 1, name: 'Живая крепость', desc: '+2 сердца, а шипы бьют на 3 урона', flag: 'thorns3', effects: { maxHp: 4 } },
+    { id: 'w_citadel', spec: 'guard', tier: 4, ranks: 1, name: 'Живая крепость', desc: '+2 сердца, шипы бьют на 3. УЛЬТА (F) «Железный бастион»: 6 с −60% урона отряду + все враги рядом таунтятся', flag: 'thorns3', effects: { maxHp: 4 }, ult: 'citadel_ult' },
     // ═══ ПОЛКОВОДЕЦ ═══
     { id: 'w_dash', spec: 'warlord', tier: 1, ranks: 2, name: 'Рывок', desc: '−12% кулдауна переката за ранг', effects: { rollCd: 0.12 } },
     { id: 'w_march', spec: 'warlord', tier: 1, ranks: 2, name: 'Марш-бросок', desc: '+4% скорости за ранг', effects: { speed: 0.04 } },
@@ -56,7 +57,8 @@ export const TALENTS = {
     { id: 'w_tactic', spec: 'warlord', tier: 2, ranks: 2, name: 'Тактик', desc: '+5% ко всему урону за ранг', effects: { dmgMelee: 0.05, dmgRanged: 0.05, dmgMagic: 0.05 } },
     { id: 'w_whirlfar', spec: 'warlord', tier: 3, ranks: 1, name: 'Стальной шторм', desc: 'Вихрь стали летит на 50% дальше', flag: 'ab_whirlfar' },
     { id: 'w_cryheal', spec: 'warlord', tier: 3, ranks: 1, name: 'Вдохновляющий клич', desc: 'Боевой клич лечит союзников на ½ сердца', flag: 'ab_cryheal' },
-    { id: 'w_warlord', spec: 'warlord', tier: 4, ranks: 1, name: 'Вождь', desc: 'Клич даёт группе +15% урона на 10 с', flag: 'ab_crydmg' },
+    { id: 'w_taunt2', spec: 'warlord', tier: 2, ranks: 1, name: 'Громовой вызов', desc: 'Вызов длится 5 с и даёт тебе барьер на 2', flag: 'ab_taunt' },
+    { id: 'w_warlord', spec: 'warlord', tier: 4, ranks: 1, name: 'Вождь', desc: 'Клич даёт группе +15% урона на 10 с. УЛЬТА (F) «Знамя войны»: 10 с отряду +25% урона и барьер', flag: 'ab_crydmg', ult: 'warlord_ult' },
     { id: 'w_horn', spec: 'warlord', tier: 4, ranks: 1, name: 'Рог войны', desc: 'Клич укрывает группу барьером на 1 сердце', flag: 'ab_cryarmor' },
   ],
   mage: [
@@ -66,18 +68,20 @@ export const TALENTS = {
     { id: 'm_twin', spec: 'pyro', tier: 2, ranks: 1, name: 'Двойной сгусток', desc: 'Посохи выпускают +1 снаряд', effects: { magicProj: 1 } },
     { id: 'm_ignite', spec: 'pyro', tier: 2, ranks: 1, name: 'Поджог', desc: 'Магия поджигает врагов: 1 урона/с на 3 с', flag: 'ignite' },
     { id: 'm_wavewide', spec: 'pyro', tier: 2, ranks: 1, name: 'Пламенный вал', desc: 'Огненная волна шире и дальше', flag: 'ab_wave' },
+    { id: 'm_combust2', spec: 'pyro', tier: 3, ranks: 1, name: 'Цепная детонация', desc: 'Возгорание перекидывает дот на врагов рядом', flag: 'ab_combust' },
     { id: 'm_blinkburn', spec: 'pyro', tier: 3, ranks: 1, name: 'Пылающий след', desc: 'Телепорт оставляет взрыв в точке старта', flag: 'ab_blink' },
     { id: 'm_echo', spec: 'pyro', tier: 3, ranks: 1, name: 'Эхо маны', desc: '20% шанс: способность почти без кулдауна', flag: 'echo' },
-    { id: 'm_storm', spec: 'pyro', tier: 4, ranks: 1, name: 'Огненный шторм', desc: 'Ещё +1 снаряд и +15% урона магии', effects: { magicProj: 1, dmgMagic: 0.15 } },
+    { id: 'm_storm', spec: 'pyro', tier: 4, ranks: 1, name: 'Огненный шторм', desc: 'Ещё +1 снаряд и +15% урона магии. УЛЬТА (F) «Испепеление»: три метеора по прицелу', effects: { magicProj: 1, dmgMagic: 0.15 }, ult: 'storm_ult' },
     // ═══ КРИОМАНТ ═══
     { id: 'm_chill', spec: 'cryo', tier: 1, ranks: 3, name: 'Стужа', desc: '+5% урона магии за ранг', effects: { dmgMagic: 0.05 } },
     { id: 'm_frost', spec: 'cryo', tier: 1, ranks: 1, name: 'Ледяная хватка', desc: 'Лёд замедляет сильнее и дольше', flag: 'frostMaster' },
     { id: 'm_barrier', spec: 'cryo', tier: 2, ranks: 1, name: 'Барьер', desc: 'Неуязвимость в перекате дольше', flag: 'barrier' },
     { id: 'm_manashield', spec: 'cryo', tier: 2, ranks: 1, name: 'Ледяная кора', desc: 'Четверть урона уходит в ману (3 маны за 1 урона)', flag: 'manashield' },
     { id: 'm_novadeep', spec: 'cryo', tier: 2, ranks: 1, name: 'Вечная мерзлота', desc: 'Ледяная нова замораживает почти намертво', flag: 'ab_nova' },
+    { id: 'm_lance2', spec: 'cryo', tier: 2, ranks: 1, name: 'Пронзающий холод', desc: 'Ледяное копьё: ×1.6 урона и лёд держится дольше', flag: 'ab_lance' },
     { id: 'm_icyveins', spec: 'cryo', tier: 3, ranks: 1, name: 'Ледяные жилы', desc: '−20% кулдауны способностей', flag: 'cdr' },
     { id: 'm_glacier', spec: 'cryo', tier: 3, ranks: 1, name: 'Ледник', desc: '+2 сердца и +1 реген маны', effects: { maxHp: 4, manaRegen: 1 } },
-    { id: 'm_deepfreeze', spec: 'cryo', tier: 4, ranks: 1, name: 'Абсолютный ноль', desc: '+35% урона по замедленным врагам', flag: 'deepfreeze' },
+    { id: 'm_deepfreeze', spec: 'cryo', tier: 4, ranks: 1, name: 'Абсолютный ноль', desc: '+35% урона по замедленным. УЛЬТА (F) «Абсолютный лёд»: заморозка и метка льда всем врагам вокруг', flag: 'deepfreeze', ult: 'freeze_ult' },
     // ═══ АРКАНИСТ ═══
     { id: 'm_medit', spec: 'arcane', tier: 1, ranks: 3, name: 'Медитация', desc: '+1 реген маны за ранг', effects: { manaRegen: 1 } },
     { id: 'm_robes', spec: 'arcane', tier: 1, ranks: 2, name: 'Лёгкие одежды', desc: '+4% скорости за ранг', effects: { speed: 0.04 } },
@@ -85,7 +89,7 @@ export const TALENTS = {
     { id: 'm_blood', spec: 'arcane', tier: 2, ranks: 1, name: 'Чародейская кровь', desc: 'Зелья действуют на 50% сильнее', flag: 'alchemy' },
     { id: 'm_focus', spec: 'arcane', tier: 3, ranks: 2, name: 'Фокусировка', desc: '+10% урона магии за ранг', effects: { dmgMagic: 0.1 } },
     { id: 'm_overmind', spec: 'arcane', tier: 3, ranks: 1, name: 'Сверхразум', desc: '+2 реген маны и +12% урона магии', effects: { manaRegen: 2, dmgMagic: 0.12 } },
-    { id: 'm_archon', spec: 'arcane', tier: 4, ranks: 1, name: 'Архонт', desc: '+1 снаряд посохам и +10% урона магии', effects: { magicProj: 1, dmgMagic: 0.1 } },
+    { id: 'm_archon', spec: 'arcane', tier: 4, ranks: 1, name: 'Архонт', desc: '+1 снаряд посохам и +10% урона магии. УЛЬТА (F) «Арканный шквал»: 12 сгустков во все стороны + 15 маны', effects: { magicProj: 1, dmgMagic: 0.1 }, ult: 'archon_ult' },
   ],
   rogue: [
     // ═══ УБИЙЦА ═══
@@ -95,8 +99,9 @@ export const TALENTS = {
     { id: 'r_ambush', spec: 'assassin', tier: 2, ranks: 1, name: 'Засада', desc: '+40% урона по врагам с полным здоровьем', flag: 'ambush' },
     { id: 'r_dashstun', spec: 'assassin', tier: 2, ranks: 1, name: 'Ошеломление', desc: 'Рывок теней оглушает на 1 с', flag: 'ab_dash' },
     { id: 'r_venom', spec: 'assassin', tier: 3, ranks: 1, name: 'Отравленные клинки', desc: 'Атаки отравляют: 1 урона/с на 4 с', flag: 'venom' },
+    { id: 'r_poison2', spec: 'assassin', tier: 2, ranks: 1, name: 'Гнилая кровь', desc: 'Ядовитый клинок: дот вдвое злее (2 урона/с)', flag: 'ab_poisonblade' },
     { id: 'r_luck', spec: 'assassin', tier: 3, ranks: 2, name: 'Фортуна', desc: '+5% шанса крита за ранг', effects: { critChance: 0.05 } },
-    { id: 'r_execution', spec: 'assassin', tier: 4, ranks: 1, name: 'Казнь', desc: '+8% крита и +15% урона ближнего боя', effects: { critChance: 0.08, dmgMelee: 0.15 } },
+    { id: 'r_execution', spec: 'assassin', tier: 4, ranks: 1, name: 'Казнь', desc: '+8% крита и +15% урона мили. УЛЬТА (F) «Танец смерти»: теневые удары по ВСЕМ врагам вокруг', effects: { critChance: 0.08, dmgMelee: 0.15 }, ult: 'exec_ult' },
     // ═══ СТРЕЛОК ═══
     { id: 'r_aim', spec: 'marksman', tier: 1, ranks: 3, name: 'Меткость', desc: '+6% урона дальнего боя за ранг', effects: { dmgRanged: 0.06 } },
     { id: 'r_hands', spec: 'marksman', tier: 1, ranks: 2, name: 'Быстрые руки', desc: '+8% скорости атаки за ранг', effects: { atkSpeed: 0.08 } },
@@ -104,25 +109,27 @@ export const TALENTS = {
     { id: 'r_bladefan', spec: 'marksman', tier: 2, ranks: 1, name: 'Стальной ливень', desc: 'Град клинков: +6 клинков', flag: 'ab_blades' },
     { id: 'r_sniper', spec: 'marksman', tier: 3, ranks: 2, name: 'Снайпер', desc: '+10% урона дальнего боя за ранг', effects: { dmgRanged: 0.1 } },
     { id: 'r_rapid', spec: 'marksman', tier: 3, ranks: 1, name: 'Шквал', desc: 'Ещё +15% скорости атаки', effects: { atkSpeed: 0.15 } },
-    { id: 'r_barrage', spec: 'marksman', tier: 4, ranks: 1, name: 'Град стали', desc: '+1 нож и +10% скорости атаки', effects: { knifeProj: 1, atkSpeed: 0.1 } },
+    { id: 'r_barrage', spec: 'marksman', tier: 4, ranks: 1, name: 'Град стали', desc: '+1 нож и +10% скорости атаки. УЛЬТА (F) «Шквал стали»: три волны по 12 клинков', effects: { knifeProj: 1, atkSpeed: 0.1 }, ult: 'barrage_ult' },
     // ═══ ПЛУТ ═══
     { id: 'r_step', spec: 'trickster', tier: 1, ranks: 2, name: 'Лёгкая поступь', desc: '+4% скорости за ранг', effects: { speed: 0.04 } },
     { id: 'r_pick', spec: 'trickster', tier: 1, ranks: 2, name: 'Карманник', desc: '+15% монет с врагов за ранг', effects: { coinMult: 0.15 } },
     { id: 'r_acro', spec: 'trickster', tier: 2, ranks: 1, name: 'Акробат', desc: '−25% кулдауна переката', effects: { rollCd: 0.25 } },
     { id: 'r_smokespd', spec: 'trickster', tier: 2, ranks: 1, name: 'Дым и зеркала', desc: 'Завеса дольше (5 с) и даёт +30% скорости', flag: 'ab_smoke' },
     { id: 'r_ghost', spec: 'trickster', tier: 3, ranks: 1, name: 'Призрак', desc: '+4% уворота и −15% кулдауна переката', effects: { dodge: 0.04, rollCd: 0.15 } },
+    { id: 'r_slippery', spec: 'trickster', tier: 3, ranks: 1, name: 'Скользкий тип', desc: 'Уклонение даёт ещё и +30% скорости', flag: 'ab_evasion' },
     { id: 'r_gold', spec: 'trickster', tier: 3, ranks: 2, name: 'Деловая хватка', desc: '+10% монет и +2% крита за ранг', effects: { coinMult: 0.1, critChance: 0.02 } },
-    { id: 'r_gambler', spec: 'trickster', tier: 4, ranks: 1, name: 'Игрок', desc: '+30% монет, +5% крита и +3% уворота', effects: { coinMult: 0.3, critChance: 0.05, dodge: 0.03 } },
+    { id: 'r_gambler', spec: 'trickster', tier: 4, ranks: 1, name: 'Игрок', desc: '+30% монет, +5% крита, +3% уворота. УЛЬТА (F) «Дым и золото»: невидимость 5 с, сброс кулдаунов, монеты ×2 на 10 с', effects: { coinMult: 0.3, critChance: 0.05, dodge: 0.03 }, ult: 'gambler_ult' },
   ],
   priest: [
     // ═══ СВЕТ: целитель отряда ═══
     { id: 'p_grace', spec: 'light', tier: 1, ranks: 3, name: 'Благодать', desc: '+1 к регену маны за ранг', effects: { manaRegen: 1 } },
     { id: 'p_touch', spec: 'light', tier: 1, ranks: 1, name: 'Тёплый свет', desc: 'Посох света лечит союзников на 2 вместо 1', flag: 'lightheal' },
     { id: 'p_wavebig', spec: 'light', tier: 2, ranks: 1, name: 'Прилив света', desc: 'Волна света лечит на 3 сердца', flag: 'ab_wavebig' },
+    { id: 'p_mend2', spec: 'light', tier: 2, ranks: 1, name: 'Тёплые ладони', desc: 'Свет прикосновения лечит на 3 и даёт цели барьер на 1', flag: 'ab_mend' },
     { id: 'p_aura', spec: 'light', tier: 2, ranks: 1, name: 'Аура света', desc: 'Союзники рядом получают +1 хп каждые 6 с', flag: 'aura' },
     { id: 'p_mend', spec: 'light', tier: 3, ranks: 2, name: 'Милосердие', desc: '+1 сердце и +5% скорости за ранг', effects: { maxHp: 2, speed: 0.05 } },
     { id: 'p_echo2', spec: 'light', tier: 3, ranks: 1, name: 'Эхо молитвы', desc: '20% шанс: способность почти без кулдауна', flag: 'echo' },
-    { id: 'p_rez', spec: 'light', tier: 4, ranks: 1, name: 'Длань Света', desc: 'Волна света поднимает павшего союзника (раз в 60 с)', flag: 'ab_waverez' },
+    { id: 'p_rez', spec: 'light', tier: 4, ranks: 1, name: 'Длань Света', desc: 'Волна света поднимает павшего (раз в 60 с). УЛЬТА (F) «Чудо»: полное исцеление и воскрешение отряда', flag: 'ab_waverez', ult: 'rez_ult' },
     // ═══ КАРА: боевой жрец ═══
     { id: 'p_zeal', spec: 'wrath', tier: 1, ranks: 3, name: 'Рвение', desc: '+6% урона магии за ранг', effects: { dmgMagic: 0.06 } },
     { id: 'p_haste', spec: 'wrath', tier: 1, ranks: 2, name: 'Пыл', desc: '+4% скорости атаки за ранг', effects: { atkSpeed: 0.04 } },
@@ -130,7 +137,8 @@ export const TALENTS = {
     { id: 'p_searing', spec: 'wrath', tier: 2, ranks: 1, name: 'Палящий свет', desc: 'Магические атаки поджигают: 1 урона/с на 3 с', flag: 'ignite' },
     { id: 'p_fervor', spec: 'wrath', tier: 3, ranks: 2, name: 'Праведный гнев', desc: '+8% урона магии за ранг', effects: { dmgMagic: 0.08 } },
     { id: 'p_crit', spec: 'wrath', tier: 3, ranks: 1, name: 'Суд небес', desc: '+6% шанса крита', effects: { critChance: 0.06 } },
-    { id: 'p_storm', spec: 'wrath', tier: 4, ranks: 1, name: 'Гнев небес', desc: '+1 снаряд света и +15% урона магии', effects: { magicProj: 1, dmgMagic: 0.15 } },
+    { id: 'p_penance2', spec: 'wrath', tier: 3, ranks: 1, name: 'Раскалённый луч', desc: 'Епитимья бьёт ×1.5 и поджигает врага', flag: 'ab_penance' },
+    { id: 'p_storm', spec: 'wrath', tier: 4, ranks: 1, name: 'Гнев небес', desc: '+1 снаряд света и +15% урона магии. УЛЬТА (F) «Гнев Господень»: столбы света по всем врагам вокруг со станом', effects: { magicProj: 1, dmgMagic: 0.15 }, ult: 'wrath_ult' },
     // ═══ ОПЛОТ: защитник ═══
     { id: 'p_body', spec: 'bastion', tier: 1, ranks: 3, name: 'Крепость духа', desc: '+1 сердце за ранг', effects: { maxHp: 2 } },
     { id: 'p_calm', spec: 'bastion', tier: 1, ranks: 2, name: 'Смирение', desc: '+3% уворота за ранг', effects: { dodge: 0.03 } },
@@ -138,9 +146,35 @@ export const TALENTS = {
     { id: 'p_manawall', spec: 'bastion', tier: 2, ranks: 1, name: 'Стена маны', desc: 'Четверть урона уходит в ману (3 маны за 1)', flag: 'manashield' },
     { id: 'p_vigil', spec: 'bastion', tier: 3, ranks: 2, name: 'Бдение', desc: '+1 сердце и +1 реген маны за ранг', effects: { maxHp: 2, manaRegen: 1 } },
     { id: 'p_cdr', spec: 'bastion', tier: 3, ranks: 1, name: 'Собранность', desc: 'Способности перезаряжаются на 20% быстрее', flag: 'cdr' },
-    { id: 'p_martyr', spec: 'bastion', tier: 4, ranks: 1, name: 'Несокрушимость', desc: '+2 сердца, смертельный удар оставляет 1 ХП (раз в 60 с)', flag: 'laststand', effects: { maxHp: 4 } },
+    { id: 'p_martyr', spec: 'bastion', tier: 4, ranks: 1, name: 'Несокрушимость', desc: '+2 сердца, смертельный удар оставляет 1 ХП (раз в 60 с). УЛЬТА (F) «Небесный оплот»: 8 с отряду барьер 6 и −40% урона', flag: 'laststand', effects: { maxHp: 4 }, ult: 'martyr_ult' },
   ],
 };
+
+// ═══ УЛЬТЫ: венец каждой ветки талантов (клавиша F) ═══
+// Открывается взятием капстоуна ветки; очков хватает лишь на одну — выбор стиля.
+export const ULTS = {
+  rage_ult: { id: 'rage_ult', name: 'Кровавая жатва', icon: 'ult_rage', cd: 75, mana: 10, desc: '8 с буйства: +40% урона мили, +30% скорости, удары мили лечат по 1' },
+  citadel_ult: { id: 'citadel_ult', name: 'Железный бастион', icon: 'ult_citadel', cd: 75, mana: 10, desc: '6 с: −60% урона тебе и союзникам рядом; враги вокруг таунтятся на тебя' },
+  warlord_ult: { id: 'warlord_ult', name: 'Знамя войны', icon: 'ult_warlord', cd: 75, mana: 10, desc: '10 с отряду: +25% всего урона и барьер на 2' },
+  storm_ult: { id: 'storm_ult', name: 'Испепеление', icon: 'ult_storm', cd: 75, mana: 20, desc: 'Три метеора по области прицела: ×5 урона магии каждый' },
+  freeze_ult: { id: 'freeze_ult', name: 'Абсолютный лёд', icon: 'ult_freeze', cd: 75, mana: 18, desc: 'Все враги вокруг: стан 1.5 с, глубокая заморозка и метка ЛЬДА' },
+  archon_ult: { id: 'archon_ult', name: 'Арканный шквал', icon: 'ult_archon', cd: 75, mana: 15, desc: '12 сгустков во все стороны ×3 урона магии; возвращает 15 маны' },
+  exec_ult: { id: 'exec_ult', name: 'Танец смерти', icon: 'ult_exec', cd: 75, mana: 12, desc: 'Теневые удары по всем врагам вокруг: ×3 урона мили каждому' },
+  barrage_ult: { id: 'barrage_ult', name: 'Шквал стали', icon: 'ult_barrage', cd: 75, mana: 12, desc: 'Три волны по 12 клинков во все стороны' },
+  gambler_ult: { id: 'gambler_ult', name: 'Дым и золото', icon: 'ult_gambler', cd: 90, mana: 10, desc: 'Невидимость 5 с, сброс кулдаунов Q/X/R, монеты с убийств ×2 на 10 с' },
+  rez_ult: { id: 'rez_ult', name: 'Чудо', icon: 'ult_rez', cd: 90, mana: 25, desc: 'Полное исцеление отряда и воскрешение всех павших рядом' },
+  wrath_ult: { id: 'wrath_ult', name: 'Гнев Господень', icon: 'ult_wrath', cd: 75, mana: 20, desc: 'Столбы света бьют всех врагов вокруг: ×2.5 урона магии и стан 1 с' },
+  martyr_ult: { id: 'martyr_ult', name: 'Небесный оплот', icon: 'ult_martyr', cd: 90, mana: 20, desc: '8 с отряду: барьер на 6 и −40% входящего урона' },
+};
+
+// ульта героя: по взятому капстоуну (взять можно только один — очков впритык)
+export function ultOf(cls, learned) {
+  for (const id of learned || []) {
+    const t = findTalent(cls, id);
+    if (t?.ult) return ULTS[t.ult] || null;
+  }
+  return null;
+}
 
 export function findTalent(cls, id) {
   return (TALENTS[cls] || []).find(t => t.id === id);

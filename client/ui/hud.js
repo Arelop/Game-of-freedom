@@ -4,6 +4,7 @@ import { VIEW_W, VIEW_H, WORLD_TILES, TILE, PLAYER_MAX_HP, SEASONS, seasonOf } f
 import { getWeapon } from '../../shared/rarity.js';
 import { STR } from '../../shared/strings.js';
 import { abilitiesOf } from '../../shared/abilities.js';
+import { ultOf } from '../../shared/talents.js';
 import { getItem } from '../../shared/rarity.js';
 
 export class Hud {
@@ -199,6 +200,30 @@ export class Hud {
       }
       ctx.fillStyle = locked ? '#696a6a' : '#fbf236';
       ctx.fillText(KEYS[i], x + 1, y0 + S - 8);
+    }
+    // УЛЬТА (F): золотая ячейка после Q/X/R — появляется с капстоуном ветки
+    const ult = ultOf(you.cls, you.tl || []);
+    if (ult) {
+      const x = x0 + 3 * (S + GAP) + 2;
+      const cd = you.ab?.[3] || 0;
+      const noMana = ult.mana > 0 && (you.mp || 0) < ult.mana;
+      ctx.fillStyle = 'rgba(30,24,10,.9)';
+      ctx.fillRect(x - 1, y0 - 1, S + 2, S + 2);
+      ctx.strokeStyle = '#df7126';
+      ctx.strokeRect(x - 0.5, y0 - 0.5, S + 1, S + 1);
+      this.atlas.draw(ctx, ult.icon, x + S / 2, y0 + S / 2, {
+        alpha: noMana ? 0.5 : 1,
+        scale: (this.atlas.map[ult.icon]?.w || 16) > 20 ? 0.5 : 1,
+      });
+      if (cd > 0) {
+        const k = Math.min(1, cd / ult.cd);
+        ctx.fillStyle = 'rgba(10,10,16,.75)';
+        ctx.fillRect(x, y0 + S * (1 - k), S, S * k);
+        ctx.fillStyle = '#eee';
+        ctx.fillText(Math.ceil(cd) + '', x + S / 2 - 2, y0 + S / 2 - 4);
+      }
+      ctx.fillStyle = '#df7126';
+      ctx.fillText('F', x + 1, y0 + S - 8);
     }
     // активный офхенд (ПКМ): иконка с кулдауном справа от способностей
     const off = getItem(you.eq?.offhand);

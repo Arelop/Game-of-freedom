@@ -4,6 +4,7 @@ import { WEAPONS } from '../shared/weapons.js';
 import { getWeapon, getItem, rarityOf } from '../shared/rarity.js';
 import { ITEMS } from '../shared/items.js';
 import { abilitiesOf } from '../shared/abilities.js';
+import { ultOf } from '../shared/talents.js';
 import { STR } from '../shared/strings.js';
 import { MSG, rleDecode } from '../shared/protocol.js';
 import { Net } from './net.js';
@@ -381,6 +382,7 @@ input.onKey = k => {
   if (k === 'KeyQ') useAbility(0);
   if (k === 'KeyX') useAbility(1);
   if (k === 'KeyR') useAbility(2);
+  if (k === 'KeyF') useAbility(3); // ульта капстоуна ветки талантов
   if (k === 'Tab') {
     // при открытой карте Tab листает измерения, иначе — инвентарь
     if (bigMap && net.mapInfo.ash) {
@@ -466,8 +468,10 @@ function spawnAbilityFx(m) {
 function useAbility(slot) {
   const you = net.you;
   if (!you || you.dead || panels.dialogOpen) return;
-  const ab = abilitiesOf(you.cls).find(a => a.id === you.abl?.[slot]) || abilitiesOf(you.cls)[slot];
-  if (!ab) return;
+  const ab = slot === 3
+    ? ultOf(you.cls, you.tl || [])
+    : abilitiesOf(you.cls).find(a => a.id === you.abl?.[slot]) || abilitiesOf(you.cls)[slot];
+  if (!ab) { if (slot === 3) panels.toast('📖 Ульта откроется с капстоуном ветки талантов'); return; }
   if (you.lvl < ab.lvl) { panels.toast(`«${ab.name}» откроется на уровне ${ab.lvl}`); return; }
   if ((you.ab?.[slot] || 0) > 0.2) return;
   // кровавый каст мага пропускаем на сервер даже без маны

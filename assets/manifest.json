@@ -1140,6 +1140,42 @@
     },
     "ab_penance": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/lightning_bolt.png"
+    },
+    "ult_rage": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/berserker_rage.png"
+    },
+    "ult_citadel": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/earth/stoneskin.png"
+    },
+    "ult_warlord": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/haste.png"
+    },
+    "ult_storm": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/fire/fire_storm.png"
+    },
+    "ult_freeze": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/ice/ice_storm.png"
+    },
+    "ult_archon": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/chain_lightning.png"
+    },
+    "ult_exec": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/translocation/dispersal.png"
+    },
+    "ult_barrage": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/airstrike.png"
+    },
+    "ult_gambler": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/invisibility.png"
+    },
+    "ult_rez": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/corona.png"
+    },
+    "ult_wrath": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/lightning_bolt.png"
+    },
+    "ult_martyr": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/deflect_missiles.png"
     }
   }
 }
