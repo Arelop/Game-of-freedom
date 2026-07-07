@@ -673,7 +673,7 @@ export class Game {
     // Реген маны: в бою — тонкая струйка; на отдыхе (5 с без каста) «медитация»
     // разгоняет реген постепенно до ×4 за ~11 секунд; у костра — ещё в полтора раза щедрее
     p.combatT += dt;
-    let regen = 0.2 + 0.12 * (p.derived?.manaRegen || 0);
+    let regen = 0.07 + 0.04 * (p.derived?.manaRegen || 0);
     if (p.combatT > 5) regen *= 1 + Math.min(3, (p.combatT - 5) / 2);
     if (this.nearCampfire(p)) regen *= 1.5;
     p.mana = Math.min(p.manaMax, p.mana + regen * dt);

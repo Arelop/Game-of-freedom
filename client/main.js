@@ -1,5 +1,5 @@
 // Точка входа клиента: цикл с фиксированным шагом, рендер, эффекты.
-import { VIEW_W, VIEW_H, SIM_DT, TILE, PLAYER_RADIUS } from '../shared/constants.js';
+import { VIEW_W, VIEW_H, SIM_DT, TILE, PLAYER_RADIUS, WORLD_TILES } from '../shared/constants.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { getWeapon, getItem, rarityOf } from '../shared/rarity.js';
 import { ITEMS } from '../shared/items.js';
@@ -53,6 +53,9 @@ let vignette = 0;          // красная вспышка урона
 const flashes = new Map(); // id -> until (белая вспышка попадания)
 let fps = 0, frames = 0, fpsT = 0;
 let bigMap = false;
+// вид карты: измерение, центр (мировые px) и зум; cx=null — авто-центр на герое
+const mapView = { dim: 'over', cx: null, cy: null, zoom: 1 };
+let mapDrag = null;      // перетаскивание карты ЛКМ
 let localMag = 0, localWeapon = '';
 let invRefresh = 0;
 let swingAnim = 0;       // анимация замаха своего игрока
@@ -118,11 +121,54 @@ net.handlers.onWelcome = () => {
   menu.style.display = 'none';
   SFX.quest();
   buildBiomeCanvas();
+  buildAshCanvas();
   Music.start(); // фоновая музыка (N — вкл/выкл)
 };
 
+// ---------- карта мира: скролл мышью и зум колесом ----------
+screen.addEventListener('mousedown', e => {
+  if (bigMap && e.button === 0) mapDrag = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('mousemove', e => {
+  if (!mapDrag || !bigMap) return;
+  const r = screen.getBoundingClientRect();
+  const S = Math.min(VIEW_W, VIEW_H) - 30;
+  const worldPx = (mapView.dim === 'ash' ? (net.mapInfo.ash?.size || 160) : WORLD_TILES) * TILE;
+  const k = S * mapView.zoom / worldPx;
+  const px = VIEW_W / r.width; // клиентские px -> нативные
+  mapView.cx -= (e.clientX - mapDrag.x) * px / k;
+  mapView.cy -= (e.clientY - mapDrag.y) * px / k;
+  mapDrag = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('mouseup', () => { mapDrag = null; });
+screen.addEventListener('wheel', e => {
+  if (!bigMap) return;
+  e.preventDefault();
+  mapView.zoom = Math.max(1, Math.min(6, mapView.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+}, { passive: false });
+
 // ---------- карта мира: биомная подложка ----------
 const BIOME_COLORS = ['#1d2b53', '#2e5d9e', '#d9c27e', '#4e7c3a', '#33552b', '#6d6a60', '#4b5d3a'];
+let ashCanvas = null;
+function buildAshCanvas() {
+  const a = net.mapInfo.ash;
+  if (!a) return;
+  const data = rleDecode(a.rle, a.size * a.size);
+  ashCanvas = document.createElement('canvas');
+  ashCanvas.width = a.size; ashCanvas.height = a.size;
+  const c = ashCanvas.getContext('2d');
+  const img = c.createImageData(a.size, a.size);
+  const COL = ['#3a3844', '#df7126', '#16141f', '#26242e', '#fbf236', '#d9a066', '#b06ee1', '#fbf236', '#696a6a'];
+  for (let i = 0; i < data.length; i++) {
+    const hex = COL[data[i]] || COL[0];
+    img.data[i * 4] = parseInt(hex.slice(1, 3), 16);
+    img.data[i * 4 + 1] = parseInt(hex.slice(3, 5), 16);
+    img.data[i * 4 + 2] = parseInt(hex.slice(5, 7), 16);
+    img.data[i * 4 + 3] = 255;
+  }
+  c.putImageData(img, 0, 0);
+}
+
 let biomeCanvas = null;
 function buildBiomeCanvas() {
   const b = net.mapInfo.biomes;
@@ -304,10 +350,22 @@ input.onKey = k => {
   if (k === 'KeyQ') useAbility(0);
   if (k === 'KeyX') useAbility(1);
   if (k === 'KeyR') useAbility(2);
-  if (k === 'Tab') panels.toggleInventory();
+  if (k === 'Tab') {
+    // при открытой карте Tab листает измерения, иначе — инвентарь
+    if (bigMap && net.mapInfo.ash) {
+      mapView.dim = mapView.dim === 'over' ? 'ash' : 'over';
+      mapView.cx = null; mapView.zoom = 1;
+    } else panels.toggleInventory();
+  }
   if (k === 'KeyC') panels.toggleChar();
   if (k === 'KeyP') panels.toggleFactions();
-  if (k === 'KeyM') bigMap = !bigMap;
+  if (k === 'KeyM') {
+    bigMap = !bigMap;
+    if (bigMap) { // открытие: измерение и центр — где стоишь
+      mapView.dim = net.you?.map === 'ash' ? 'ash' : 'over';
+      mapView.cx = null; mapView.zoom = 1;
+    }
+  }
   if (k === 'KeyJ') panels.toggleJournal();
   if (k === 'KeyL') panels.toggleLog();
   if (k === 'KeyB') {
@@ -419,7 +477,7 @@ function simStep() {
 
   const mv = panels.dialogOpen ? { mx: 0, my: 0 } : input.moveVec();
   const roll = panels.dialogOpen ? false : input.takeRoll();
-  const fire = !panels.dialogOpen && input.fire;
+  const fire = !panels.dialogOpen && !bigMap && input.fire; // при карте ЛКМ тащит карту, не стреляет
   const blk = !panels.dialogOpen && input.block;
 
   // разовое нажатие ПКМ: активный предмет левой руки (гримуар/сфера/сеть)
@@ -880,72 +938,142 @@ function renderLight(timeSec) {
 function renderBigMap() {
   const S = Math.min(VIEW_W, VIEW_H) - 30;
   const x0 = (VIEW_W - S) / 2, y0 = (VIEW_H - S) / 2;
+  const dim = mapView.dim === 'ash' && net.mapInfo.ash ? 'ash' : 'over';
+  const worldPx = (dim === 'ash' ? net.mapInfo.ash.size : WORLD_TILES) * TILE;
+  const youDim = net.you?.map === 'ash' ? 'ash' : net.you?.map === 'over' ? 'over' : null;
+
+  // авто-центр: на герое в его измерении, иначе — середина карты
+  if (mapView.cx === null) {
+    mapView.cx = youDim === dim ? net.pred.x : worldPx / 2;
+    mapView.cy = youDim === dim ? net.pred.y : worldPx / 2;
+  }
+  const half = worldPx / (2 * mapView.zoom);
+  mapView.cx = Math.max(half, Math.min(worldPx - half, mapView.cx));
+  mapView.cy = Math.max(half, Math.min(worldPx - half, mapView.cy));
+  const k = S * mapView.zoom / worldPx;
+  const vL = mapView.cx - half, vT = mapView.cy - half;
+  const px = wx => x0 + (wx - vL) * k;          // мировые px -> экран карты
+  const py = wy => y0 + (wy - vT) * k;
+  const seen = (x, y) => x > x0 - 4 && x < x0 + S + 4 && y > y0 - 4 && y < y0 + S + 4;
+
   ctx.fillStyle = 'rgba(14,12,20,.93)';
-  ctx.fillRect(x0 - 6, y0 - 6, S + 12, S + 12);
-  ctx.strokeStyle = '#5b6ee1';
+  ctx.fillRect(x0 - 6, y0 - 18, S + 12, S + 24);
+  ctx.strokeStyle = dim === 'ash' ? '#df7126' : '#5b6ee1';
   ctx.strokeRect(x0 - 5.5, y0 - 5.5, S + 11, S + 11);
-  // биомная подложка: настоящий рельеф мира
-  if (biomeCanvas) {
+  // вкладки измерений
+  ctx.font = '8px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = dim === 'over' ? '#fbf236' : '#696a6a';
+  ctx.fillText('◈ Верхний мир', x0, y0 - 9);
+  if (net.mapInfo.ash) {
+    ctx.fillStyle = dim === 'ash' ? '#df7126' : '#696a6a';
+    ctx.fillText('◈ Выжженные земли', x0 + 70, y0 - 9);
+    ctx.fillStyle = '#696a6a';
+    ctx.fillText('Tab · колесо · ЛКМ', x0 + S - 88, y0 - 9);
+  }
+
+  // подложка: рельеф выбранного измерения с учётом зума и сдвига
+  const base = dim === 'ash' ? ashCanvas : biomeCanvas;
+  if (base) {
     ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = 0.9;
-    ctx.drawImage(biomeCanvas, x0, y0, S, S);
+    const sw = base.width / mapView.zoom;
+    ctx.drawImage(base, vL / worldPx * base.width, vT / worldPx * base.width, sw, sw, x0, y0, S, S);
     ctx.globalAlpha = 1;
   }
-  const k = S / (512 * TILE);
-  ctx.font = '8px monospace';
-  for (const s of net.mapInfo.settlements) {
-    const x = x0 + s.x * TILE * k, y = y0 + s.y * TILE * k;
-    const sz = Math.min(7, 3 + Math.floor((s.pop || 6) / 4)); // размер точки = размер деревни
-    // статус: зелёная — живёт, красная — захвачена, фиолетовая — форт Тьмы, серая — руины
-    ctx.fillStyle = s.st === 3 ? '#7b2fbe' : s.st === 2 ? '#696a6a' : s.st === 1 ? '#d9574a' : '#99e550';
-    ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
-    const mark = s.st === 3 ? ' ⛧' : s.st === 2 ? ' ☠' : s.st === 1 ? ' ⚔' : '';
-    ctx.fillText(s.name + (s.pop ? ` (${s.pop})` : '') + mark, x - 18, y - 10);
+
+  if (dim === 'over') {
+    for (const s of net.mapInfo.settlements) {
+      const x = px(s.x * TILE), y = py(s.y * TILE);
+      if (!seen(x, y)) continue;
+      const sz = Math.min(7, 3 + Math.floor((s.pop || 6) / 4)); // размер точки = размер деревни
+      // статус: зелёная — живёт, красная — захвачена, фиолетовая — форт Тьмы, серая — руины
+      ctx.fillStyle = s.st === 3 ? '#7b2fbe' : s.st === 2 ? '#696a6a' : s.st === 1 ? '#d9574a' : '#99e550';
+      ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+      const mark = s.st === 3 ? ' ⛧' : s.st === 2 ? ' ☠' : s.st === 1 ? ' ⚔' : '';
+      ctx.fillText(s.name + (s.pop ? ` (${s.pop})` : '') + mark, x - 18, y - 10);
+    }
+    // Чернокаменная Цитадель — сердце Тьмы
+    if (net.mapInfo.citadel) {
+      const c = net.mapInfo.citadel;
+      const x = px(c.x * TILE), y = py(c.y * TILE);
+      if (seen(x, y)) {
+        ctx.fillStyle = '#7b2fbe';
+        ctx.fillRect(x - 3, y - 3, 7, 7);
+        ctx.fillStyle = '#b57edc';
+        ctx.fillText('⛧ ' + c.name + (net.darkPower ? ` (мощь ${net.darkPower.pw})` : ''), x - 50, y + 6);
+      }
+    }
+    const POI_COLORS = {
+      dungeon: '#d9574a', camp: '#df7126',
+      hermit: '#99e550', circle: '#b06ee1', obelisk: '#fbf236', spring: '#63c5ff', ashportal: '#df7126',
+    };
+    for (const p of net.mapInfo.pois) {
+      const x = px(p.x * TILE), y = py(p.y * TILE);
+      if (!seen(x, y)) continue;
+      const special = !!POI_COLORS[p.type] && p.type !== 'dungeon' && p.type !== 'camp';
+      ctx.fillStyle = (p.cleared && !special) ? '#696a6a' : POI_COLORS[p.type] || '#df7126';
+      const sz = special ? 4 : 3;
+      ctx.fillRect(x - 1, y - 1, sz, sz);
+      if (special) ctx.fillText({ hermit: '🛖', circle: '⛧', obelisk: '▲', spring: '~', ashportal: '🔥' }[p.type] || '', x + 4, y - 4);
+    }
+    for (const m of net.mapInfo.markers || []) {
+      const x = px(m.x * TILE), y = py(m.y * TILE);
+      if (seen(x, y)) { ctx.fillStyle = '#fbf236'; ctx.fillRect(x - 1, y - 1, 3, 3); }
+    }
+    for (const q of net.you?.qs || []) {
+      if (!q.tx) continue;
+      const qx = px(q.tx * TILE), qy = py(q.ty * TILE);
+      if (!seen(qx, qy)) continue;
+      ctx.fillStyle = q.done ? '#99e550' : '#fbf236';
+      ctx.fillRect(qx - 2, qy, 5, 1); ctx.fillRect(qx, qy - 2, 1, 5);
+      ctx.fillText(q.title, qx - 30, qy + 6);
+    }
+  } else {
+    // Выжженные земли: лагерь, логово, портал
+    const a = net.mapInfo.ash;
+    const mark = (tx, ty, color, label) => {
+      const x = px(tx * TILE), y = py(ty * TILE);
+      if (!seen(x, y)) return;
+      ctx.fillStyle = color;
+      ctx.fillRect(x - 2, y - 2, 5, 5);
+      ctx.fillText(label, x - 24, y - 6);
+    };
+    mark(a.camp.x, a.camp.y, '#99e550', '🔥 Лагерь огнеходцев');
+    mark(a.lair.x, a.lair.y, '#d9574a', '🗿 Логово големов');
+    mark(a.portal.x, a.portal.y, '#b06ee1', 'Портал домой');
   }
-  // Чернокаменная Цитадель — сердце Тьмы
-  if (net.mapInfo.citadel) {
-    const c = net.mapInfo.citadel;
-    const x = x0 + c.x * TILE * k, y = y0 + c.y * TILE * k;
-    ctx.fillStyle = '#7b2fbe';
-    ctx.fillRect(x - 3, y - 3, 7, 7);
-    ctx.fillStyle = '#b57edc';
-    ctx.fillText('⛧ ' + c.name + (net.darkPower ? ` (мощь ${net.darkPower.pw})` : ''), x - 50, y + 6);
+
+  // герои (снапшот отдаёт только тех, кто в твоём измерении)
+  if (youDim === dim) {
+    for (const [, r] of net.remotes) {
+      if (r.data.tp !== 'p') continue;
+      const pos = net.lerpEnt(r);
+      const x = px(pos.x), y = py(pos.y);
+      if (!seen(x, y)) continue;
+      ctx.fillStyle = '#639bff';
+      ctx.fillRect(x - 1, y - 1, 3, 3);
+      ctx.fillText(r.data.nm || '', x - 10, y - 6);
+    }
+    // ты — белая точка с пульсирующим кольцом
+    const mx = px(net.pred.x), my = py(net.pred.y);
+    if (seen(mx, my)) {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(mx - 1, my - 1, 3, 3);
+      ctx.strokeStyle = '#fff';
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath(); ctx.arc(mx, my, 5 + Math.sin(performance.now() / 200) * 2, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  } else {
+    ctx.fillStyle = '#696a6a';
+    ctx.fillText(youDim === null ? 'ты — в подземелье' : 'ты — в другом измерении', x0 + 4, y0 + 10);
   }
-  const POI_COLORS = {
-    dungeon: '#d9574a', camp: '#df7126',
-    hermit: '#99e550', circle: '#b06ee1', obelisk: '#fbf236', spring: '#63c5ff',
-  };
-  for (const p of net.mapInfo.pois) {
-    const special = !!POI_COLORS[p.type] && p.type !== 'dungeon' && p.type !== 'camp';
-    ctx.fillStyle = (p.cleared && !special) ? '#696a6a' : POI_COLORS[p.type] || '#df7126';
-    const sz = special ? 4 : 3;
-    ctx.fillRect(x0 + p.x * TILE * k - 1, y0 + p.y * TILE * k - 1, sz, sz);
-    if (special) ctx.fillText({ hermit: '🛖', circle: '⛧', obelisk: '▲', spring: '~' }[p.type] || '', x0 + p.x * TILE * k + 4, y0 + p.y * TILE * k - 4);
-  }
-  for (const m of net.mapInfo.markers || []) {
-    ctx.fillStyle = '#fbf236';
-    ctx.fillRect(x0 + m.x * TILE * k - 1, y0 + m.y * TILE * k - 1, 3, 3);
-  }
-  for (const q of net.you?.qs || []) {
-    if (!q.tx) continue;
-    ctx.fillStyle = q.done ? '#99e550' : '#fbf236';
-    const qx = x0 + q.tx * TILE * k, qy = y0 + q.ty * TILE * k;
-    ctx.fillRect(qx - 2, qy, 5, 1); ctx.fillRect(qx, qy - 2, 1, 5);
-    ctx.fillText(q.title, qx - 30, qy + 6);
-  }
-  // союзники на карте
-  for (const [, r] of net.remotes) {
-    if (r.data.tp !== 'p') continue;
-    const pos = net.lerpEnt(r);
-    ctx.fillStyle = '#639bff';
-    ctx.fillRect(x0 + pos.x * k - 1, y0 + pos.y * k - 1, 3, 3);
-    ctx.fillText(r.data.nm || '', x0 + pos.x * k - 10, y0 + pos.y * k - 6);
-  }
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(x0 + net.pred.x * k - 1, y0 + net.pred.y * k - 1, 3, 3);
   // легенда
   ctx.fillStyle = '#847e87';
-  ctx.fillText('■ деревня  ■ данж  ■ лагерь  ▲ обелиск  ⛧ круг/Тьма  ~ источник  🛖 отшельник  ● ты', x0 + 4, y0 + S - 8);
+  ctx.fillText(dim === 'over'
+    ? '■ деревня  ■ данж  ■ лагерь  ▲ обелиск  ⛧ круг/Тьма  ~ источник  🔥 портал  ● ты'
+    : '▩ пепел  ▩ лава  ▩ обсидиан  ▪ тлеющие жилы  ● ты', x0 + 4, y0 + S - 8);
 }
 
 function blit() {

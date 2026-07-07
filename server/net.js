@@ -6,7 +6,21 @@ import { ENEMIES } from '../shared/enemies.js';
 import { dist2 } from '../shared/simCore.js';
 import { xpNeed } from '../shared/classes.js';
 import { buildBiomeMap } from './world/worldgen.js';
+import { generateAshlands } from './world/ashlands.js';
+import { T } from '../shared/constants.js';
 import { RELATIONS } from './sim/factions.js';
+
+// карта Выжженных земель для клиентского атласа измерений (коды тайлов)
+function buildAshMap(seed) {
+  const d = generateAshlands(seed);
+  const code = t =>
+    t === T.LAVA ? 1 : t === T.OBSIDIAN ? 2 : t === T.BURNT_TREE ? 3 : t === T.EMBER ? 4
+    : (t === T.FENCE || t === T.CAMPFIRE || t === T.STALL || t === T.TABLE || t === T.BED || t === T.ANVIL) ? 5
+    : t === T.PORTAL ? 6 : t === T.CHEST ? 7 : (t === T.STATUE || t === T.PILLAR) ? 8 : 0;
+  const out = new Uint8Array(d.size * d.size);
+  for (let i = 0; i < d.grid.length; i++) out[i] = code(d.grid[i]);
+  return { size: d.size, camp: d.camp, lair: d.lair, portal: d.entrance, tiles: out };
+}
 
 export class Net {
   constructor(game, httpServer) {
@@ -50,6 +64,10 @@ export class Net {
           settlements: game.world.settlements.map(s => ({ x: s.x, y: s.y, name: s.name, faction: s.faction })),
           pois: game.world.pois.map(o => ({ x: o.x, y: o.y, name: o.name, type: o.type, cleared: o.cleared })),
           biomes: rleEncode(Array.from(this.biomeMap ??= buildBiomeMap(game.world))),
+          ash: (this.ashMap ??= buildAshMap(game.world.seed)) && {
+            size: this.ashMap.size, camp: this.ashMap.camp, lair: this.ashMap.lair,
+            portal: this.ashMap.portal, rle: rleEncode(Array.from(this.ashMap.tiles)),
+          },
           roads: game.world.roads,
           citadel: game.world.citadel
             ? { x: game.world.citadel.x, y: game.world.citadel.y, name: game.world.citadel.name }
