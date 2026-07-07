@@ -62,6 +62,7 @@ export function saveWorld(game) {
       daily: w.daily || null,
       ashLooted: w.ashLooted || false,
       plagueExposed: w.plagueExposed || false,
+      ashLordDead: w.ashLordDead || false, ashLordFirst: w.ashLordFirst || null,
     };
     writeFileSync(FILE, JSON.stringify(data));
   } catch (e) { console.warn('[save] не удалось сохранить:', e.message); }
@@ -122,6 +123,8 @@ export function applyWorldData(game, data) {
     if (data.daily) w.daily = data.daily;
     if (data.ashLooted) w.ashLooted = true;
     if (data.plagueExposed) w.plagueExposed = true;
+    if (data.ashLordDead) w.ashLordDead = true;
+    if (data.ashLordFirst) w.ashLordFirst = data.ashLordFirst;
     if (data.wildChests) for (const rec of data.wildChests) {
       const c = w.wildChests?.find(x => x.x === rec.x && x.y === rec.y);
       if (c) c.opened = rec.opened;

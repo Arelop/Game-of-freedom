@@ -722,6 +722,22 @@ export class Game {
     // ---- реликвии-проки ----
     p.blT = Math.max(0, (p.blT || 0) - dt); // заряды «Жажды крови» тают
     p.stepBonusT = Math.max(0, (p.stepBonusT || 0) - dt); // бонус Шага сквозь тень
+    p.frostArmorT = Math.max(0, (p.frostArmorT || 0) - dt); // ледяная броня мага
+    p.poisonBladeT = Math.max(0, (p.poisonBladeT || 0) - dt); // яд на клинках вора
+    // «Сияние» жреца: святой свет жжёт врагов рядом раз в секунду
+    if ((p.radianceT || 0) > 0) {
+      p.radianceT -= dt;
+      p.radAcc = (p.radAcc || 0) + dt;
+      if (p.radAcc >= 1) {
+        p.radAcc -= 1;
+        for (const e of [...this.entities.values()]) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) > 60 * 60) continue;
+          this.damageEnemy(e, 1, { owner: p.id, school: 'magic', isDot: true, vx: 0, vy: 0, knockback: 0 });
+        }
+        this.fx({ t: 'barrier', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      }
+    }
     // классовые ресурсы: ярость остывает вне боя, комбо рвётся от простоя
     if (p.cls === 'warrior' && p.combatT > 3 && p.rage > 0)
       p.rage = Math.max(0, p.rage - 5 * dt);
@@ -1927,6 +1943,136 @@ export class Game {
         }
         break;
       }
+      case 'shield_bash': { // воин: тычок со станом в упор
+        const wDmg = this.weapon(p).melee ? this.weapon(p).damage : 4;
+        hitAround(p.x, p.y, 34, Math.round(wDmg * (d.dmgMelee || 1) * 1.5 * 10) / 10, 140, e => {
+          let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          return Math.abs(da) <= Math.PI / 3;
+        });
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) > 34 * 34) continue;
+          let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          if (Math.abs(da) <= Math.PI / 3) { e.stunT = Math.max(e.stunT || 0, 1); e.aggro = true; }
+        }
+        break;
+      }
+      case 'rally': { // воин: второе дыхание
+        p.hp = Math.min(p.maxHp, p.hp + 2);
+        delete p.buffs.slowed;
+        this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'taunt': { // воин: враги переключаются на танка
+        let n = 0;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) > 110 * 110) continue;
+          e.tauntT = 3; e.tauntBy = p.id; e.aggro = true; n++;
+        }
+        if (n) this.fx({ t: 'react', name: 'ВЫЗОВ!', x: p.x, y: p.y - 10 }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'ice_lance': { // маг: пронзающее копьё льда
+        const atk = { dmg: Math.round(4 * (d.dmgMagic || 1) * 2.5 * 10) / 10 };
+        this.projectiles.push({
+          x: p.x, y: p.y - 4, vx: Math.cos(aim) * 420, vy: Math.sin(aim) * 420,
+          life: 0.8, radius: 3, dmg: atk.dmg, knockback: 40, school: 'magic',
+          slow: { mult: 0.5, time: 1.6 }, chill: true,
+          owner: p.id, friendly: true, mapId: p.mapId,
+        });
+        break;
+      }
+      case 'frost_armor': { // маг: ледяная броня — обидчики замерзают
+        p.frostArmorT = 60;
+        this.fx({ t: 'barrier', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        this.toast(p, '❄ Ледяная броня: 60 с враги, ударившие вблизи, замерзают');
+        break;
+      }
+      case 'combust': { // маг: детонация дотов — сердце реакций
+        const tx = p.x + Math.cos(aim) * 110, ty = p.y + Math.sin(aim) * 110;
+        let best = null, bd = 100 * 100;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId || (e.dotT || 0) <= 0) continue;
+          const d2 = dist2(tx, ty, e.x, e.y);
+          if (d2 < bd) { bd = d2; best = e; }
+        }
+        if (!best) { p.abCd[slot] = 1; this.toast(p, 'Рядом нет горящих или отравленных врагов'); break; }
+        const burst = Math.round((best.dotDmg || 1) * best.dotT * 3 * 10) / 10;
+        best.dotT = 0;
+        this.damageEnemy(best, burst, { vx: 0, vy: 0, knockback: 30, owner: p.id, school: 'magic', fire: true });
+        this.fx({ t: 'boom', x: best.x, y: best.y, r: 26 }, p.mapId, best.x, best.y);
+        break;
+      }
+      case 'flash_powder': { // вор: порошок в глаза
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) > 70 * 70) continue;
+          let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          if (Math.abs(da) <= Math.PI / 2.5) { e.stunT = Math.max(e.stunT || 0, 1.2); e.aggro = true; }
+        }
+        this.fx({ t: 'poof', x: p.x + Math.cos(aim) * 30, y: p.y + Math.sin(aim) * 30 }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'poison_blade': { // вор: клинки в яде — вход в ТОКСИН
+        p.poisonBladeT = 20;
+        this.toast(p, '☠ Клинки отравлены (20 с): атаки вешают яд');
+        break;
+      }
+      case 'evasion': { // вор: пять секунд неуловимости
+        p.buffs.evasion = { mult: 0.4, t: 5 };
+        this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'mend': { // жрец: свет прикосновения — самому раненому рядом
+        let worst = null;
+        for (const q of this.players.values()) {
+          if (q === p || q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > 60 * 60) continue;
+          if (q.hp < q.maxHp && (!worst || q.hp / q.maxHp < worst.hp / worst.maxHp)) worst = q;
+        }
+        if (worst) {
+          worst.hp = Math.min(worst.maxHp, worst.hp + 2);
+          this.fx({ t: 'heal', pid: worst.id, x: worst.x, y: worst.y }, worst.mapId, worst.x, worst.y);
+          this.gainGrace(p);
+        } else if (p.hp < p.maxHp) {
+          p.hp = Math.min(p.maxHp, p.hp + 1);
+          this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        } else { p.abCd[slot] = 1; this.toast(p, 'Некого лечить'); }
+        break;
+      }
+      case 'radiance': { // жрец: сияние жжёт врагов рядом
+        p.radianceT = 6;
+        this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'penance': { // жрец: луч — кара врагу или лечение союзнику
+        const tx = p.x + Math.cos(aim) * 110, ty = p.y + Math.sin(aim) * 110;
+        let bestE = null, bde = 80 * 80, bestQ = null, bdq = 80 * 80;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          const d2 = dist2(tx, ty, e.x, e.y);
+          if (d2 < bde) { bde = d2; bestE = e; }
+        }
+        for (const q of this.players.values()) {
+          if (q === p || q.dead || q.mapId !== p.mapId || q.hp >= q.maxHp) continue;
+          const d2 = dist2(tx, ty, q.x, q.y);
+          if (d2 < bdq) { bdq = d2; bestQ = q; }
+        }
+        if (bestQ && bdq <= bde) { // раненый союзник ближе к прицелу — лечим
+          bestQ.hp = Math.min(bestQ.maxHp, bestQ.hp + 2);
+          this.fx({ t: 'chain', pts: [[p.x, p.y - 6], [bestQ.x, bestQ.y]] }, p.mapId, p.x, p.y);
+          this.fx({ t: 'heal', pid: bestQ.id, x: bestQ.x, y: bestQ.y }, bestQ.mapId, bestQ.x, bestQ.y);
+          this.gainGrace(p);
+        } else if (bestE) {
+          this.fx({ t: 'chain', pts: [[p.x, p.y - 6], [bestE.x, bestE.y]] }, p.mapId, p.x, p.y);
+          this.damageEnemy(bestE, Math.round(4 * (d.dmgMagic || 1) * 2 * 10) / 10,
+            { vx: 0, vy: 0, knockback: 30, owner: p.id, school: 'magic' });
+        } else { p.abCd[slot] = 1; this.toast(p, 'Луч не нашёл цели'); }
+        break;
+      }
     }
     this.fx({ t: 'ability', pid: p.id, id: ab.id, x: p.x, y: p.y, aim }, p.mapId, p.x, p.y);
   }
@@ -2159,6 +2305,11 @@ export class Game {
         this.fx({ t: 'block', pid: -1, x: e.x, y: e.y }, e.mapId, e.x, e.y);
       }
     }
+    // Владыка Пепла: существо огня — лёд жжёт его, пламя почти бессильно
+    if (defS?.iceWeak && pr) {
+      if (pr.fire || pr.fiery) dmg *= 0.4;
+      if (pr.chill || pr.slow) dmg *= 1.4;
+    }
     // таланты атакующего: казнь, засада, абсолютный ноль, яды и поджог
     const attacker = pr && !pr.isDot ? this.players.get(pr.owner) : null;
     if (attacker) {
@@ -2219,6 +2370,10 @@ export class Game {
       }
       // сет «Волчья стая» (4): ближний бой пускает кровь
       if (pr.school === 'melee' && attacker.setFlags?.set_bleed && (e.dotT || 0) <= 0) {
+        e.dotT = 3; e.dotDmg = 1; e.dotSrc = attacker.id; e.dotKind = 'venom';
+      }
+      // «Ядовитый клинок» вора: атаки травят
+      if ((attacker.poisonBladeT || 0) > 0 && (e.dotT || 0) <= 0) {
         e.dotT = 3; e.dotDmg = 1; e.dotSrc = attacker.id; e.dotKind = 'venom';
       }
       // Отравленные клинки / Поджог: навешиваем дот
@@ -2388,6 +2543,21 @@ export class Game {
       if (spot) this.chunks.setTile('over', spot.x, spot.y, T.SWAMP); // идол рассыпался
       this.toastAll('✦ Голос болот развеян — топи очистились!', true);
       this.events.push(this.world.day, 'Болотный дух повержен, рыбаки празднуют');
+    }
+    // ВЛАДЫКА ПЕПЛА повержен: легендарка, сет, вечная слава
+    if (e.kind === 'ashLord') {
+      this.world.ashLordDead = true;
+      this.spawnDrop('weapon:volcanoheart@l', 1, e.mapId, e.x, e.y, 600);
+      this.dropSetPiece(e.mapId, e.x + 14, e.y, luck + 4, 'ashorder');
+      this.dropRelic(e.mapId, e.x - 14, e.y);
+      if (!this.world.ashLordFirst) {
+        this.world.ashLordFirst = killer?.name || gainers[0]?.name || '—';
+        this.toastAll(`♨♨♨ ${this.world.ashLordFirst} СРАЗИЛ ВЛАДЫКУ ПЕПЛА — первым в истории мира! ♨♨♨`, true);
+      } else {
+        this.toastAll('♨ Владыка Пепла повержен!', true);
+      }
+      this.events.push(this.world.day, `Владыка Пепла развеян. Трон пуст — теперь по-настоящему`);
+      for (const q of gainers) this.addXp(q, 60); // сверх обычного xp дефа
     }
     // Старший голем повержен — испытание огнеходцев пройдено
     if (e.ashElder) {
@@ -2566,7 +2736,8 @@ export class Game {
     // Дух-хранитель жреца бережёт от боли
     if (p.buffs.guarded) dmg *= 1 - p.buffs.guarded.mult;
     // уворот от ловкости и экипировки: урон полностью игнорируется
-    if (this.rand() < (p.derived?.dodge || 0)) {
+    // («Уклонение» вора добавляет свои 40% на время баффа)
+    if (this.rand() < (p.derived?.dodge || 0) + (p.buffs.evasion?.mult || 0)) {
       this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
       return;
     }
@@ -2617,6 +2788,12 @@ export class Game {
         const def = ENEMIES[source.kind];
         moveWithCollision(source, -Math.cos(a) * 10, -Math.sin(a) * 10, def?.radius || 5, map);
         // Шипастый доспех (талант/реликвия): возмездие за удар вблизи
+        // «Ледяная броня» мага: обидчик замерзает
+        if ((p.frostArmorT || 0) > 0) {
+          source.chillT = Math.max(source.chillT || 0, 1.6);
+          source.slowT = Math.max(source.slowT || 0, 1.6);
+          source.slowMult = 0.6;
+        }
         const thorn = (this.hasTalent(p, 'thorns3') ? 3 : this.hasTalent(p, 'thorns') ? 1 : 0)
           + (p.procs?.thorns?.dmg || 0);
         if (thorn > 0)
@@ -2917,6 +3094,8 @@ export class Game {
       if (t === T.CHEST && p.mapId === 'ash') { this.openAshChest(p, tx + dx, ty + dy); return; }
       if (t === T.CHEST) { this.openChest(p, tx + dx, ty + dy); return; }
       if (t === T.PORTAL) { this.usePortal(p); return; }
+      // трон Владыки Пепла: статуи у трона в логове големов
+      if ((t === T.STATUE || t === T.PILLAR) && p.mapId === 'ash') { this.tryWakeAshLord(p, tx + dx, ty + dy); return; }
       if (t === T.STATUE && this.tryBarrowStatue(p, tx + dx, ty + dy)) return;
       if (t === T.DUNGEON_EXIT && p.mapId !== 'over') { this.exitDungeon(p); return; }
       if (t === T.LOCKED_DOOR && p.mapId !== 'over') {
@@ -3273,6 +3452,33 @@ export class Game {
       p.story.ashSeen = true;
       this.toast(p, 'Пепел скрипит под ногами. Лагерь огнеходцев — рядом, дальше — только огонь');
     }
+  }
+
+  // ═══ ВЛАДЫКА ПЕПЛА: ритуал пробуждения у пустого трона ═══
+  tryWakeAshLord(p, tx, ty) {
+    const d = this.dungeons.get('ash')?.dungeon;
+    if (!d) return;
+    // трон — статуи в логове; нужно стоять в его кольце
+    if ((tx - d.lair.x) ** 2 + (ty - d.lair.y) ** 2 > 10 * 10) {
+      this.toast(p, 'Обугленный камень. Молчит.');
+      return;
+    }
+    if (this.world.ashLordDead) { this.toast(p, '♨ Трон остыл. Владыка Пепла развеян — навсегда'); return; }
+    if (this.ashLordSpawned) { this.toast(p, '♨ Владыка уже восстал — он ЗДЕСЬ'); return; }
+    if (!this.ashElderDead) { this.toast(p, '🗿 Трон охраняет Старший голем. Сначала — он'); return; }
+    if ((p.inventory.crystal || 0) < 15) {
+      this.toast(p, '♨ Трон дремлет. Ритуал пробуждения: 15 кристаллов в тлеющие желоба');
+      return;
+    }
+    p.inventory.crystal -= 15;
+    this.ashLordSpawned = true;
+    const id = this.spawnEnemy('ashLord', 'ash', d.lair.x * TILE, (d.lair.y - 2) * TILE, { noElite: true });
+    const lord = this.entities.get(id);
+    if (lord) lord.aggro = true;
+    this.fx({ t: 'boom', x: d.lair.x * TILE, y: d.lair.y * TILE, r: 60 }, 'ash', d.lair.x * TILE, d.lair.y * TILE);
+    this.toastMap('ash', '♨ ТРОН ВСПЫХНУЛ: ВЛАДЫКА ПЕПЛА ВОССТАЛ! Лёд — его погибель, огонь ему смешон');
+    this.toastAll(`♨ ${p.name} пробудил Владыку Пепла — Выжженные земли дрожат!`, true);
+    this.events.push(this.world.day, `${p.name} провёл ритуал у трона Владыки Пепла`);
   }
 
   // сундук ордена в логове големов: реликвия — раз на мир

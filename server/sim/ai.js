@@ -44,12 +44,18 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
     wander(e, def, dt, map, rand);
     return shots;
   }
-  for (const p of players) {
+  // «Вызов» воина: пока действует, враг видит только танка
+  if ((e.tauntT || 0) > 0) {
+    e.tauntT -= dt;
+    const tank = players.find(p => p.id === e.tauntBy && !p.dead && p.mapId === e.mapId);
+    if (tank) { target = tank; bestD = dist2(e.x, e.y, tank.x, tank.y); e.aggro = true; }
+  }
+  if (!target) for (const p of players) {
     if (p.dead || p.mapId !== e.mapId || p.invisT > 0) continue;
     const d = dist2(e.x, e.y, p.x, p.y);
     if (d < bestD) { bestD = d; target = p; }
   }
-  for (const n of npcs) {
+  if ((e.tauntT || 0) <= 0) for (const n of npcs) { // под «Вызовом» NPC не отвлекают
     if (n.mapId !== e.mapId) continue;
     // боевые призывы (элементаль, наёмник) ПРИТЯГИВАЮТ агро — работают танком;
     // мирных жителей монстры замечают неохотнее, чем игроков
@@ -105,10 +111,12 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
           // а не выстраивается в очередь за спиной друг у друга
           let moveA = ang;
           if (dist > 60) {
-            // персональный угол обхода: знак чередуем по счётчику, чтобы стая
-            // гарантированно расходилась в обе стороны, а не куда упадёт кубик
-            if (e.flankA === undefined)
-              e.flankA = (0.5 + rand() * 0.9) * ((flankSeq++ % 2) ? 1 : -1);
+            // персональный угол обхода: детерминированный веер (±0.5, ±0.95, ±1.4…),
+            // чтобы стая гарантированно расходилась по разным дугам
+            if (e.flankA === undefined) {
+              const i = flankSeq++;
+              e.flankA = ((i % 2) ? 1 : -1) * (0.5 + ((i >> 1) % 3) * 0.55);
+            }
             const fromTarget = Math.atan2(e.y - target.y, e.x - target.x);
             const wantA = fromTarget + e.flankA;
             const tx = target.x + Math.cos(wantA) * 55, ty = target.y + Math.sin(wantA) * 55;

@@ -1097,6 +1097,49 @@
     },
     "item_wedding_ring": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/ring/gold.png"
+    },
+    "enemy_ash_lord": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/fire_giant.png",
+      "down": 2
+    },
+    "wpn_volcano": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/giant_spiked_club.png"
+    },
+    "ab_shield_bash": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/sure_blade.png"
+    },
+    "ab_rally": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/haste.png"
+    },
+    "ab_taunt": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/cause_fear.png"
+    },
+    "ab_ice_lance": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/ice/throw_icicle.png"
+    },
+    "ab_frost_armor": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/ice/ozocubus_armour.png"
+    },
+    "ab_combust": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/fire/ignite_poison.png"
+    },
+    "ab_flash_powder": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/confuse.png"
+    },
+    "ab_poison_blade": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/poison/poison_brand.png"
+    },
+    "ab_evasion": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/repel_missiles.png"
+    },
+    "ab_mend": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/extension.png"
+    },
+    "ab_radiance": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/fire/ring_of_flames.png"
+    },
+    "ab_penance": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/lightning_bolt.png"
     }
   }
 }

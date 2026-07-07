@@ -183,6 +183,12 @@ export const WEAPONS = {
     projRadius: 3, projLife: 1.0, price: 450, legendary: true,
     chain: { count: 3, radius: 85, falloff: 0.75 }, // каждая молния скачет трижды
   },
+  volcanoheart: {
+    id: 'volcanoheart', structDmg: 10, name: 'Сердце вулкана', melee: true, school: 'melee',
+    damage: 14, fireRate: 0.85, range: 34, arcDeg: 130, knockback: 190, recoilShake: 0.5,
+    infiniteAmmo: true, burn: { time: 3, dmg: 2 }, fire: true, // раны кипят лавой
+    sprite: 'wpn_volcano', sound: 'swing_heavy', swingColor: '#df7126', price: 500, legendary: true,
+  },
   windbow: {
     id: 'windbow', name: 'Ветер степей', school: 'ranged', damage: 4,
     projectilesPerShot: 2, spreadDeg: 6, projectileSpeed: 480, fireRate: 2.3, magSize: 14,

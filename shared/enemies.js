@@ -314,6 +314,31 @@ export const ENEMIES = {
     region: 'ash',
   },
 
+  ashLord: {
+    id: 'ashLord', name: 'Владыка Пепла', archetype: 'boss', hp: 320, speed: 34, tier: 6,
+    radius: 10, touchDamage: 4, sprite: 'enemy_ash_lord', xp: 120,
+    drops: { coin: [60, 100], crystal: [4, 8] }, region: 'ash',
+    iceWeak: true, // существо огня: лёд бьёт больнее, пламя почти бессильно
+    phases: [
+      { hpAbove: 0.66, steps: [
+        { pattern: 'fan5', interval: 1.8, move: 'chase' },
+        { slam: { dmg: 4, radius: 56, windup: 1.2 }, interval: 3.2, move: 'chase' }, // лавовый кулак
+        { pattern: 'aimedTriple', interval: 1.4, move: 'strafe' },
+      ]},
+      { hpAbove: 0.33, adds: { kind: 'efreet', n: 1 }, steps: [ // рвёт завесу за подмогой
+        { pattern: 'ring12', interval: 2.0, move: 'chase' },
+        { charge: { dmg: 4, speed: 340, windup: 1.0 }, interval: 3.4 }, // лавина пепла
+        { slam: { dmg: 4, radius: 60, windup: 1.1 }, interval: 3.0, move: 'chase' },
+      ]},
+      { hpAbove: 0, adds: { kind: 'salamander', n: 2 }, enrage: true, steps: [
+        { charge: { dmg: 5, speed: 400, windup: 0.7 }, interval: 2.4 },
+        { charge: { dmg: 5, speed: 400, windup: 0.7 }, interval: 2.4 }, // двойной прорыв
+        { pattern: 'spiral', interval: 0.16, move: 'strafe' },
+        { slam: { dmg: 5, radius: 66, windup: 0.9 }, interval: 2.8, move: 'chase' },
+      ]},
+    ],
+  },
+
   // --- боссы биомов: живут в логовах на карте ---
   swampWitch: {
     id: 'swampWitch', name: 'Болотная колдунья', archetype: 'boss', hp: 130, speed: 38, tier: 6,
@@ -470,4 +495,5 @@ export const HABITATS = {
   efreet: 'Выжженные земли; рвёт завесу и зовёт бесов',
   magmaGolem: 'Выжженные земли; раскалённая корка блокирует удары спереди',
   lavaWyrm: 'Выжженные земли; плюётся лавой с дальней дистанции',
+  ashLord: 'Трон в логове големов; будится ритуалом. СЛАБ КО ЛЬДУ, огонь ему смешон',
 };
