@@ -13,19 +13,40 @@ export const ABSTRACT_DT = 5;
 const HYDRATE_R = 340;        // px
 const DEHYDRATE_R = 520;
 
+// Стаи мира. biome — тайл, где стая может завестись (нет — где угодно);
+// night — только ночью; winter — только зимой. Так работает бестиарий.
 const PACK_KINDS = [
   { name: 'крысиное гнездо', units: ['rat', 'rat', 'rat', 'rat'], faction: 'monsters' },
-  { name: 'стая волков', units: ['wolf', 'wolf', 'wolf'], faction: 'monsters' },
+  { name: 'стая волков', units: ['wolf', 'wolf', 'wolf'], faction: 'monsters', biome: T.FOREST_FLOOR },
   { name: 'слизни', units: ['slime', 'slime', 'slime', 'slime'], faction: 'monsters' },
   { name: 'банда разбойников', units: ['bandit', 'gnollRaider', 'banditHeavy'], faction: 'bandits' },
-  { name: 'лесные стрелки', units: ['archer', 'archer', 'gnollRaider'], faction: 'bandits' },
-  { name: 'нежить', units: ['skeleton', 'ghoul', 'ghoul'], faction: 'monsters' },
-  // средневековая рубка: орды идут врукопашную
+  { name: 'лесные стрелки', units: ['archer', 'archer', 'gnollRaider'], faction: 'bandits', biome: T.FOREST_FLOOR },
+  { name: 'нежить', units: ['skeleton', 'ghoul', 'ghoul'], faction: 'monsters', night: true },
   { name: 'гоблинья ватага', units: ['goblin', 'goblin', 'goblin', 'hobgoblin'], faction: 'monsters' },
   { name: 'орочий отряд', units: ['orcWarrior', 'orcWarrior', 'orcKnight'], faction: 'monsters' },
-  { name: 'упыриная стая', units: ['ghoul', 'ghoul', 'ghoul'], faction: 'monsters' },
+  { name: 'упыриная стая', units: ['ghoul', 'ghoul', 'ghoul'], faction: 'monsters', night: true },
   { name: 'огр с прихвостнями', units: ['ogre', 'goblin', 'goblin'], faction: 'monsters' },
+  // биомная живность
+  { name: 'кабанье стадо', units: ['boar', 'boar', 'boar'], faction: 'monsters', biome: T.FOREST_FLOOR },
+  { name: 'пауки', units: ['spider', 'spider', 'spider'], faction: 'monsters', biome: T.FOREST_FLOOR },
+  { name: 'скорпионы', units: ['scorpion', 'scorpion', 'rat'], faction: 'monsters', biome: T.SAND },
+  { name: 'наги топей', units: ['nagaWarrior', 'slime', 'slime'], faction: 'monsters', biome: T.SWAMP },
+  { name: 'медведь-шатун', units: ['bear'], faction: 'monsters', biome: T.FOREST_FLOOR },
+  { name: 'тролль с прихвостнями', units: ['ironTroll', 'goblin', 'goblin'], faction: 'monsters', biome: T.ROCK },
+  { name: 'нетопыри', units: ['giantBat', 'giantBat', 'giantBat', 'giantBat'], faction: 'monsters', night: true },
+  { name: 'некромант со свитой', units: ['necromancer', 'skeleton', 'ghoul'], faction: 'monsters', night: true },
+  { name: 'ледяной великан', units: ['frostGiant'], faction: 'monsters', winter: true },
 ];
+
+// подобрать стаю под место и время
+function pickPack(rand, game, tx, ty) {
+  const base = baseTile(game.world.seed, tx, ty);
+  const winter = seasonOf(game.world.day) === 3;
+  const night = game.isNight();
+  const fits = PACK_KINDS.filter(k =>
+    (!k.biome || k.biome === base) && (!k.night || night) && (!k.winter || winter));
+  return pick(rand, fits.length ? fits : PACK_KINDS);
+}
 
 export class AbstractSim {
   constructor(game) {
@@ -49,7 +70,7 @@ export class AbstractSim {
     for (let i = 0; i < 10; i++) {
       const x = randInt(rand, 40, WORLD_TILES - 40), y = randInt(rand, 40, WORLD_TILES - 40);
       if (baseTile(world.seed, x, y) <= T.WATER) continue;
-      const kind = pick(rand, PACK_KINDS);
+      const kind = pickPack(rand, this.game, x, y);
       this.tokens.push({
         id: 'tok' + this.nextId++, type: 'pack', name: kind.name,
         faction: kind.faction, units: [...kind.units],
@@ -202,11 +223,11 @@ export class AbstractSim {
     // казнь главаря (сюжет Ярославы): Вольница временно не собирает банды
     if (world.banditsWeakT > 0) world.banditsWeakT -= ABSTRACT_DT;
 
-    // редкие мировые события
+    // редкие мировые события: стая заводится в подходящем биоме
     if (rand() < 0.10 && this.tokens.length < 14) {
-      let kind = pick(rand, PACK_KINDS);
-      if (kind.faction === 'bandits' && world.banditsWeakT > 0) kind = PACK_KINDS[0]; // банды притихли
       const x = randInt(rand, 30, WORLD_TILES - 30), y = randInt(rand, 30, WORLD_TILES - 30);
+      let kind = pickPack(rand, this.game, x, y);
+      if (kind.faction === 'bandits' && world.banditsWeakT > 0) kind = PACK_KINDS[0]; // банды притихли
       this.tokens.push({
         id: 'tok' + this.nextId++, type: 'pack', name: kind.name,
         faction: kind.faction, units: [...kind.units], x: x * TILE, y: y * TILE, hydrated: null,

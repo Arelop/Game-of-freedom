@@ -41,7 +41,7 @@ export function saveWorld(game) {
         weaponUp: p.weaponUp || {},
         story: p.story,
         home: p.home || null, homeStash: p.homeStash || {}, hintStage: p.hintStage,
-        ascended: p.ascended || false,
+        ascended: p.ascended || false, bestiary: p.bestiary || {},
       })),
       banditsWeakT: w.banditsWeakT || 0,
     };
@@ -125,6 +125,7 @@ export function applySavedPlayer(game, p) {
     if (rec.quests) p.quests = rec.quests;
     else if (rec.quest) p.quests = [rec.quest];
     if (rec.ascended) p.ascended = true;
+    if (rec.bestiary) p.bestiary = rec.bestiary;
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);

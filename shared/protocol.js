@@ -19,6 +19,7 @@ export const MSG = {
   OFFHAND: 'offhand',          // активировать предмет в левой руке (ПКМ)
   STASH: 'stash',              // { op: 'put'|'take', item } общий сундук отряда
   GIVE: 'give',                // { item } передать предмет союзнику рядом
+  BESTIARY: 'bestiary',        // запросить свой бестиарий (счётчики убийств)
 
   // сервер -> клиент
   WELCOME: 'welcome',     // { id, worldSeed, worldMeta, tick }

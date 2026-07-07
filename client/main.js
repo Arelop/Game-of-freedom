@@ -207,6 +207,7 @@ net.handlers.onFx = (kind, m) => {
     case 'sellMode': panels.openSellMode(); break;
     case 'shop': panels.showShop(m); break;
     case 'stash': panels.showStash(m); break;
+    case 'bestiary': panels.showBestiary(m); break;
     case 'toast': panels.toast(m.text); break;
     case 'dialog': panels.showDialog(m); break;
     case 'marker': net.mapInfo.markers = net.mapInfo.markers || []; net.mapInfo.markers.push(m); break;
@@ -269,6 +270,10 @@ input.onKey = k => {
   if (k === 'KeyP') panels.toggleFactions();
   if (k === 'KeyM') bigMap = !bigMap;
   if (k === 'KeyJ') panels.toggleJournal();
+  if (k === 'KeyB') {
+    if (panels.beOpen) panels.hideBestiary();
+    else net.send({ t: MSG.BESTIARY });
+  }
   if (k === 'KeyN') panels.toast(Music.toggle() ? '🎵 Музыка включена' : '🔇 Музыка выключена');
   if (k === 'F3') hud.debug = !hud.debug;
   if (k === 'Escape') panels.hideDialog();

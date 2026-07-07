@@ -5,7 +5,8 @@ import { ITEMS, GEAR_SLOTS, SLOT_NAMES, isGear, isPotion, describeItem, isWeapon
 import { AMMO_NAMES, WEAPONS } from '../../shared/weapons.js';
 import { getWeapon, getItem, rarityOf, sellPriceR, RARITIES } from '../../shared/rarity.js';
 import { CLASSES, STAT_KEYS, STAT_NAMES, STAT_DESC, xpNeed, MAX_LEVEL } from '../../shared/classes.js';
-import { TALENTS, TIER_REQ, SPECS, specPoints } from '../../shared/talents.js';
+import { ENEMIES, HABITATS, ARCHETYPE_NAMES } from '../../shared/enemies.js';
+import { TALENTS, TIER_REQ, SPECS, specPoints, talentRank } from '../../shared/talents.js';
 import { SFX } from '../sfx.js';
 
 const USABLE_FOOD = new Set(['bread', 'meat', 'cooked_meat', 'bandage']);
@@ -132,6 +133,75 @@ export class Panels {
     this.hideStash();
   }
   get dialogOpen() { return this.dialogEl.style.display === 'block' || this.shopOpen || this.stashOpen; }
+
+  // ---------- бестиарий (B): все твари мира по тирам ----------
+  showBestiary(m) {
+    this.bestiaryCounts = m.k || {};
+    this.beOpen = true;
+    let el = document.getElementById('bestiary');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'bestiary';
+      document.body.appendChild(el);
+    }
+    el.style.display = 'block';
+    this.renderBestiary();
+  }
+
+  hideBestiary() {
+    this.beOpen = false;
+    const el = document.getElementById('bestiary');
+    if (el) el.style.display = 'none';
+  }
+
+  renderBestiary() {
+    const el = document.getElementById('bestiary');
+    if (!el || !this.beOpen) return;
+    const counts = this.bestiaryCounts || {};
+    const kinds = Object.values(ENEMIES);
+    const known = kinds.filter(d => counts[d.id] > 0).length;
+    el.innerHTML = `<h3>🐾 Бестиарий <span class="becount">${known}/${kinds.length} изучено</span></h3>
+      <div class="behint">Победи тварь, чтобы раскрыть её повадки. Подсказка «где искать» видна всегда.</div>`;
+    for (let tier = 1; tier <= 5; tier++) {
+      const list = kinds.filter(d => d.tier === tier);
+      if (!list.length) continue;
+      const h = document.createElement('div');
+      h.className = 'betier';
+      h.textContent = `— Тир ${tier} ${'★'.repeat(tier)} —`;
+      el.appendChild(h);
+      for (const d of list) {
+        const n = counts[d.id] || 0;
+        const row = document.createElement('div');
+        row.className = 'beentry' + (n > 0 ? ' known' : '');
+        const icon = this.freshIcon(d.sprite);
+        icon.classList.add('beicon');
+        if (n === 0) icon.style.filter = 'brightness(0.25)';
+        row.appendChild(icon);
+        const info = document.createElement('div');
+        info.className = 'beinfo';
+        if (n > 0) {
+          info.innerHTML = `<div class="bename">${d.name}${d.faction === 'darkness' ? ' ⛧' : ''}`
+            + ` <span class="bekills">убито: ${n}</span></div>`
+            + `<div class="bestats">${ARCHETYPE_NAMES[d.archetype] || d.archetype} · ${d.hp} ХП`
+            + ` · урон ${d.touchDamage || '—'} · опыт ${d.xp}</div>`
+            + `<div class="behab">${HABITATS[d.id] || ''}</div>`;
+        } else {
+          info.innerHTML = `<div class="bename" style="color:#696a6a">???</div>`
+            + `<div class="behab">${HABITATS[d.id] || 'Неизвестно…'}</div>`;
+        }
+        row.appendChild(info);
+        el.appendChild(row);
+      }
+    }
+    const btn = document.createElement('div');
+    btn.className = 'shopbtns';
+    const close = document.createElement('button');
+    close.textContent = STR.close + ' (B)';
+    close.style.cssText = 'width:100%;background:#222034;color:#99e550;border:1px solid #45444f;padding:8px;font-family:inherit;cursor:pointer';
+    close.onclick = () => this.hideBestiary();
+    btn.appendChild(close);
+    el.appendChild(btn);
+  }
 
   // ---------- журнал заданий (J) ----------
   toggleJournal() {
@@ -753,41 +823,66 @@ export class Panels {
       el.appendChild(row);
     }
 
-    // таланты: три специализации со своим прогрессом
+    // таланты в духе WoW Classic: три вкладки-специализации, ранги, ярусы
     const th = document.createElement('h3');
     th.innerHTML = 'Таланты' + (you.tp2 > 0 ? ` <span class="pts">(+${you.tp2} очк.)</span>` : '');
     el.appendChild(th);
     const learned = you.tl || [];
-    for (const spec of SPECS[you.cls] || []) {
+    const specs = SPECS[you.cls] || [];
+    this.specTab = this.specTab ?? 0;
+
+    // вкладки: имя ветки + вложенные очки
+    const tabs = document.createElement('div');
+    tabs.className = 'spectabs';
+    specs.forEach((spec, i) => {
       const pts = specPoints(you.cls, spec.id, learned);
-      const head = document.createElement('div');
-      head.className = 'spechead';
-      head.innerHTML = `<span style="color:${spec.color}">◆ ${spec.name}</span>`
-        + `<span class="specpts">${pts}/6</span>`;
-      head.title = spec.desc;
-      el.appendChild(head);
-      const sub = document.createElement('div');
-      sub.className = 'specdesc';
-      sub.textContent = spec.desc;
-      el.appendChild(sub);
-      for (const t of (TALENTS[you.cls] || []).filter(x => x.spec === spec.id)) {
-        const isLearned = learned.includes(t.id);
-        const tierOpen = pts >= TIER_REQ[t.tier];
-        const avail = !isLearned && tierOpen && you.tp2 > 0;
-        const box = document.createElement('div');
-        box.className = 'talent ' + (isLearned ? 'learned' : avail ? 'avail' : 'locked');
-        box.style.borderLeft = `3px solid ${isLearned ? spec.color : '#45444f'}`;
-        const req = !tierOpen && !isLearned ? ` <span class="treq">(нужно ${TIER_REQ[t.tier]} в ветке)</span>` : '';
-        box.innerHTML = `<div class="tname">${isLearned ? '✓ ' : ''}${t.name}${t.tier === 3 ? ' ★' : ''}${req}</div><div class="tdesc">${t.desc}</div>`;
-        if (avail) {
-          box.onclick = () => {
-            SFX.quest();
-            this.net.send({ t: MSG.LEARN_TALENT, id: t.id });
-            setTimeout(() => this.renderChar(), 150);
-          };
-        }
-        el.appendChild(box);
+      const b = document.createElement('button');
+      b.className = 'spectab' + (i === this.specTab ? ' active' : '');
+      b.style.borderBottomColor = spec.color;
+      if (i === this.specTab) b.style.color = spec.color;
+      b.innerHTML = `${spec.name}<br><span class="specpts">${pts}</span>`;
+      b.onclick = () => { this.specTab = i; this.renderChar(); };
+      tabs.appendChild(b);
+    });
+    el.appendChild(tabs);
+
+    const spec = specs[this.specTab];
+    if (!spec) return;
+    const pts = specPoints(you.cls, spec.id, learned);
+    const sub = document.createElement('div');
+    sub.className = 'specdesc';
+    sub.textContent = `${spec.desc} · вложено очков: ${pts}`;
+    el.appendChild(sub);
+
+    let lastTier = 0;
+    for (const t of (TALENTS[you.cls] || []).filter(x => x.spec === spec.id)) {
+      if (t.tier !== lastTier) {
+        lastTier = t.tier;
+        const tl = document.createElement('div');
+        tl.className = 'tierlabel';
+        tl.textContent = t.tier === 4 ? `— КАПСТОУНЫ (нужно ${TIER_REQ[4]} очков в ветке)`
+          : `— Ярус ${t.tier}` + (TIER_REQ[t.tier] ? ` (нужно ${TIER_REQ[t.tier]} очков в ветке)` : '');
+        el.appendChild(tl);
       }
+      const rank = talentRank(t.id, learned);
+      const maxRank = t.ranks || 1;
+      const isMax = rank >= maxRank;
+      const tierOpen = pts >= TIER_REQ[t.tier];
+      const avail = !isMax && tierOpen && you.tp2 > 0;
+      const box = document.createElement('div');
+      box.className = 'talent ' + (isMax ? 'learned' : rank > 0 ? 'partial' : avail ? 'avail' : 'locked');
+      if (avail && rank > 0) box.classList.add('avail');
+      box.style.borderLeft = `3px solid ${rank > 0 ? spec.color : '#45444f'}`;
+      const rankTxt = maxRank > 1 ? ` <span class="trank" style="color:${rank > 0 ? spec.color : '#696a6a'}">${rank}/${maxRank}</span>` : (isMax ? ' ✓' : '');
+      box.innerHTML = `<div class="tname">${t.name}${t.tier === 4 ? ' ★' : ''}${rankTxt}</div><div class="tdesc">${t.desc}</div>`;
+      if (avail) {
+        box.onclick = () => {
+          SFX.quest();
+          this.net.send({ t: MSG.LEARN_TALENT, id: t.id });
+          setTimeout(() => this.renderChar(), 150);
+        };
+      }
+      el.appendChild(box);
     }
   }
 }

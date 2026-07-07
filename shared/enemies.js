@@ -188,6 +188,54 @@ export const ENEMIES = {
     sprite: 'enemy_orc_warlord', xp: 35, drops: { coin: [18, 30], weapon: 1 },
   },
 
+  // --- живность биомов: у каждого зверя свой дом ---
+  boar: {
+    id: 'boar', name: 'Вепрь', archetype: 'chaser', hp: 5, speed: 62, tier: 1,
+    radius: 5, touchDamage: 1, lungeSpeed: 220, lungeWindup: 0.3, lungeRange: 40,
+    sprite: 'enemy_boar', xp: 2, drops: { meat: [1, 2] },
+  },
+  giantBat: {
+    id: 'giantBat', name: 'Нетопырь', archetype: 'chaser', hp: 3, speed: 95, tier: 1,
+    radius: 4, touchDamage: 1, lungeSpeed: 240, lungeWindup: 0.2, lungeRange: 35,
+    sprite: 'enemy_bat', xp: 2, drops: { coin: [0, 2] },
+  },
+  spider: {
+    id: 'spider', name: 'Волчий паук', archetype: 'chaser', hp: 8, speed: 78, tier: 2,
+    radius: 5, touchDamage: 1, lungeSpeed: 260, lungeWindup: 0.25, lungeRange: 45,
+    sprite: 'enemy_spider', xp: 4, drops: { coin: [1, 3] },
+  },
+  scorpion: {
+    id: 'scorpion', name: 'Скорпион', archetype: 'chaser', hp: 9, speed: 55, tier: 2,
+    radius: 5, touchDamage: 2, lungeSpeed: 230, lungeWindup: 0.35, lungeRange: 40,
+    sprite: 'enemy_scorpion', xp: 5, drops: { coin: [1, 4] },
+  },
+  bear: {
+    id: 'bear', name: 'Бурый медведь', archetype: 'chaser', hp: 26, speed: 52, tier: 3,
+    radius: 7, touchDamage: 2, lungeSpeed: 220, lungeWindup: 0.4, lungeRange: 50,
+    sprite: 'enemy_bear', xp: 10, drops: { meat: [2, 3], hide: [1, 2] },
+  },
+  nagaWarrior: {
+    id: 'nagaWarrior', name: 'Нага-воин', archetype: 'chaser', hp: 20, speed: 50, tier: 3,
+    radius: 6, touchDamage: 2, lungeSpeed: 220, lungeWindup: 0.35, lungeRange: 50,
+    sprite: 'enemy_naga', xp: 9, drops: { coin: [4, 8], crystal: [0, 1] },
+  },
+  necromancer: {
+    id: 'necromancer', name: 'Некромант', archetype: 'shooter', hp: 22, speed: 40, tier: 4,
+    radius: 5, touchDamage: 1, preferRange: [90, 150], fireInterval: 2.0,
+    pattern: 'burst3aimed', sprite: 'enemy_necromancer', xp: 12,
+    drops: { coin: [6, 12], crystal: [1, 2] },
+  },
+  ironTroll: {
+    id: 'ironTroll', name: 'Железный тролль', archetype: 'chaser', hp: 50, speed: 34, tier: 4,
+    radius: 8, touchDamage: 3, lungeSpeed: 180, lungeWindup: 0.55, lungeRange: 55,
+    sprite: 'enemy_iron_troll', xp: 18, drops: { coin: [8, 16], metal: [2, 4] },
+  },
+  frostGiant: {
+    id: 'frostGiant', name: 'Ледяной великан', archetype: 'chaser', hp: 90, speed: 38, tier: 5,
+    radius: 9, touchDamage: 3, lungeSpeed: 200, lungeWindup: 0.5, lungeRange: 60,
+    sprite: 'enemy_frost_giant', xp: 40, drops: { coin: [20, 35], crystal: [2, 4] },
+  },
+
   // --- боссы биомов: живут в логовах на карте ---
   swampWitch: {
     id: 'swampWitch', name: 'Болотная колдунья', archetype: 'boss', hp: 130, speed: 38, tier: 5,
@@ -245,3 +293,53 @@ export function enemiesOfTier(min, max) {
 
 // войско Тьмы для фортов и рейдов
 export const DARK_KINDS = ['darkSoldier', 'darkSoldier', 'darkArcher', 'darkMage', 'darkKnight'];
+
+// ---------- бестиарий: где и когда встречается каждая тварь ----------
+export const ARCHETYPE_NAMES = {
+  chaser: 'Рукопашный', shooter: 'Стрелок', turret: 'Тотем', dasher: 'Прыгун', boss: 'БОСС',
+};
+
+export const HABITATS = {
+  rat: 'Повсюду в глуши; гнёзда близ дорог и руин',
+  slime: 'Луга и болота; сползаются в стаи',
+  wolf: 'Леса; стаи охотятся и множатся ночью',
+  boar: 'Кабаньи стада в лесах — источник мяса',
+  giantBat: 'Вылетают только ночью, стаями',
+  bandit: 'Банды Вольницы у дорог и в лагерях',
+  banditHeavy: 'Вожаки в лагерях разбойников',
+  gnollRaider: 'Наёмник Вольницы в бандах',
+  skeleton: 'Подземелья; ночная нежить в глуши',
+  ghoul: 'Упыриные стаи ночью и в подземельях',
+  spider: 'Лесные чащи и своды подземелий',
+  scorpion: 'Пустыни и барханы',
+  archer: 'Лесные засады Вольницы',
+  imp: 'Подземелья; вырываются из тёмных ритуалов',
+  goblin: 'Гоблиньи ватаги в холмах, подземельях',
+  hobgoblin: 'Вожаки гоблиньих ватаг',
+  bear: 'Медведь-шатун бродит по глухим лесам',
+  nagaWarrior: 'Топи и болотные тропы',
+  turret: 'Тотемы в глубине подземелий',
+  spiralTurret: 'Вихревые тотемы у сокровищниц',
+  dasher: 'Прыгуны в средних этажах подземелий',
+  mimic: 'Прикидывается сундуком в подземельях',
+  orcWarrior: 'Орочьи отряды в дикой степи и данжах',
+  orcKnight: 'Элита орочьих отрядов',
+  demon: 'Разломы, тёмные ритуалы, круги камней',
+  golem: 'Скалы, подземелья; охраняет метеориты',
+  necromancer: 'Глубины подземелий; поднимает нежить',
+  ironTroll: 'Скальные пустоши и пещеры',
+  ogre: 'Огры-одиночки с гоблинской свитой',
+  minotaur: 'Хранитель ключа в подземельях с боссом',
+  orcWarlord: 'Хранитель ключа в подземельях с боссом',
+  frostGiant: 'Спускается с гор ТОЛЬКО ЗИМОЙ',
+  darkSoldier: 'Войска Тьмы: рейды и форты',
+  darkArcher: 'Войска Тьмы: рейды и форты',
+  darkMage: 'Войска Тьмы: рейды и форты',
+  darkKnight: 'Элита Тьмы: гарнизон Цитадели, рейды',
+  darkLord: 'Владыка Чернокаменной Цитадели',
+  heartKeeper: 'Является у Каменного круга во время Войны с Тьмой',
+  swampWitch: 'Логово в болотах (see: карта)',
+  rockKing: 'Трон в скалах (see: карта)',
+  packLeader: 'Логово в лесах (see: карта)',
+  bossOgre: 'Владыка последней комнаты подземелий',
+};

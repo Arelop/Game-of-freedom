@@ -101,6 +101,7 @@ export class Net {
       case MSG.OFFHAND: game.useOffhand(p); break;
       case MSG.STASH: game.stashOp(p, m.op === 'take' ? 'take' : 'put', String(m.item || ''), m.box === 'home' ? 'home' : 'team'); break;
       case MSG.GIVE: game.giveItem(p, String(m.item || '')); break;
+      case MSG.BESTIARY: game.fx({ t: 'bestiary', pid: p.id, k: p.bestiary || {} }, null); break;
     }
   }
 

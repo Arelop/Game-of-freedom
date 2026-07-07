@@ -199,6 +199,42 @@
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_crystal.png",
       "down": 2
     },
+    "enemy_boar": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/hog.png",
+      "down": 2
+    },
+    "enemy_bat": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/giant_bat.png",
+      "down": 2
+    },
+    "enemy_spider": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/wolf_spider.png",
+      "down": 2
+    },
+    "enemy_scorpion": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/giant_scorpion.png",
+      "down": 2
+    },
+    "enemy_bear": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/grizzly_bear.png",
+      "down": 2
+    },
+    "enemy_naga": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/naga_warrior.png",
+      "down": 2
+    },
+    "enemy_necromancer": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/necromancer.png",
+      "down": 2
+    },
+    "enemy_iron_troll": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/iron_troll.png",
+      "down": 2
+    },
+    "enemy_frost_giant": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/frost_giant.png",
+      "down": 2
+    },
     "enemy_goblin": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/goblin.png",
       "down": 2

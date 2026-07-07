@@ -191,6 +191,7 @@ export class Game {
       // сюжетные цепочки именных NPC: стадии, счётчики, осколки
       story: { rado: 0, capt: 0, mira: 0, bandits: 0, banditsGoal: 0, shards: [], captCamp: null },
       hintStage: 0, hintKills: 0, // онбординг: цепочка первых целей в HUD
+      bestiary: {},               // счётчики убийств по видам монстров
       lastSeq: 0, inputs: [],
       fireHeld: false, fireLatch: false,
       hungerTickT: 0,
@@ -334,7 +335,9 @@ export class Game {
     p.talentPts--;
     p.talents.push(id);
     this.recomputeStats(p);
-    this.toast(p, `Талант изучен: ${findTalent(p.cls, id).name}`);
+    const t = findTalent(p.cls, id);
+    const rank = p.talents.filter(x => x === id).length;
+    this.toast(p, `Талант изучен: ${t.name}${(t.ranks || 1) > 1 ? ` (ранг ${rank}/${t.ranks})` : ''}`);
   }
 
   // Общее имя предмета (включая оружие-предметы weapon:xxx)
@@ -696,7 +699,12 @@ export class Game {
         if (dist2(p.x, p.y, e.x, e.y) > (r + def.radius) ** 2) continue;
         let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
         da = Math.atan2(Math.sin(da), Math.cos(da));
-        if (arcDeg >= 360 || Math.abs(da) <= half) this.damageEnemy(e, atk.dmg, hitFake);
+        if (arcDeg >= 360 || Math.abs(da) <= half) {
+          this.damageEnemy(e, atk.dmg, hitFake);
+          // Оглушающий удар: шанс ошеломить врага
+          if (this.hasTalent(p, 'stunhit') && this.rand() < 0.15 && this.entities.has(e.id))
+            e.stunT = Math.max(e.stunT || 0, 0.6);
+        }
       } else if (e.entType === 'npc' && e.mapId === p.mapId) {
         if (dist2(p.x, p.y, e.x, e.y) > (r + 5) ** 2) continue;
         let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
@@ -980,6 +988,17 @@ export class Game {
 
       const map = this.mapFor(e.mapId);
       if (e.entType === 'enemy') {
+        // доты: яд и горение тикают раз в секунду
+        if ((e.dotT || 0) > 0) {
+          e.dotT -= dt;
+          e.dotAcc = (e.dotAcc || 0) + dt;
+          if (e.dotAcc >= 1) {
+            e.dotAcc -= 1;
+            this.damageEnemy(e, e.dotDmg || 1,
+              { owner: e.dotSrc, school: 'magic', isDot: true, vx: 0, vy: 0, knockback: 0 });
+            if (!this.entities.has(e.id)) continue; // дот добил
+          }
+        }
         const npcs = [...this.entities.values()].filter(n => n.entType === 'npc' && n.mapId === e.mapId);
         const shots = updateEnemy(e, dt, map, [...this.players.values()], this.rand, npcs);
         for (const s of shots) this.enemyFire(e, s);
@@ -1065,6 +1084,11 @@ export class Game {
     if (ab.mana > 0) p.ammo.mana -= ab.mana;
     // Ледяные жилы и божественность: способности перезаряжаются быстрее
     p.abCd[slot] = ab.cd * (this.hasTalent(p, 'cdr') ? 0.8 : 1) * (p.ascended ? 0.75 : 1);
+    // Эхо маны: иногда способность почти не уходит в кулдаун
+    if (this.hasTalent(p, 'echo') && this.rand() < 0.2) {
+      p.abCd[slot] = 0.5;
+      this.toast(p, '✨ Эхо маны!');
+    }
     const aim = p.aim || 0;
     const d = p.derived || {};
     const map = this.mapFor(p.mapId);
@@ -1107,6 +1131,15 @@ export class Game {
             q.buffs.blessed = { mult: 0.15, t: 10 };
             this.recomputeStats(q);
             this.toast(q, '⚔ Клич вождя: +15% урона на 10 с');
+          }
+        }
+        // Рог войны: клич укрывает группу барьером
+        if (this.hasTalent(p, 'ab_cryarmor')) {
+          for (const q of this.players.values()) {
+            if (q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > 95 * 95) continue;
+            q.shieldHp = Math.max(q.shieldHp || 0, 2);
+            q.shieldT = Math.max(q.shieldT || 0, 6);
+            this.fx({ t: 'barrier', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
           }
         }
         break;
@@ -1398,6 +1431,20 @@ export class Game {
 
   // ---------- урон ----------
   damageEnemy(e, dmg, pr) {
+    // таланты атакующего: казнь, засада, абсолютный ноль, яды и поджог
+    const attacker = pr && !pr.isDot ? this.players.get(pr.owner) : null;
+    if (attacker) {
+      if (e.hp >= e.maxHp && this.hasTalent(attacker, 'ambush')) dmg *= 1.4;          // Засада
+      if (e.hp / (e.maxHp || 1) <= 0.25 && this.hasTalent(attacker, 'execute')) dmg *= 1.5; // Палач
+      if ((e.slowT || 0) > 0 && this.hasTalent(attacker, 'deepfreeze')) dmg *= 1.35;  // Абсолютный ноль
+      dmg = Math.round(dmg * 10) / 10;
+      // Отравленные клинки / Поджог: навешиваем дот
+      if (pr.school !== 'magic' && this.hasTalent(attacker, 'venom')) {
+        e.dotT = 4; e.dotDmg = 1; e.dotSrc = attacker.id; e.dotKind = 'venom';
+      } else if (pr.school === 'magic' && this.hasTalent(attacker, 'ignite')) {
+        e.dotT = 3; e.dotDmg = 1; e.dotSrc = attacker.id; e.dotKind = 'ignite';
+      }
+    }
     e.hp -= dmg;
     e.aggro = true;
     if (pr && pr.knockback) {
@@ -1435,6 +1482,11 @@ export class Game {
     // сюжет: счётчик бандитов для Ярославы — всем участникам боя
     if (['bandit', 'banditHeavy', 'archer'].includes(e.kind))
       for (const q of gainers) if (q.story) q.story.bandits++;
+    // бестиарий: участники боя записывают вид твари
+    for (const q of gainers) {
+      q.bestiary = q.bestiary || {};
+      q.bestiary[e.kind] = (q.bestiary[e.kind] || 0) + 1;
+    }
     // онбординг: первые победы
     for (const q of gainers) {
       if (q.hintStage === 2 && ++q.hintKills >= 3) {
@@ -1537,6 +1589,7 @@ export class Game {
       return;
     }
     // блок щитом в левой руке (ПКМ): режет урон, гасит полностью удары спереди
+    // (Мастер щита расширяет сектор блока вдвое)
     if (p.blocking) {
       const off = getItem(p.equipment.offhand);
       if (off?.block) {
@@ -1544,11 +1597,21 @@ export class Game {
         if (source && source.x !== undefined) {
           let da = Math.atan2(source.y - p.y, source.x - p.x) - p.aim;
           da = Math.atan2(Math.sin(da), Math.cos(da));
-          frontal = Math.abs(da) <= Math.PI / 2.5;
+          frontal = Math.abs(da) <= (this.hasTalent(p, 'blockwide') ? Math.PI / 1.3 : Math.PI / 2.5);
         }
         this.fx({ t: 'block', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
         if (frontal) { p.hurtT = 0.3; return; } // лобовой удар полностью погашен
         dmg = Math.max(0.5, Math.round(dmg * 0.5 * 10) / 10);
+      }
+    }
+    // Ледяная кора: четверть урона уходит в ману (3 маны за 1 урона)
+    if (this.hasTalent(p, 'manashield') && (p.ammo.mana || 0) >= 3 && dmg >= 1) {
+      const abs = Math.min(Math.ceil(dmg * 0.25), Math.floor((p.ammo.mana || 0) / 3));
+      if (abs > 0) {
+        p.ammo.mana -= abs * 3;
+        dmg -= abs;
+        this.fx({ t: 'barrierHit', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        if (dmg <= 0) { p.hurtT = PLAYER_HURT_INVULN * 0.5; return; }
       }
     }
     p.hp -= dmg;
@@ -1561,9 +1624,10 @@ export class Game {
       if (source.entType === 'enemy') {
         const def = ENEMIES[source.kind];
         moveWithCollision(source, -Math.cos(a) * 10, -Math.sin(a) * 10, def?.radius || 5, map);
-        // Шипастый доспех: возмездие за удар вблизи
-        if (this.hasTalent(p, 'thorns'))
-          this.damageEnemy(source, 1, { vx: -Math.cos(a), vy: -Math.sin(a), knockback: 30, owner: p.id, school: 'melee' });
+        // Шипастый доспех (и Живая крепость): возмездие за удар вблизи
+        if (this.hasTalent(p, 'thorns') || this.hasTalent(p, 'thorns3'))
+          this.damageEnemy(source, this.hasTalent(p, 'thorns3') ? 3 : 1,
+            { vx: -Math.cos(a), vy: -Math.sin(a), knockback: 30, owner: p.id, school: 'melee', isDot: true });
       }
     }
     // Последний рубеж: смертельный удар оставляет 1 ХП (раз в 60 с)
