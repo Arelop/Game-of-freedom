@@ -113,14 +113,21 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
     }
     case 'boss': {
       const phase = def.phases.find(ph => e.hp / def.hp > ph.hpAbove) || def.phases[def.phases.length - 1];
-      if (e.phase !== phase) { e.phase = phase; e.stepIdx = 0; e.stepT = 0; }
+      if (e.phase !== phase) { // смена фазы: приспешники и ярость — обрабатывает game
+        e.phase = phase; e.stepIdx = 0; e.stepT = 0;
+        if (phase.adds || phase.enrage) shots.push({ phase });
+      }
       e.stepT -= dt;
       const step = phase.steps[e.stepIdx % phase.steps.length];
       if (e.stepT <= 0) {
-        e.stepT = step.interval;
+        e.stepT = step.interval * (e.enraged ? 0.75 : 1); // в ярости бьёт чаще
         e.stepIdx++;
         if (step.slam) { // телеграфированный удар по области — обрабатывает game
           shots.push({ slam: step.slam });
+          break;
+        }
+        if (step.charge) { // телеграфированный рывок по прямой — обрабатывает game
+          shots.push({ charge: step.charge, aim: ang });
           break;
         }
         e.shotIndex = (e.shotIndex || 0) + 1;

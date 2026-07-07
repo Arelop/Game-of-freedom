@@ -243,12 +243,12 @@ export class Panels {
     const known = kinds.filter(d => counts[d.id] > 0).length;
     el.innerHTML = `<h3>🐾 Бестиарий <span class="becount">${known}/${kinds.length} изучено</span></h3>
       <div class="behint">Победи тварь, чтобы раскрыть её повадки. Подсказка «где искать» видна всегда.</div>`;
-    for (let tier = 1; tier <= 5; tier++) {
+    for (let tier = 1; tier <= 6; tier++) {
       const list = kinds.filter(d => d.tier === tier);
       if (!list.length) continue;
       const h = document.createElement('div');
       h.className = 'betier';
-      h.textContent = `— Тир ${tier} ${'★'.repeat(tier)} —`;
+      h.textContent = tier === 6 ? `— Тир 6 ★★★★★★ ВЛАДЫКИ —` : `— Тир ${tier} ${'★'.repeat(tier)} —`;
       el.appendChild(h);
       for (const d of list) {
         const n = counts[d.id] || 0;

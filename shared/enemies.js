@@ -96,7 +96,7 @@ export const ENEMIES = {
     drops: { coin: [6, 11], crystal: [1, 2] }, faction: 'darkness',
   },
   darkLord: {
-    id: 'darkLord', name: 'Лорд Тьмы', archetype: 'boss', hp: 220, speed: 38, tier: 5,
+    id: 'darkLord', name: 'Лорд Тьмы', archetype: 'boss', hp: 220, speed: 38, tier: 6,
     radius: 8, touchDamage: 3, sprite: 'enemy_dark_lord', xp: 90,
     drops: { coin: [40, 70], weapon: 1, crystal: [3, 6] }, faction: 'darkness',
     phases: [
@@ -104,13 +104,14 @@ export const ENEMIES = {
         { pattern: 'aimedTriple', interval: 1.4, move: 'chase' },
         { pattern: 'fan5', interval: 2.0, move: 'strafe' },
       ]},
-      { hpAbove: 0.33, steps: [
+      { hpAbove: 0.33, adds: { kind: 'darkSoldier', n: 2 }, steps: [ // зовёт стражу
         { pattern: 'ring8', interval: 1.6, move: 'chase' },
         { slam: { dmg: 3, radius: 50, windup: 1.1 }, interval: 3.0, move: 'chase' },
         { pattern: 'spiral', interval: 0.22, move: 'strafe' },
       ]},
-      { hpAbove: 0, steps: [
+      { hpAbove: 0, adds: { kind: 'darkKnight', n: 1 }, enrage: true, steps: [
         { pattern: 'spiral', interval: 0.16, move: 'strafe' },
+        { charge: { dmg: 4, speed: 380, windup: 0.9 }, interval: 3.4 }, // тень несётся сквозь строй
         { slam: { dmg: 4, radius: 56, windup: 0.9 }, interval: 2.6, move: 'chase' },
         { pattern: 'aimedTriple', interval: 1.0, move: 'chase' },
       ]},
@@ -123,23 +124,24 @@ export const ENEMIES = {
     drops: { coin: [10, 18], metal: [1, 3] },
   },
   bossOgre: {
-    id: 'bossOgre', name: 'Огр-вожак', archetype: 'boss', hp: 170, speed: 34, tier: 5,
+    id: 'bossOgre', name: 'Огр-вожак', archetype: 'boss', hp: 170, speed: 34, tier: 6,
     radius: 10, touchDamage: 2, sprite: 'enemy_boss', xp: 60,
     drops: { coin: [30, 50], weapon: 1 },
     phases: [
       { hpAbove: 0.66, steps: [
         { pattern: 'aimedTriple', interval: 1.6, move: 'chase' },
+        { charge: { dmg: 3, speed: 320, windup: 1.0 }, interval: 3.6 }, // таранит с разбега
         { pattern: 'ring8', interval: 2.4, move: 'chase' },
       ]},
-      { hpAbove: 0.33, steps: [
+      { hpAbove: 0.33, adds: { kind: 'goblin', n: 3 }, steps: [ // свистит свите
         { pattern: 'spiral', interval: 0.2, move: 'strafe' },
         { slam: { dmg: 3, radius: 52, windup: 1.2 }, interval: 3.2, move: 'chase' },
         { pattern: 'fan5', interval: 1.4, move: 'chase' },
       ]},
-      { hpAbove: 0, steps: [
+      { hpAbove: 0, enrage: true, steps: [
         { pattern: 'ring12', interval: 1.8, move: 'chase' },
+        { charge: { dmg: 4, speed: 360, windup: 0.8 }, interval: 3.0 },
         { slam: { dmg: 3, radius: 56, windup: 1.0 }, interval: 2.8, move: 'chase' },
-        { pattern: 'spiral', interval: 0.16, move: 'strafe' },
         { pattern: 'wideWave', interval: 1.3, move: 'chase' },
       ]},
     ],
@@ -314,58 +316,82 @@ export const ENEMIES = {
 
   // --- боссы биомов: живут в логовах на карте ---
   swampWitch: {
-    id: 'swampWitch', name: 'Болотная колдунья', archetype: 'boss', hp: 130, speed: 38, tier: 5,
+    id: 'swampWitch', name: 'Болотная колдунья', archetype: 'boss', hp: 130, speed: 38, tier: 6,
     radius: 7, touchDamage: 2, sprite: 'enemy_swamp_witch', xp: 55,
     drops: { coin: [25, 40], weapon: 1, crystal: [2, 4] },
+    healer: { amount: 5, interval: 4, range: 140 }, // латает свою свиту
     phases: [
       { hpAbove: 0.5, steps: [
         { pattern: 'aimedTriple', interval: 1.5, move: 'strafe' },
         { pattern: 'fan5', interval: 2.0, move: 'chase' },
       ]},
-      { hpAbove: 0, steps: [
+      { hpAbove: 0.25, adds: { kind: 'slime', n: 4 }, steps: [ // болото оживает
         { pattern: 'ring8', interval: 1.6, move: 'strafe' },
         { slam: { dmg: 3, radius: 46, windup: 1.1 }, interval: 3.0, move: 'chase' },
         { pattern: 'burst3aimed', interval: 1.0, move: 'chase' },
       ]},
+      { hpAbove: 0, adds: { kind: 'gasSpore', n: 3 }, enrage: true, steps: [ // живые бомбы!
+        { pattern: 'spiral', interval: 0.2, move: 'strafe' },
+        { slam: { dmg: 3, radius: 50, windup: 0.9 }, interval: 2.6, move: 'chase' },
+        { pattern: 'fan5', interval: 1.1, move: 'chase' },
+      ]},
     ],
   },
   rockKing: {
-    id: 'rockKing', name: 'Каменный король', archetype: 'boss', hp: 220, speed: 26, tier: 5,
+    id: 'rockKing', name: 'Каменный король', archetype: 'boss', hp: 220, speed: 26, tier: 6,
     radius: 9, touchDamage: 3, sprite: 'enemy_rock_king', xp: 70,
     drops: { coin: [30, 50], weapon: 1, metal: [4, 8] },
+    shielded: true, // гранитный фронт: бей с фланга или оглушай
     phases: [
       { hpAbove: 0.6, steps: [
         { pattern: 'ring8', interval: 2.2, move: 'chase' },
         { pattern: 'aimedTriple', interval: 1.6, move: 'chase' },
       ]},
-      { hpAbove: 0.3, steps: [
+      { hpAbove: 0.3, adds: { kind: 'golem', n: 2 }, steps: [ // скалы встают на защиту
         { pattern: 'ring12', interval: 1.9, move: 'chase' },
         { slam: { dmg: 4, radius: 60, windup: 1.3 }, interval: 3.4, move: 'chase' },
         { pattern: 'wideWave', interval: 1.4, move: 'strafe' },
       ]},
-      { hpAbove: 0, steps: [
+      { hpAbove: 0, enrage: true, steps: [
         { pattern: 'spiral', interval: 0.18, move: 'strafe' },
+        { charge: { dmg: 5, speed: 300, windup: 1.1 }, interval: 3.6 }, // лавина из камня
         { slam: { dmg: 4, radius: 64, windup: 1.0 }, interval: 2.8, move: 'chase' },
         { pattern: 'ring12', interval: 1.6, move: 'chase' },
       ]},
     ],
   },
   packLeader: {
-    id: 'packLeader', name: 'Вожак варгов', archetype: 'chaser', hp: 90, speed: 80, tier: 5,
-    radius: 7, touchDamage: 2, lungeSpeed: 300, lungeWindup: 0.4, lungeRange: 70,
-    sprite: 'enemy_pack_leader', xp: 45, drops: { coin: [20, 35], weapon: 1, hide: [2, 4], meat: [2, 3] },
+    id: 'packLeader', name: 'Вожак варгов', archetype: 'boss', hp: 110, speed: 70, tier: 6,
+    radius: 7, touchDamage: 3, sprite: 'enemy_pack_leader', xp: 50,
+    drops: { coin: [20, 35], weapon: 1, hide: [2, 4], meat: [2, 3] },
+    phases: [ // бой без магии: клыки, рывки и стая
+      { hpAbove: 0.55, steps: [
+        { charge: { dmg: 3, speed: 380, windup: 0.7 }, interval: 2.6 },
+        { slam: { dmg: 2, radius: 40, windup: 0.7 }, interval: 2.2, move: 'chase' }, // укус по кругу
+      ]},
+      { hpAbove: 0.25, adds: { kind: 'wolf', n: 3 }, steps: [ // вой созывает стаю
+        { charge: { dmg: 3, speed: 400, windup: 0.6 }, interval: 2.2 },
+        { slam: { dmg: 3, radius: 44, windup: 0.7 }, interval: 2.4, move: 'chase' },
+      ]},
+      { hpAbove: 0, adds: { kind: 'wolf', n: 2 }, enrage: true, steps: [
+        { charge: { dmg: 4, speed: 430, windup: 0.5 }, interval: 1.9 },
+        { charge: { dmg: 4, speed: 430, windup: 0.5 }, interval: 1.9 }, // двойной рывок!
+        { slam: { dmg: 3, radius: 48, windup: 0.6 }, interval: 2.2, move: 'chase' },
+      ]},
+    ],
   },
   heartKeeper: {
-    id: 'heartKeeper', name: 'Хранитель сердца', archetype: 'shooter', hp: 120, speed: 44, tier: 5,
+    id: 'heartKeeper', name: 'Хранитель сердца', archetype: 'shooter', hp: 120, speed: 44, tier: 6,
     radius: 7, touchDamage: 2, preferRange: [70, 130], fireInterval: 1.5,
     pattern: 'fan5', sprite: 'enemy_heart_keeper', xp: 60,
     drops: { coin: [20, 40], crystal: [2, 4] }, faction: 'darkness',
+    summoner: { kind: 'imp', max: 3, interval: 6 }, // сердце Тьмы плодит бесов
   },
 };
 
 // Рост урона с тиром: старшие твари бьют больнее той же атакой.
-// Касание: +1 на тирах 3-4, +2 на тире 5. Снаряды: 2 урона с тира 4.
-export function tierTouchBonus(tier) { return Math.floor(((tier || 1) - 1) / 2); }
+// Касание: +1 на тирах 3-4, +2 на тире 5, +3 на тире 6 (боссы). Снаряды: 2 с тира 4.
+export function tierTouchBonus(tier) { return (tier || 1) >= 6 ? 3 : Math.floor(((tier || 1) - 1) / 2); }
 export function tierProjDmg(tier) { return 1 + Math.floor(((tier || 1) - 1) / 3); }
 
 // Монстры тира min..max — для спавна по сложности (без боссов, войск Тьмы
@@ -430,10 +456,10 @@ export const HABITATS = {
   darkKnight: 'Элита Тьмы: гарнизон Цитадели, рейды',
   darkLord: 'Владыка Чернокаменной Цитадели',
   heartKeeper: 'Является у Каменного круга во время Войны с Тьмой',
-  swampWitch: 'Логово в болотах (see: карта)',
-  rockKing: 'Трон в скалах (see: карта)',
-  packLeader: 'Логово в лесах (see: карта)',
-  bossOgre: 'Владыка последней комнаты подземелий',
+  swampWitch: 'Логово в болотах; лечит свиту, в ярости мечет живые бомбы',
+  rockKing: 'Трон в скалах; гранитный фронт не пробить — фланг или стан',
+  packLeader: 'Логово в лесах; двойные рывки, вой созывает стаю',
+  bossOgre: 'Владыка последней комнаты подземелий; таранит с разбега',
   orcShieldbearer: 'Орочьи отряды; блокирует удары спереди — фланг или стан',
   orcPriest: 'Лечит свою стаю издали — приоритетная цель',
   demonologist: 'Подземелья; без конца тянет бесов из иного мира',

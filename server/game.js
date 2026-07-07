@@ -586,7 +586,7 @@ export class Game {
       }
       case 'hunt': { // странствующий именной зверь — трофей для смельчаков
         const NAMES_H = ['Кровавый Клык', 'Старый Хрыч', 'Гроза Дорог', 'Косматый Ужас', 'Одноглазый'];
-        const KINDS_H = ['bear', 'packLeader', 'ogre', 'ironTroll', 'minotaur'];
+        const KINDS_H = ['bear', 'orcWarlord', 'ogre', 'ironTroll', 'minotaur']; // боссы в логовах — охота на элитных зверей
         const i = Math.floor(this.rand() * NAMES_H.length);
         const hx = 60 + Math.floor(this.rand() * 390), hy = 60 + Math.floor(this.rand() * 390);
         this.abstract.tokens.push({
@@ -1260,6 +1260,26 @@ export class Game {
           }
           continue; // во время замаха не двигается и не стреляет
         }
+        // рывок босса: замах с телеграф-линией, затем несётся по прямой
+        if ((e.chargeT || 0) > 0) {
+          e.chargeT -= dt;
+          if (e.chargeT <= 0) e.chargingT = 0.55; // помчался
+          continue;
+        }
+        if ((e.chargingT || 0) > 0) {
+          e.chargingT -= dt;
+          const cdef = ENEMIES[e.kind];
+          moveWithCollision(e, e.chargeVx * dt, e.chargeVy * dt, cdef.radius, map);
+          for (const p of this.players.values()) {
+            if (p.dead || p.mapId !== e.mapId || e.chargeHit.has(p.id)) continue;
+            if (circlesOverlap(e.x, e.y, cdef.radius + 4, p.x, p.y, PLAYER_RADIUS)) {
+              e.chargeHit.add(p.id);
+              this.damagePlayer(p, e.chargeSpec.dmg, { x: e.x - e.chargeVx, y: e.y - e.chargeVy });
+            }
+          }
+          if (e.chargingT <= 0) this.fx({ t: 'hit', kind: 'wall', x: e.x, y: e.y }, e.mapId, e.x, e.y);
+          continue; // рывок не прерывается на стрельбу
+        }
         const npcs = [...this.entities.values()].filter(n => n.entType === 'npc' && n.mapId === e.mapId);
         const shots = updateEnemy(e, dt, map, [...this.players.values()], this.rand, npcs);
         for (const s of shots) {
@@ -1267,6 +1287,32 @@ export class Game {
             e.slamT = s.slam.windup;
             e.slamSpec = s.slam;
             this.fx({ t: 'telegraph', x: e.x, y: e.y, r: s.slam.radius, w: s.slam.windup }, e.mapId, e.x, e.y);
+            continue;
+          }
+          if (s.charge) { // телеграфированный рывок: линия предупреждает о траектории
+            e.chargeT = s.charge.windup;
+            e.chargeSpec = s.charge;
+            e.chargeVx = Math.cos(s.aim) * s.charge.speed;
+            e.chargeVy = Math.sin(s.aim) * s.charge.speed;
+            e.chargeHit = new Set();
+            this.fx({ t: 'telegraphLine', x: e.x, y: e.y, a: s.aim, len: s.charge.speed * 0.55, w: s.charge.windup }, e.mapId, e.x, e.y);
+            continue;
+          }
+          if (s.phase) { // смена фазы: свита и ярость
+            const ph = s.phase;
+            if (ph.adds) {
+              for (let i = 0; i < ph.adds.n; i++) {
+                const a = (i / ph.adds.n) * Math.PI * 2;
+                this.spawnEnemy(ph.adds.kind, e.mapId, e.x + Math.cos(a) * 30, e.y + Math.sin(a) * 30, { noElite: true });
+              }
+              this.fx({ t: 'summon', x: e.x, y: e.y }, e.mapId, e.x, e.y);
+            }
+            if (ph.enrage && !e.enraged) {
+              e.enraged = true;
+              e.hasteF = Math.max(e.hasteF || 1, 1.3);
+              this.fx({ t: 'enrage', x: e.x, y: e.y }, e.mapId, e.x, e.y);
+              this.toastMap(e.mapId, `⚠ ${ENEMIES[e.kind].name} В ЯРОСТИ!`);
+            }
             continue;
           }
           this.enemyFire(e, s);

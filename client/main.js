@@ -251,6 +251,18 @@ net.handlers.onFx = (kind, m) => {
       ringFx.push({ x: m.x, y: m.y, r0: 6, r1: m.r, t: 0, dur: m.w, color: '#d9574a', fill: true });
       SFX.enemy_shot();
       break;
+    case 'telegraphLine':
+      // босс метит рывок: красная полоса — уйди с траектории!
+      ringFx.push({ x: m.x, y: m.y, line: true, aim: m.a, len: m.len, t: 0, dur: m.w, color: '#d9574a' });
+      SFX.enemy_shot();
+      break;
+    case 'enrage':
+      // босс в ярости: багровая вспышка и дрожь земли
+      ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 52, t: 0, dur: 0.5, color: '#d9574a' });
+      particles.burst(m.x, m.y, '#d9574a', 22, 100, 0.5, 2);
+      cam.addTrauma(0.5);
+      SFX.boom();
+      break;
     case 'bloodcast':
       particles.blood(m.x, m.y, 8);
       ringFx.push({ x: m.x, y: m.y, r0: 4, r1: 16, t: 0, dur: 0.3, color: '#d9574a' });
@@ -589,6 +601,18 @@ function render(timeSec) {
   for (const r of ringFx) {
     if (r.t < 0) continue; // отложенный старт (волны вихря)
     const k = Math.min(1, r.t / r.dur);
+    if (r.line) { // телеграф рывка босса: красная полоса растёт вдоль траектории
+      const s = cam.toScreen(r.x, r.y);
+      ctx.globalAlpha = 0.25 + k * 0.3;
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y - 2);
+      ctx.lineTo(s.x + Math.cos(r.aim) * r.len * k, s.y - 2 + Math.sin(r.aim) * r.len * k);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      continue;
+    }
     const rad = r.r0 + (r.r1 - r.r0) * k;
     const s = cam.toScreen(r.x, r.y);
     ctx.globalAlpha = (1 - k) * 0.9;
