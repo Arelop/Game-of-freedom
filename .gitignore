@@ -2,3 +2,5 @@ node_modules/
 assets/raw/
 saves/
 *.log
+admintest-saves/
+bigworld-saves/
