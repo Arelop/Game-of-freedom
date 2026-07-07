@@ -56,6 +56,8 @@ let bigMap = false;
 let localMag = 0, localWeapon = '';
 let invRefresh = 0;
 let swingAnim = 0;       // анимация замаха своего игрока
+let atkShowT = 0;        // оружие видно только в момент атаки (не мельтешит в руках)
+const remoteAtk = new Map(); // pid -> ms, до которого показывать оружие союзника
 const swings = [];       // {x,y,aim,range,arc,t,maxT,color}
 const floatTexts = [];   // летящие цифры урона {x,y,text,color,t,big}
 const chainFx = [];      // молнии {pts:[[x,y]..], t}
@@ -156,8 +158,13 @@ net.handlers.onMapChange = m => {
 
 net.handlers.onFx = (kind, m) => {
   switch (kind) {
-    case 'shot': particles.muzzle(m.x, m.y, m.aim); if (m.pid !== net.myId) playWeaponSound(getWeapon(m.weapon)?.sound); break;
+    case 'shot':
+      particles.muzzle(m.x, m.y, m.aim);
+      remoteAtk.set(m.pid, performance.now() + 350);
+      if (m.pid !== net.myId) playWeaponSound(getWeapon(m.weapon)?.sound);
+      break;
     case 'swing':
+      remoteAtk.set(m.pid, performance.now() + 350);
       if (m.pid !== net.myId) { spawnSwing(m.x, m.y, m.aim, m.range, m.arc, getWeapon(m.weapon)); playWeaponSound(getWeapon(m.weapon)?.sound); }
       break;
     case 'eshot': SFX.enemy_shot(); break;
@@ -210,7 +217,9 @@ net.handlers.onFx = (kind, m) => {
     case 'bestiary': panels.showBestiary(m); break;
     case 'toast':
       panels.logMsg(m.text, m.w);
-      if (!m.w) panels.toast(m.text); // мировые вести не мельтешат на экране — они в летописи (L)
+      // тихие мировые вести (w:1) не мельтешат — только летопись (L);
+      // личные и ВАЖНЫЕ мировые (w:2 — события, война) всплывают
+      if (m.w !== 1) panels.toast(m.text);
       break;
     case 'dialog': panels.showDialog(m); break;
     case 'marker': net.mapInfo.markers = net.mapInfo.markers || []; net.mapInfo.markers.push(m); break;
@@ -436,12 +445,14 @@ function simStep() {
       fireCd = 1 / w.fireRate;
       spawnSwing(net.pred.x, net.pred.y, aim, w.range, w.arcDeg, w);
       swingAnim = 0.18;
+      atkShowT = 0.35;
       cam.addTrauma(w.recoilShake * 0.5);
       playWeaponSound(w.sound);
     } else if (canAct && (w.manaCost
       ? (you.mp >= w.manaCost || (you.cls === 'mage' && you.hp > 2)) // посох: мана или кровавый каст
       : (you.rt <= 0 && you.mag > 0))) {
       fireCd = 1 / w.fireRate;
+      atkShowT = 0.35;
       net.spawnWeaponBullets(net.pred.x, net.pred.y, aim, w, (net.seq * 2654435761) >>> 0);
       particles.muzzle(net.pred.x + Math.cos(aim) * 8, net.pred.y - 4 + Math.sin(aim) * 8, aim);
       cam.addTrauma(w.recoilShake * 0.5);
@@ -451,6 +462,7 @@ function simStep() {
 
   // затухание свингов и цифр урона
   swingAnim = Math.max(0, swingAnim - SIM_DT);
+  atkShowT = Math.max(0, atkShowT - SIM_DT);
   for (const s of swings) s.t -= SIM_DT;
   for (let i = swings.length - 1; i >= 0; i--) if (swings[i].t <= 0) swings.splice(i, 1);
   for (const f of floatTexts) { f.t -= SIM_DT; f.y -= 18 * SIM_DT; }
@@ -709,7 +721,8 @@ function drawMe(timeSec) {
   } else {
     atlas.draw(ctx, sprite, s.x, s.y - bob, { flipX, alpha });
     if (you.blk && input.block) drawShield(you, s.x, s.y - 2 - bob, p.aim);
-    else drawWeapon(getWeapon(you.w), s.x, s.y - 2 - bob, p.aim, flipX, swingAnim);
+    // оружие показывается только в момент атаки — руки свободны в мирное время
+    else if (atkShowT > 0) drawWeapon(getWeapon(you.w), s.x, s.y - 2 - bob, p.aim, flipX, swingAnim);
   }
   // божественный нимб: золотое кольцо над головой и редкие искры
   if (you.asc) {
@@ -780,7 +793,8 @@ function drawEntity(id, r, p, nowMs, timeSec) {
     if (e.dn) { atlas.draw(ctx, e.k, s.x, s.y, { rot: Math.PI / 2, alpha: 0.7 }); return; }
     if (flash) atlas.drawTinted(ctx, e.k, s.x, s.y, '#fff', { flipX });
     else atlas.draw(ctx, e.k, s.x, s.y, { flipX, alpha: e.iv ? 0.35 : 1 });
-    drawWeapon(getWeapon(e.w), s.x, s.y - 2, p.a || 0, flipX, 0);
+    // оружие союзника видно только в момент его атаки
+    if ((remoteAtk.get(+id.slice(1)) || 0) > nowMs) drawWeapon(getWeapon(e.w), s.x, s.y - 2, p.a || 0, flipX, 0);
     if (e.asc) { // нимб бога-союзника
       ctx.strokeStyle = '#fbf236';
       ctx.globalAlpha = 0.6;

@@ -329,7 +329,7 @@ export class AbstractSim {
         this.game.dropRandomGear('over', hx, hy, true, 6);
         this.game.dropRandomWeapon('over', hx + 12, hy, 6, 2);
         this.game.spawnDrop('coin', 40 + Math.floor(this.game.rand() * 40), 'over', hx - 10, hy, 300);
-        this.game.toastAll(`🏆 «${tok.hunt}» повержен! Трофеи ждут на месте охоты`);
+        this.game.toastAll(`🏆 «${tok.hunt}» повержен! Трофеи ждут на месте охоты`, true);
         this.game.events.push(this.game.world.day, `Путники добыли зверя по кличке ${tok.hunt}`);
       }
       if (tok.garrison && this.game.world.citadel) {
@@ -337,13 +337,13 @@ export class AbstractSim {
         const c = this.game.world.citadel;
         c.power = Math.max(3, Math.round(c.power / 2));
         this.game.events.push(this.game.world.day, `★ Гарнизон Чернокаменной Цитадели повержен — Тьма отступает!`, { x: Math.round(tok.x / TILE), y: Math.round(tok.y / TILE) });
-        this.game.toastAll('★ Гарнизон Цитадели повержен! Тьма ослаблена');
+        this.game.toastAll('★ Гарнизон Цитадели повержен! Тьма ослаблена', true);
         // Война с Тьмой: победа в штурме обнажает Сердце Тьмы
         const w = this.game.world.war;
         if (w && w.stage === 3) {
           w.stage = 4;
           this.game.spawnDarkHeart();
-          this.game.toastAll('🖤 В пустом зале Цитадели обнажилось СЕРДЦЕ ТЬМЫ. Реши его судьбу (E)');
+          this.game.toastAll('🖤 В пустом зале Цитадели обнажилось СЕРДЦЕ ТЬМЫ. Реши его судьбу (E)', true);
           this.game.events.push(this.game.world.day, 'Штурм Цитадели удался — Сердце Тьмы беззащитно');
         }
       } else {

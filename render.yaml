@@ -5,6 +5,7 @@ services:
     name: pogranichye
     runtime: node
     plan: free
+    region: frankfurt   # Европа: минимальный пинг из России/СНГ
     buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /

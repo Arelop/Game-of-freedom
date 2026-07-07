@@ -125,7 +125,7 @@ export class Admin {
       }
       case 'time': {
         g.world.time = m.value === 'night' ? 0.9 : 0.3;
-        g.toastAll(m.value === 'night' ? '🌙 Судьба призвала ночь' : '☀ Судьба призвала день');
+        g.toastAll(m.value === 'night' ? '🌙 Судьба призвала ночь' : '☀ Судьба призвала день', true);
         return { ok: true };
       }
       case 'weather': {
@@ -143,7 +143,7 @@ export class Admin {
       case 'announce': {
         const text = String(m.text || '').slice(0, 160);
         if (!text) return { error: 'пустое объявление' };
-        g.toastAll(`📣 ${text}`);
+        g.toastAll(`📣 ${text}`, true);
         g.events.push(g.world.day, `Глас небес: ${text}`);
         return { ok: true };
       }
@@ -178,7 +178,7 @@ export class Admin {
     const chunks = [];
     for (let cy = 0; cy < 16; cy++) for (let cx = 0; cx < 16; cx++) chunks.push([cx, cy]);
     g.fx({ t: 'remap', mapId: 'over', chunks }, null);
-    g.toastAll(`📜 Мир восстановлен из летописи (день ${g.world.day})`);
+    g.toastAll(`📜 Мир восстановлен из летописи (день ${g.world.day})`, true);
     console.log(`[admin] сейв загружен на лету (день ${g.world.day})`);
     return { ok: true, day: g.world.day };
   }

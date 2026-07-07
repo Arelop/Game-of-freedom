@@ -545,7 +545,7 @@ export class Game {
     switch (type) {
       case 'bloodMoon': {
         this.world.event = { type, t: 100 };
-        this.toastAll('🌕 КРОВАВАЯ ЛУНА! Твари свирепеют — элита повсюду (100 с)');
+        this.toastAll('🌕 КРОВАВАЯ ЛУНА! Твари свирепеют — элита повсюду (100 с)', true);
         this.events.push(this.world.day, 'Кровавая луна взошла над Пограничьем');
         break;
       }
@@ -560,7 +560,7 @@ export class Game {
           });
         }
         for (const q of this.players.values()) this.fx({ t: 'marker', pid: q.id, x: s.x + 25, y: s.y + 20 }, null);
-        this.toastAll(`⛧ РАЗЛОМ: демоны иного мира идут на ${s.name}!`);
+        this.toastAll(`⛧ РАЗЛОМ: демоны иного мира идут на ${s.name}!`, true);
         this.events.push(this.world.day, `Разлом открылся у ${s.name} — демоны рвутся в мир`, { x: s.x, y: s.y });
         break;
       }
@@ -571,7 +571,7 @@ export class Game {
         for (let i = 0; i < 2; i++)
           this.spawnEnemy('golem', 'over', mx * TILE + (this.rand() - 0.5) * 60, my * TILE + (this.rand() - 0.5) * 60, { forceElite: true });
         for (const q of this.players.values()) this.fx({ t: 'marker', pid: q.id, x: mx, y: my }, null);
-        this.toastAll('☄ Метеорит упал в глуши! Кристаллы ждут смельчаков (метка на карте)');
+        this.toastAll('☄ Метеорит упал в глуши! Кристаллы ждут смельчаков (метка на карте)', true);
         this.events.push(this.world.day, 'С неба упал метеорит — искатели спешат к кратеру', { x: mx, y: my });
         break;
       }
@@ -582,7 +582,7 @@ export class Game {
         const n = this.entities.get(id);
         n.name = 'Заезжий купец';
         n.dieAtTick = this.tick + 200 * 30;
-        this.toastAll(`🧳 Странствующий торговец заглянул в ${s.name} (на ~3 мин)`);
+        this.toastAll(`🧳 Странствующий торговец заглянул в ${s.name} (на ~3 мин)`, true);
         break;
       }
       case 'hunt': { // странствующий именной зверь — трофей для смельчаков
@@ -596,7 +596,7 @@ export class Game {
           x: hx * TILE, y: hy * TILE, hydrated: null,
         });
         for (const q of this.players.values()) this.fx({ t: 'marker', pid: q.id, x: hx, y: hy }, null);
-        this.toastAll(`🎯 ОХОТА: в глуши замечен «${NAMES_H[i]}» — награда тому, кто добудет трофей!`);
+        this.toastAll(`🎯 ОХОТА: в глуши замечен «${NAMES_H[i]}» — награда тому, кто добудет трофей!`, true);
         this.events.push(this.world.day, `Объявлена охота на зверя по кличке ${NAMES_H[i]}`, { x: hx, y: hy });
         break;
       }
@@ -608,7 +608,7 @@ export class Game {
           faction: 'monsters', units: ['darkMage', 'darkSoldier', 'darkSoldier'],
           x: (s.x - 28) * TILE, y: (s.y + 24) * TILE, march: s.id, hydrated: null,
         });
-        this.toastAll(`⛧ Культ Тьмы восстал против узурпатора — идут на ${s.name}!`);
+        this.toastAll(`⛧ Культ Тьмы восстал против узурпатора — идут на ${s.name}!`, true);
         this.events.push(this.world.day, `Культ Тьмы объявился у ${s.name}`, { x: s.x, y: s.y });
         break;
       }
@@ -2630,7 +2630,7 @@ export class Game {
     if (w.stage === 0) {
       w.stage = 1;
       this.toast(p, '⚔ Война началась! Заручись доверием Северян, Озёрного союза и Степняков (репутация 25)');
-      this.toastAll('⚔ ВОЙНА С ТЬМОЙ: старейшины зовут героев объединить фракции!');
+      this.toastAll('⚔ ВОЙНА С ТЬМОЙ: старейшины зовут героев объединить фракции!', true);
       this.events.push(this.world.day, `${p.name} поднял знамя Войны с Тьмой`);
     } else if (w.stage === 1) {
       const reps = ['severane', 'ozerny', 'stepnyaki'].map(f => p.rep[f] || 0);
@@ -2640,7 +2640,7 @@ export class Game {
       }
       w.stage = 2;
       this.spawnHeartKeeper();
-      this.toastAll('⚔ Союз трёх фракций заключён! Для великого ритуала нужны реликвии:');
+      this.toastAll('⚔ Союз трёх фракций заключён! Для великого ритуала нужны реликвии:', true);
       this.toastAll('10 кристаллов · Сердце Тени (Хранитель у Каменного круга) · Древний осколок (боссы данжей)');
       this.events.push(this.world.day, `${p.name} объединил три фракции против Тьмы`);
       const circle = this.world.pois.find(o => o.type === 'circle');
@@ -2660,7 +2660,7 @@ export class Game {
       const g = this.abstract.tokens.find(t => t.garrison && !t.dead);
       if (g && !g.hydrated) g.units = ['darkLord', 'darkKnight', 'darkArcher'];
       this.addXp(p, 150);
-      this.toastAll('✦ ВЕЛИКИЙ РИТУАЛ СВЕРШЁН! Врата Чернокаменной Цитадели пали — на штурм!');
+      this.toastAll('✦ ВЕЛИКИЙ РИТУАЛ СВЕРШЁН! Врата Чернокаменной Цитадели пали — на штурм!', true);
       this.events.push(this.world.day, 'Великий ритуал трёх фракций ослабил Цитадель — начался штурм');
       for (const q of this.players.values()) this.fx({ t: 'marker', pid: q.id, x: c.x, y: c.y }, null);
     } else if (w.stage === 3) {
@@ -2721,7 +2721,7 @@ export class Game {
       for (const q of grp)
         for (const f of ['severane', 'ozerny', 'stepnyaki'])
           q.rep[f] = Math.min(100, (q.rep[f] || 0) + 25);
-      this.toastAll('☀ СЕРДЦЕ ТЬМЫ УНИЧТОЖЕНО! Война окончена — свет победил навсегда');
+      this.toastAll('☀ СЕРДЦЕ ТЬМЫ УНИЧТОЖЕНО! Война окончена — свет победил навсегда', true);
       this.events.push(this.world.day, `${p.name} уничтожил Сердце Тьмы. Цитадель мертва, мир свободен`);
     } else {
       p.inventory['dark_seal@l'] = (p.inventory['dark_seal@l'] || 0) + 1;
@@ -2730,7 +2730,7 @@ export class Game {
       for (const q of grp)
         for (const f of ['severane', 'ozerny', 'stepnyaki'])
           q.rep[f] = Math.max(-100, (q.rep[f] || 0) - 30);
-      this.toastAll(`⛧ ${p.name} ПОДЧИНИЛ Сердце Тьмы. Цитадель принадлежит смертному… Люди этого не забудут`);
+      this.toastAll(`⛧ ${p.name} ПОДЧИНИЛ Сердце Тьмы. Цитадель принадлежит смертному… Люди этого не забудут`, true);
       this.events.push(this.world.day, `${p.name} подчинил Сердце Тьмы — добрые фракции отвернулись от него`);
     }
   }
@@ -2981,7 +2981,7 @@ export class Game {
     p.hp = p.maxHp;
     this.addXp(p, 0);
     this.fx({ t: 'ascend', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
-    this.toastAll(`✸✸✸ ${p.name} ВОЗНЁССЯ! Смертный стал богом Пограничья ✸✸✸`);
+    this.toastAll(`✸✸✸ ${p.name} ВОЗНЁССЯ! Смертный стал богом Пограничья ✸✸✸`, true);
     this.toast(p, '✸ Божественная мощь: +4 ко всем атрибутам, +3 сердца, реген, быстрые способности');
     this.events.push(this.world.day, `${p.name} прошёл Ритуал Вознесения и обрёл божественность`);
   }
@@ -4328,6 +4328,12 @@ export class Game {
       this.toast(p, '📖 Журнал полон (3 задания). Заверши что-нибудь (J — журнал)');
       return false;
     }
+    // одна цель — одно задание: дубль не берётся
+    const key = q => q.type + ':' + (q.poi ?? q.token ?? q.to ?? (q.type === 'supply' ? q.giver + q.item : q.title));
+    if (p.quests.some(q => key(q) === key(quest))) {
+      this.toast(p, '📖 Это задание уже в твоём журнале (J)');
+      return false;
+    }
     p.quests.push(quest);
     this.toast(p, STR.questNew(quest.title) + extraToast);
     if (p.hintStage === 1) p.hintStage = 2;
@@ -4342,7 +4348,7 @@ export class Game {
     const roll = this.rand();
     let quest = null;
     // голодающая деревня просит еду в первую очередь
-    if (s.food < 35) {
+    if (s.food < 35 && !p.quests.some(q => q.type === 'supply' && q.giver === s.id)) {
       this.addQuest(p, {
         type: 'supply', item: 'meat', count: 6, given: 0, giver: s.id, done: false,
         title: `Принести 6 сырого мяса в ${s.name}`, tx: s.x, ty: s.y,
@@ -4352,7 +4358,8 @@ export class Game {
     }
     // караван этой деревни в пути — предложи сопровождение
     const caravan = this.abstract.tokens.find(t =>
-      t.type === 'caravan' && !t.dead && t.from === s.id && t.cargo);
+      t.type === 'caravan' && !t.dead && t.from === s.id && t.cargo
+      && !p.quests.some(q => q.token === t.id));
     if (caravan && roll < 0.5) {
       const to = this.world.settlements.find(x => x.id === caravan.target);
       this.addQuest(p, {
@@ -4364,8 +4371,9 @@ export class Game {
       return;
     }
     if (roll < 0.45) {
+      // ближайший незачищенный данж, на который ЕЩЁ нет задания в журнале
       const poi = this.world.pois
-        .filter(x => !x.cleared)
+        .filter(x => !x.cleared && !p.quests.some(q => q.poi === x.id))
         .sort((a, b) => dist2(a.x * TILE, a.y * TILE, sx, sy) - dist2(b.x * TILE, b.y * TILE, sx, sy))[0];
       if (poi) quest = {
         type: 'clear', poi: poi.id, giver: s.id, done: false,
@@ -4374,7 +4382,7 @@ export class Game {
       };
     } else if (roll < 0.75) {
       const tok = this.abstract.tokens
-        .filter(t => t.type === 'pack')
+        .filter(t => t.type === 'pack' && !p.quests.some(q => q.token === t.id))
         .sort((a, b) => dist2(a.x, a.y, sx, sy) - dist2(b.x, b.y, sx, sy))[0];
       if (tok) quest = {
         type: 'kill', token: tok.id, giver: s.id, done: false,
@@ -4383,14 +4391,15 @@ export class Game {
       };
     }
     if (!quest) {
-      const to = pick(this.rand, this.world.settlements.filter(x => x.id !== s.id));
+      const to = pick(this.rand, this.world.settlements.filter(x =>
+        x.id !== s.id && !p.quests.some(q => q.type === 'deliver' && q.to === x.id)));
       if (to) quest = {
         type: 'deliver', to: to.id, giver: s.id, done: false,
         title: `Доставить письмо в ${to.name}`, tx: to.x, ty: to.y,
         reward: { coins: 25, rep: 10, xp: 30 },
       };
     }
-    if (!quest) return;
+    if (!quest) { this.toast(p, '«Пока новых дел нет — загляни позже»'); return; }
     this.addQuest(p, quest);
   }
 
@@ -4460,7 +4469,9 @@ export class Game {
   }
 
   toast(p, text) { this.fx({ t: 'toast', pid: p.id, text }, null); }
-  toastAll(text) { this.fx({ t: 'toast', text, w: 1 }, null); } // w: мировая весть — клиент кладёт в летопись, не на экран
+  // Мировая весть. w:1 — тихая (только летопись), w:2 — ВАЖНАЯ (всплывает у всех):
+  // мировые события, война, падения деревень, вмешательства судьбы.
+  toastAll(text, important = false) { this.fx({ t: 'toast', text, w: important ? 2 : 1 }, null); }
   toastMap(mapId, text) { this.fx({ t: 'toast', mapId, text }, null); }
 }
 

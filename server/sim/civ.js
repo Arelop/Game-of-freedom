@@ -101,7 +101,7 @@ export class CivSim {
       x: src.x * TILE, y: src.y * TILE, hydrated: null,
     });
     g.events.push(g.world.day, `⛧ Войско Тьмы выступило из ${src.name || 'Цитадели'} к ${target.name}!`, { x: src.x, y: src.y });
-    g.toastAll(`⛧ Войско Тьмы идёт к ${target.name}!`);
+    g.toastAll(`⛧ Войско Тьмы идёт к ${target.name}!`, true);
   }
 
   // Процветающая деревня отправляет поселенцев возрождать руины
@@ -287,7 +287,7 @@ export class CivSim {
     s.population = 0; s.guards = 0;
     this.rehydrate(s);
     g.events.push(g.world.day, `${s.name} ${reason}. Остались руины…`, { x: s.x, y: s.y });
-    g.toastAll(`☠ ${s.name} ${reason}`);
+    g.toastAll(`☠ ${s.name} ${reason}`, true);
   }
 
   // Бандиты захватили деревню
@@ -299,7 +299,7 @@ export class CivSim {
     s.population = Math.max(0, s.population - 2);
     this.rehydrate(s);
     g.events.push(g.world.day, `Вольница захватила ${s.name}! Кто освободит жителей?`, { x: s.x, y: s.y });
-    g.toastAll(`⚔ ${s.name} захвачена бандитами!`);
+    g.toastAll(`⚔ ${s.name} захвачена бандитами!`, true);
   }
 
   // Армия Тьмы захватила деревню — теперь это её форт
@@ -313,7 +313,7 @@ export class CivSim {
     if (c && !c.forts.includes(s.id)) { c.forts.push(s.id); c.power += 5; }
     this.rehydrate(s);
     g.events.push(g.world.day, `⛧ Армия Тьмы захватила ${s.name} — теперь это форт Тьмы!`, { x: s.x, y: s.y });
-    g.toastAll(`⛧ ${s.name} пала под натиском Тьмы!`);
+    g.toastAll(`⛧ ${s.name} пала под натиском Тьмы!`, true);
   }
 
   // Игроки перебили захватчиков — деревня свободна
@@ -331,7 +331,7 @@ export class CivSim {
     }
     this.rehydrate(s);
     g.events.push(g.world.day, `${liberator?.name || 'Путники'} освободили ${s.name} от ${wasDark ? 'Армии Тьмы' : 'бандитов'}!`, { x: s.x, y: s.y });
-    g.toastAll(`★ ${s.name} освобождена!`);
+    g.toastAll(`★ ${s.name} освобождена!`, true);
     if (liberator) {
       liberator.rep[s.homeFaction] = Math.min(100, (liberator.rep[s.homeFaction] || 0) + 25);
       g.addXp(liberator, 60);
