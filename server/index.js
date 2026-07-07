@@ -7,6 +7,7 @@ import { networkInterfaces } from 'node:os';
 import { TICK_RATE } from '../shared/constants.js';
 import { Game } from './game.js';
 import { Net } from './net.js';
+import { Admin } from './admin.js';
 import { saveWorld, loadWorld, applySavedPlayer } from './persist.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -19,8 +20,11 @@ const MIME = {
 };
 
 const http = createServer(async (req, res) => {
-  let url = (req.url || '/').split('?')[0];
+  const parsed = new URL(req.url || '/', 'http://x');
+  if (await admin.handle(req, res, parsed)) return;
+  let url = parsed.pathname;
   if (url === '/') url = '/client/index.html';
+  if (url === '/admin') url = '/client/admin.html';
   const file = normalize(join(ROOT, url));
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
   try {
@@ -33,6 +37,7 @@ const http = createServer(async (req, res) => {
 });
 
 const game = new Game(SEED);
+const admin = new Admin(game);
 loadWorld(game);
 const _addPlayer = game.addPlayer.bind(game);
 game.addPlayer = (...args) => {
@@ -60,6 +65,7 @@ setInterval(() => {
     acc -= TICK_MS;
     steps++;
     const el = performance.now() - t0;
+    game.lastTickMs = el;
     if (el > TICK_MS) console.warn(`[tick] перегруз: ${el.toFixed(1)} мс (сущностей: ${game.entities.size})`);
   }
   if (steps === 5) acc = 0; // спираль смерти — сброс
@@ -76,5 +82,6 @@ http.listen(PORT, () => {
     for (const a of addrs || [])
       if (a.family === 'IPv4' && !a.internal)
         console.log(`По сети:   http://${a.address}:${PORT}  (${name})`);
+  console.log(`Админка:   http://localhost:${PORT}/admin#${admin.key}${process.env.ADMIN_KEY ? '' : '  (ключ случайный, задай ADMIN_KEY для постоянного)'}`);
   console.log(`Seed: ${SEED}. Ctrl+C — сохранить и выйти.\n`);
 });

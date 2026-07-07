@@ -2,6 +2,7 @@
 // Проверяет: снапшоты идут, позиция меняется, выстрелы доходят, чистый выход.
 import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 
@@ -9,7 +10,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 8123;
 
 const server = spawn(process.execPath, [join(ROOT, 'server', 'index.js')], {
-  env: { ...process.env, PORT, SEED: 4242 },
+  // сейвы — во временную папку, чтобы тестовый мир не затёр настоящий
+  env: { ...process.env, PORT, SEED: 4242, SAVES_DIR: join(tmpdir(), 'pogranichye-smoke') },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverLog = '';

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Пограничье — управление сервером</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d0b12 radial-gradient(ellipse at 50% -20%, #1d1830 0%, #0d0b12 70%); color: #eee;
+    font-family: 'Courier New', monospace; min-height: 100vh; padding: 20px; }
+  h1 { color: #fbf236; font-size: 22px; letter-spacing: 2px; margin-bottom: 2px; }
+  .sub { color: #847e87; font-size: 11px; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; max-width: 1500px; }
+  .panel { background: rgba(18,15,24,.96); border: 12px solid transparent;
+    border-image: url(/assets/ui/panel-gold.png) 16 round; background-clip: padding-box; padding: 12px 14px; }
+  .panel.violet { border-image-source: url(/assets/ui/panel-violet.png); }
+  .panel.green { border-image-source: url(/assets/ui/panel-green.png); }
+  .panel.blue { border-image-source: url(/assets/ui/panel-blue.png); }
+  .panel.red { border-image-source: url(/assets/ui/panel-red.png); }
+  .panel h2 { font-size: 14px; color: #d9a066; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  .kv { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; border-bottom: 1px dotted #2c2a38; }
+  .kv b { color: #99e550; font-weight: normal; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { color: #847e87; text-align: left; padding: 3px 4px; border-bottom: 1px solid #45444f; font-weight: normal; }
+  td { padding: 4px; border-bottom: 1px dotted #2c2a38; }
+  button { background: #222034; color: #99e550; border: 1px solid #45444f; padding: 4px 8px;
+    font-family: inherit; font-size: 11px; cursor: pointer; }
+  button:hover { background: #30303f; border-color: #fbf236; }
+  button.danger { color: #d9574a; }
+  button.big { padding: 8px 12px; font-size: 12px; }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  input, select { background: #1a1826; color: #eee; border: 1px solid #45444f; padding: 5px 7px;
+    font-family: inherit; font-size: 12px; }
+  #log { max-height: 380px; overflow-y: auto; }
+  .lgrow { font-size: 11px; color: #b8b8b8; padding: 2px 0; border-bottom: 1px dotted #2c2a38; }
+  .lgrow .d { color: #696a6a; }
+  #msg { position: fixed; top: 12px; right: 16px; background: #222034; border: 1px solid #fbf236;
+    padding: 8px 14px; font-size: 12px; display: none; z-index: 9; }
+  .stset { color: #99e550; } .stcap { color: #d9574a; } .struin { color: #847e87; } .stdark { color: #b57edc; }
+  #keybox { max-width: 420px; margin: 80px auto; text-align: center; }
+  #keybox input { width: 100%; margin: 10px 0; text-align: center; }
+  .hint { font-size: 10px; color: #696a6a; margin-top: 6px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="msg"></div>
+<div id="keybox" class="panel" style="display:none">
+  <h2>Ключ управления</h2>
+  <div class="hint">Ключ печатается в консоли сервера при запуске<br>(или задан переменной ADMIN_KEY)</div>
+  <input id="keyInput" placeholder="вставь ключ">
+  <button class="big" onclick="saveKey()">Войти</button>
+</div>
+
+<div id="main" style="display:none">
+  <h1>⚙ ПОГРАНИЧЬЕ — управление сервером</h1>
+  <div class="sub" id="topline">подключение…</div>
+  <div class="grid">
+    <div class="panel">
+      <h2>🌍 Мир</h2>
+      <div id="world"></div>
+      <div class="btnrow">
+        <button onclick="act({type:'time',value:'day'})">☀ День</button>
+        <button onclick="act({type:'time',value:'night'})">🌙 Ночь</button>
+        <button onclick="act({type:'weather',value:'clear'})">Ясно</button>
+        <button onclick="act({type:'weather',value:'rain'})">🌧 Дождь</button>
+        <button onclick="act({type:'weather',value:'snow'})">❄ Снег</button>
+      </div>
+      <div class="btnrow">
+        <select id="evsel">
+          <option value="bloodMoon">🌕 Кровавая луна</option>
+          <option value="rift">⛧ Разлом</option>
+          <option value="meteor">☄ Метеорит</option>
+          <option value="trader">🧳 Торговец</option>
+          <option value="hunt">🐺 Именной зверь</option>
+          <option value="cult">🕯 Культ Тьмы</option>
+        </select>
+        <button onclick="act({type:'event',value:evsel.value})">Наслать событие</button>
+      </div>
+      <div class="btnrow">
+        <input id="antext" placeholder="объявление всем…" style="flex:1">
+        <button onclick="announce()">📣</button>
+      </div>
+    </div>
+
+    <div class="panel blue">
+      <h2>🛡 Игроки</h2>
+      <table id="players"></table>
+      <div class="hint">🎁 — выдать: «coins», «bandage», «sword@e», «war_helm@e»…</div>
+    </div>
+
+    <div class="panel green">
+      <h2>🏘 Поселения</h2>
+      <table id="setts"></table>
+    </div>
+
+    <div class="panel red">
+      <h2>💾 Сейвы</h2>
+      <div class="kv"><span>Автосохранение</span><b>раз в 60 с</b></div>
+      <div class="btnrow">
+        <button class="big" onclick="saveNow()">💾 Сохранить сейчас</button>
+        <button class="big" onclick="location.href=api('download')">⬇ Скачать бэкап</button>
+        <button class="big" onclick="upfile.click()">⬆ Загрузить сейв</button>
+        <input type="file" id="upfile" accept=".json" style="display:none" onchange="upload(this.files[0])">
+      </div>
+      <div class="hint">Загрузка применяет сейв НА ЛЕТУ: мир и профили игроков
+        заменяются, все переносятся в верхний мир. Сид должен совпадать.
+        На бесплатном Render диск стирается при рестарте — скачивай бэкап,
+        после рестарта загружай обратно.</div>
+    </div>
+
+    <div class="panel violet" style="grid-column: 1 / -1;">
+      <h2>🕮 Летопись</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let KEY = location.hash.slice(1) || localStorage.getItem('adminKey') || '';
+const $ = id => document.getElementById(id);
+const api = (route, q = '') => `/api/admin/${route}?key=${encodeURIComponent(KEY)}${q}`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function saveKey() { KEY = $('keyInput').value.trim(); localStorage.setItem('adminKey', KEY); location.hash = ''; boot(); }
+function toast(t, bad) {
+  const m = $('msg'); m.textContent = t; m.style.borderColor = bad ? '#d9574a' : '#fbf236';
+  m.style.display = 'block'; clearTimeout(m._t); m._t = setTimeout(() => m.style.display = 'none', 3500);
+}
+
+async function act(body) {
+  const r = await fetch(api('action'), { method: 'POST', body: JSON.stringify(body) }).then(x => x.json()).catch(() => ({ error: 'сервер молчит' }));
+  if (r.error) toast('✗ ' + r.error, 1); else { toast('✓ Исполнено'); refresh(); }
+}
+function announce() { const t = $('antext').value.trim(); if (t) { act({ type: 'announce', text: t }); $('antext').value = ''; } }
+async function saveNow() {
+  const r = await fetch(api('save'), { method: 'POST' }).then(x => x.json()).catch(() => ({ error: 'сервер молчит' }));
+  toast(r.error ? '✗ ' + r.error : '✓ Мир сохранён', !!r.error);
+}
+async function upload(file) {
+  if (!file || !confirm('Заменить текущий мир содержимым сейва? Это применится сразу.')) { $('upfile').value = ''; return; }
+  const body = await file.text();
+  const r = await fetch(api('upload'), { method: 'POST', body }).then(x => x.json()).catch(() => ({ error: 'сервер молчит' }));
+  toast(r.error ? '✗ ' + r.error : `✓ Мир восстановлен (день ${r.day})`, !!r.error);
+  $('upfile').value = ''; refresh();
+}
+function giveDlg(pid, name) {
+  const item = prompt(`Что выдать игроку ${name}? (coins / bandage / sword@e / war_helm@e …)`);
+  if (!item) return;
+  const count = +prompt('Сколько?', '1') || 1;
+  act({ type: 'give', pid, item: item.trim(), count });
+}
+
+const CLS = { warrior: '⚔ Воин', mage: '✦ Маг', rogue: '🏹 Вор' };
+const WT = { clear: 'ясно', rain: '🌧 дождь', snow: '❄ снег' };
+const EV = { bloodMoon: '🌕 Кровавая луна', rift: '⛧ разлом', meteor: '☄ метеорит', trader: '🧳 торговец', hunt: '🐺 именной зверь', cult: '🕯 культ' };
+
+async function refresh() {
+  let s;
+  try { s = await fetch(api('status')).then(x => x.json()); } catch { $('topline').textContent = '⚠ сервер недоступен'; return; }
+  if (s.error) { localStorage.removeItem('adminKey'); $('main').style.display = 'none'; $('keybox').style.display = 'block'; return; }
+  const h = Math.floor(s.time * 24), mnt = Math.floor((s.time * 24 % 1) * 60);
+  $('topline').textContent = `день ${s.day} · ${String(h).padStart(2, '0')}:${String(mnt).padStart(2, '0')} · тик ${s.tickMs.toFixed(1)} мс · сущностей ${s.entities} · отрядов ${s.tokens}`;
+  $('world').innerHTML =
+    kv('Погода', WT[s.weather] || s.weather) +
+    kv('Событие', s.event ? `${EV[s.event.type] || s.event.type} (${s.event.t}с)` : '—') +
+    kv('Задание дня', s.daily ? s.daily.name : '—') +
+    (s.dark ? kv('Мощь Тьмы', `${s.dark.power}${s.dark.dead ? ' · повержена' : s.dark.owned ? ' · подчинена' : ''} · фортов ${s.dark.forts}`) : '') +
+    kv('Арена', s.arena.active ? `волна ${s.arena.active.wave} (${esc(s.arena.active.fighters || '')})` :
+      s.arena.record ? `рекорд ${s.arena.record.wave} (${esc(s.arena.record.name)})` : 'пусто');
+  $('players').innerHTML = '<tr><th>Имя</th><th>Кл.</th><th>Ур.</th><th>HP</th><th>Мон.</th><th>Где</th><th></th></tr>' +
+    (s.players.length ? s.players.map(p => `<tr>
+      <td>${esc(p.name)}${p.ascended ? ' 👑' : ''}${p.bounty ? ' 💀' + p.bounty : ''}${p.dead ? ' ☠' : ''}</td>
+      <td>${CLS[p.cls] || p.cls}</td><td>${p.level}</td><td>${p.hp}/${p.maxHp}</td><td>${p.coins}</td>
+      <td>${p.mapId === 'over' ? p.x + ',' + p.y : esc(p.mapId)}</td>
+      <td style="white-space:nowrap">
+        <button title="исцелить" onclick="act({type:'heal',pid:${p.id}})">✨</button>
+        <button title="выдать" onclick="giveDlg(${p.id},'${esc(p.name)}')">🎁</button>
+        <button title="в деревню" onclick="act({type:'tp',pid:${p.id}})">🏘</button>
+        <button title="кикнуть" class="danger" onclick="if(confirm('Кикнуть ${esc(p.name)}?'))act({type:'kick',pid:${p.id}})">✖</button>
+      </td></tr>`).join('') : '<tr><td colspan="7" style="color:#696a6a">никого нет</td></tr>');
+  $('setts').innerHTML = '<tr><th>Деревня</th><th>Фракция</th><th>Жителей</th><th>Еда</th><th>Статус</th></tr>' +
+    s.settlements.map(t => `<tr><td>${esc(t.name)}</td><td>${t.faction}</td><td>${t.population}</td><td>${t.food}</td>
+      <td class="${t.status === 'живёт' ? 'stset' : t.status === 'руины' ? 'struin' : t.status === 'форт Тьмы' ? 'stdark' : 'stcap'}">${t.status}</td></tr>`).join('');
+}
+
+async function refreshLog() {
+  try {
+    const r = await fetch(api('events', '&n=80')).then(x => x.json());
+    if (r.events) $('log').innerHTML = r.events.slice().reverse().map(e =>
+      `<div class="lgrow"><span class="d">д.${e.day}</span> ${esc(e.text)}</div>`).join('');
+  } catch {}
+}
+
+function kv(k, v) { return `<div class="kv"><span>${k}</span><b>${v}</b></div>`; }
+
+async function boot() {
+  if (!KEY) { $('keybox').style.display = 'block'; return; }
+  localStorage.setItem('adminKey', KEY);
+  $('keybox').style.display = 'none'; $('main').style.display = 'block';
+  await refresh(); await refreshLog();
+  setInterval(refresh, 3000); setInterval(refreshLog, 6000);
+}
+boot();
+</script>
+</body>
+</html>

@@ -4,8 +4,10 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CLASSES } from '../shared/classes.js';
 
-const SAVES = join(dirname(fileURLToPath(import.meta.url)), '..', 'saves');
+// SAVES_DIR — куда класть сейвы (для тестов и внешних дисков хостинга)
+const SAVES = process.env.SAVES_DIR || join(dirname(fileURLToPath(import.meta.url)), '..', 'saves');
 const FILE = join(SAVES, 'world.json');
+export const SAVE_FILE = FILE;
 
 export function saveWorld(game) {
   try {
@@ -61,6 +63,15 @@ export function loadWorld(game) {
   try {
     const data = JSON.parse(readFileSync(FILE, 'utf8'));
     if (data.seed !== game.world.seed) return false;
+    applyWorldData(game, data);
+    console.log(`[save] мир загружен (день ${game.world.day})`);
+    return true;
+  } catch (e) { console.warn('[save] не удалось загрузить:', e.message); return false; }
+}
+
+// применить данные сейва к игровому миру (общая часть загрузки с диска и через админку)
+export function applyWorldData(game, data) {
+  {
     const w = game.world;
     w.time = data.time; w.day = data.day;
     for (const [k, v] of data.edits) w.edits.set(k, v);
@@ -101,9 +112,7 @@ export function loadWorld(game) {
     if (data.events) game.events.entries = data.events;
     game.savedPlayers = new Map((data.players || []).map(p => [p.name, p]));
     game.chunks.cache.clear();
-    console.log(`[save] мир загружен (день ${w.day})`);
-    return true;
-  } catch (e) { console.warn('[save] не удалось загрузить:', e.message); return false; }
+  }
 }
 
 // применить сохранённый профиль при входе игрока с тем же именем

@@ -499,11 +499,11 @@ export class Game {
   isNight() { return this.world.time < 0.22 || this.world.time > 0.85; }
 
   // ---------- мировые события ----------
-  rollWorldEvent() {
-    if (!this.players.size || this.world.event) return; // пустой сервер / событие уже идёт
+  rollWorldEvent(force) {
+    if (!force && (!this.players.size || this.world.event)) return; // пустой сервер / событие уже идёт
     const pool = ['bloodMoon', 'rift', 'meteor', 'trader', 'hunt'];
     if (this.world.citadel?.owned) pool.push('cult', 'cult'); // узурпатору мстит культ
-    const type = pick(this.rand, pool);
+    const type = force || pick(this.rand, pool);
     const alive = this.world.settlements.filter(s => !s.ruined && !s.captured);
     switch (type) {
       case 'bloodMoon': {
