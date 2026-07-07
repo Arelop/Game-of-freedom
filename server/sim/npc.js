@@ -20,6 +20,16 @@ function scheduleAnchor(npc, s, t) {
 }
 
 export function updateNpc(npc, dt, map, game) {
+  // спасённый пленник: безоружный, просто держится за спасителем
+  if (npc.role === 'lostman') {
+    if (!npc.owner) return;
+    const owner = game.players.get(npc.owner);
+    if (!owner || owner.mapId !== npc.mapId) return;
+    const od = dist2(npc.x, npc.y, owner.x, owner.y);
+    if (od > 200 * 200) { npc.x = owner.x + 12; npc.y = owner.y + 6; } // отстал — догоняет бегом
+    else if (od > 34 * 34) walkTo(npc, owner.x, owner.y, NPC_SPEED * 1.4, dt, map);
+    return;
+  }
   // наёмник и призванный элементаль: следуют за хозяином, бьют врагов поблизости
   if (npc.role === 'mercenary' || npc.role === 'elemental') {
     const fiery = npc.role === 'elemental';

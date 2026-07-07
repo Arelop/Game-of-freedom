@@ -151,9 +151,12 @@ export function generateDungeon(seed, difficulty, withBoss, depth = 1) {
     if (g[by * SIZE + bx + 2] === T.DUNGEON_FLOOR) g[by * SIZE + bx + 2] = T.STATUE;
   }
   // целебный фонтан в сокровищнице — передышка перед боссом
+  // (декор тем мог занять клетку — перебираем кандидатов вокруг сундука)
   if (treasureRoom) {
-    const fx2 = treasureRoom.x + 2, fy2 = treasureRoom.y;
-    if (g[fy2 * SIZE + fx2] === T.DUNGEON_FLOOR) g[fy2 * SIZE + fx2] = T.FOUNTAIN;
+    for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2], [2, 2], [-2, -2]]) {
+      const fx2 = treasureRoom.x + dx, fy2 = treasureRoom.y + dy;
+      if (g[fy2 * SIZE + fx2] === T.DUNGEON_FLOOR) { g[fy2 * SIZE + fx2] = T.FOUNTAIN; break; }
+    }
   }
 
   // лестница на нижний этаж — в комнате босса (глубина ограничена)

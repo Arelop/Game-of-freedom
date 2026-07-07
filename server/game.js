@@ -12,7 +12,7 @@ import {
   moveWithCollision,
 } from '../shared/simCore.js';
 import { mulberry32, hash2, randInt, pick } from '../shared/rng.js';
-import { makeWorld } from './world/worldgen.js';
+import { makeWorld, baseTile } from './world/worldgen.js';
 import { ChunkStore } from './world/chunks.js';
 import { generateDungeon, roomAt, generateArena } from './world/dungeon.js';
 import { generateAshlands } from './world/ashlands.js';
@@ -225,7 +225,8 @@ export class Game {
       // сюжетные цепочки именных NPC: стадии, счётчики, осколки
       story: {
         rado: 0, capt: 0, mira: 0, bandits: 0, banditsGoal: 0, shards: [], captCamp: null,
-        smith: 0, widow: 0, well: 0, // новые цепочки: Творимир, Милица, Голос из колодца
+        smith: 0, widow: 0, well: 0, // цепочки: Творимир, Милица, Голос из колодца
+        plague: 0, car: 0, bog: 0,   // цепочки дальних деревень: Хворь, Караванщик, Голос болот
       },
       hintStage: 0, hintKills: 0, // онбординг: цепочка первых целей в HUD
       bestiary: {},               // счётчики убийств по видам монстров
@@ -287,6 +288,7 @@ export class Game {
     if (p.ascended) for (const k of STAT_KEYS) eff[k] = (eff[k] || 0) + 4;
     // дар запечатанного колодца: +1 ИНТ и +1 УДЧ навсегда
     if (p.story?.wellBlessed) { eff.int = (eff.int || 0) + 1; eff.lck = (eff.lck || 0) + 1; }
+    // кровавый пакт с Голосом болот: сила за плоть (обсчёт ниже — сердца и урон)
     p.effStats = eff;
     const sb = statBonuses(eff);
     const d = {
@@ -355,6 +357,9 @@ export class Game {
       const b = 1 + p.buffs.blessed.mult;
       d.dmgMelee *= b; d.dmgRanged *= b; d.dmgMagic *= b;
     }
+
+    // кровавый пакт с Голосом болот: −1 сердце навсегда, +10% всего урона
+    if (p.story?.bogPact) { maxHp = Math.max(4, maxHp - 2); gearDmg *= 1.1; }
 
     // амулеты с общим уроном (медвежий) усиливают все школы
     d.dmgMelee *= gearDmg; d.dmgRanged *= gearDmg; d.dmgMagic *= gearDmg;
@@ -739,6 +744,58 @@ export class Game {
           this.damageEnemy(best, p.procs.smite.dmg, { vx: 0, vy: 0, knockback: 20, owner: p.id, school: 'magic' });
           this.fx({ t: 'chain', pts: [[p.x, p.y - 12], [best.x, best.y]] }, p.mapId, p.x, p.y);
         }
+      }
+    }
+    // «Пропавший караванщик»: сюжет ведёт по следам
+    if (this.tick % 15 === 0 && p.mapId === 'over' && (p.story.car === 1 || p.story.car === 2)) {
+      const sites = this.carSites();
+      if (sites) {
+        const near = pt => {
+          const dx = p.x / TILE - pt.x, dy = p.y / TILE - pt.y;
+          return dx * dx + dy * dy < 25;
+        };
+        if (p.story.car === 1 && near(sites.crash)) {
+          p.story.car = 2;
+          this.fx({ t: 'marker', pid: p.id, x: sites.trail.x, y: sites.trail.y }, null);
+          this.toast(p, '🐎 Разбитые повозки, стрелы в бортах… Следы волочения уходят дальше — метка на карте');
+        } else if (p.story.car === 2 && near(sites.trail) && !this.carResolved) {
+          this.carResolved = true;
+          const tx = sites.trail.x * TILE, ty = sites.trail.y * TILE;
+          if (sites.alive) { // Милош жив — в плену у бандитов
+            const mid = this.spawnNpc('lostman', null, 'over', tx, ty, { kind: 'npc_villager' });
+            const man = this.entities.get(mid);
+            if (man) { man.name = 'Милош'; man.hp = man.maxHp = 12; }
+            for (let i = 0; i < 3; i++)
+              this.spawnEnemy('bandit', 'over', tx + Math.cos(i * 2.1) * 40, ty + Math.sin(i * 2.1) * 40, { noElite: true });
+            this.toast(p, '⛓ В овраге — связанный человек под охраной! Это Милош!');
+          } else { // погиб: осталось лишь кольцо
+            this.spawnDrop('wedding_ring', 1, 'over', tx, ty, 600);
+            this.toast(p, '🕯 Тело истерзано зверями. На пальце блестит обручальное кольцо…');
+          }
+        }
+      }
+    }
+    // «Пропавший караванщик»: довёл Милоша до дома
+    if (p.story.car === 4 && this.tick % 15 === 0) {
+      const man = [...this.entities.values()].find(e => e.role === 'lostman' && e.owner === p.id);
+      const s3 = this.world.settlements[3];
+      if (!man) { // погиб в пути — след придётся взять заново
+        p.story.car = 2;
+        this.carResolved = false;
+        this.toast(p, '🕯 Милош погиб в дороге… Весняна не должна узнать об этом ТАК. Вернись к оврагу');
+      } else if (dist2(man.x, man.y, p.x, p.y) > 250 * 250) {
+        man.x = p.x + 12; man.y = p.y + 6; // сильно отстал — догоняет бегом
+      } else if (s3 && dist2(man.x, man.y, s3.x * TILE, s3.y * TILE) < 90 * 90) {
+        this.entities.delete(man.id);
+        this.fx({ t: 'heal', pid: p.id, x: man.x, y: man.y }, 'over', man.x, man.y);
+        p.story.car = 10;
+        p.coins += 120;
+        p.inventory['rune_amulet@e'] = (p.inventory['rune_amulet@e'] || 0) + 1;
+        this.addXp(p, 90);
+        p.rep[s3.faction] = Math.min(100, (p.rep[s3.faction] || 0) + 15);
+        this.toast(p, '🐎 Милош дома! Весняна: «Рунный амулет деда — теперь твой» (+120 мон., +15 репутации)');
+        this.toastAll(`🐎 ${p.name} вернул Весняне пропавшего мужа!`);
+        this.events.push(this.world.day, `${p.name} спас караванщика Милоша из плена`);
       }
     }
     // паломничество: дошёл до святыни — поклонился
@@ -1170,6 +1227,30 @@ export class Game {
           ms.name = 'Творимир';
           ms.hp = ms.maxHp = 20;
           ids.push(mid);
+        }
+        // знахарь Богумил в третьей деревне (цепочка «Хворь») — пока не разоблачён
+        if (s === this.world.settlements[2] && !this.world.plagueExposed) {
+          const bid = this.spawnNpc('plaguedoc', s.id, 'over', sx + 36, sy - 16, { kind: 'npc_wizard' });
+          const bd = this.entities.get(bid);
+          bd.name = 'Богумил';
+          bd.hp = bd.maxHp = 16;
+          ids.push(bid);
+        }
+        // торговка Весняна в четвёртой деревне (цепочка «Пропавший караванщик»)
+        if (s === this.world.settlements[3]) {
+          const vid = this.spawnNpc('caravanwife', s.id, 'over', sx - 36, sy - 12, { kind: 'npc_villager2' });
+          const vs = this.entities.get(vid);
+          vs.name = 'Весняна';
+          vs.hp = vs.maxHp = 14;
+          ids.push(vid);
+        }
+        // рыбак Тихон в пятой деревне (цепочка «Голос болот»)
+        if (s === this.world.settlements[4]) {
+          const tid = this.spawnNpc('fisherman', s.id, 'over', sx + 28, sy + 26, { kind: 'npc_villager' });
+          const th = this.entities.get(tid);
+          th.name = 'Тихон';
+          th.hp = th.maxHp = 14;
+          ids.push(tid);
         }
         ids.push(this.spawnNpc('merchant', s.id, 'over', (a.stalls[0]?.x ?? s.x) * TILE + 8, (a.stalls[0]?.y ?? s.y) * TILE + 8));
         // ремесленники и служители — если деревня их «выучила»
@@ -2275,6 +2356,39 @@ export class Game {
         }
       }
     }
+    // «Хворь»: Отравитель Богумил повержен
+    if (e.plagueBoss) {
+      const s2 = this.world.settlements[2];
+      if (s2) s2.prosperity = Math.min(100, (s2.prosperity || 0) + 10);
+      this.spawnDrop('owl_amulet@e', 1, e.mapId, e.x, e.y, 300);
+      this.spawnDrop('coin', 80, e.mapId, e.x + 10, e.y, 300);
+      for (const q of gainers) {
+        if (q.story?.plague === 3) {
+          q.story.plague = 10;
+          if (s2) q.rep[s2.faction] = Math.min(100, (q.rep[s2.faction] || 0) + 20);
+          this.toast(q, `⚔ Отравитель мёртв. ${s2?.name} снова дышит свободно (+20 репутации)`);
+        }
+      }
+      this.toastAll(`⚔ Отравитель Богумил повержен — хворь в ${s2?.name} отступает!`, true);
+      this.events.push(this.world.day, `Отравитель ${s2?.name} казнён путниками`);
+    }
+    // «Голос болот»: аватар развеян
+    if (e.bogAvatar) {
+      const s4 = this.world.settlements[4];
+      this.dropRelic(e.mapId, e.x, e.y);
+      this.spawnDrop('coin', 100, e.mapId, e.x + 10, e.y, 300);
+      for (const q of this.players.values()) {
+        if (q.story?.bog === 2) {
+          q.story.bog = 10;
+          if (s4) q.rep[s4.faction] = Math.min(100, (q.rep[s4.faction] || 0) + 20);
+          this.toast(q, '✦ Голос болот умолк. Туман рассеивается (+20 репутации)');
+        }
+      }
+      const spot = this.world.bogAltar;
+      if (spot) this.chunks.setTile('over', spot.x, spot.y, T.SWAMP); // идол рассыпался
+      this.toastAll('✦ Голос болот развеян — топи очистились!', true);
+      this.events.push(this.world.day, 'Болотный дух повержен, рыбаки празднуют');
+    }
     // Старший голем повержен — испытание огнеходцев пройдено
     if (e.ashElder) {
       this.ashElderDead = true;
@@ -2589,6 +2703,11 @@ export class Game {
         p.inventory[drop.item] = (p.inventory[drop.item] || 0) + drop.count;
         // подбор — летящий текст у героя, а не тост: меньше мельтешения
         this.fx({ t: 'loot', pid: p.id, x: p.x, y: p.y, text: this.itemName(drop.item) + (drop.count > 1 ? ` ×${drop.count}` : '') }, p.mapId, p.x, p.y);
+        // сюжет: кольцо погибшего караванщика
+        if (drop.item === 'wedding_ring' && p.story.car === 2) {
+          p.story.car = 3;
+          this.toast(p, '🕯 Кольцо Милоша… Весняна ждёт вестей. Каких — решать тебе');
+        }
       }
       this.entities.delete(drop.id);
       this.fx({ t: 'pickup', x: drop.x, y: drop.y }, drop.mapId, drop.x, drop.y);
@@ -2870,6 +2989,39 @@ export class Game {
             [{ id: 'altar_power', label: '🗡 Кровь за силу (+20% урона, 90 с)' },
              { id: 'altar_gift', label: '💰 Кровь за добычу (вещь из тайника)' },
              { id: 'close', label: 'Не сегодня' }]);
+          return;
+        }
+        // «Голос болот»: чёрный идол в топи
+        const bog = this.world.bogAltar;
+        if (bog && Math.abs(bog.x - (tx + dx)) < 2 && Math.abs(bog.y - (ty + dy)) < 2) {
+          if (p.story.bog === 1) {
+            if ((p.inventory.meat || 0) < 5) { this.toast(p, '🕯 Идол ждёт подношения: 5 сырого мяса'); return; }
+            p.inventory.meat -= 5;
+            p.story.bog = 2;
+            const ax = bog.x * TILE, ay = bog.y * TILE;
+            const aid = this.spawnEnemy('necromancer', 'over', ax + 20, ay, { forceElite: true });
+            const av = this.entities.get(aid);
+            if (av) { av.name = 'Голос болот'; av.bogAvatar = true; av.aggro = true; }
+            for (let i = 0; i < 2; i++) this.spawnEnemy('nagaWarrior', 'over', ax - 20 + i * 40, ay + 20, { noElite: true });
+            this.fx({ t: 'bloodcast', pid: p.id, x: ax, y: ay }, 'over', ax, ay);
+            this.toastMap('over', '⛧ ТОПЬ ВСКИПЕЛА: Голос болот принял облик! Срази его — или коснись идола вновь и прими сделку');
+            return;
+          }
+          if (p.story.bog === 2) { // кровавый пакт: сила навсегда, сердце навсегда
+            p.story.bog = 11;
+            p.story.bogPact = true;
+            for (const e of [...this.entities.values()])
+              if (e.bogAvatar || (e.kind === 'nagaWarrior' && dist2(e.x, e.y, bog.x * TILE, bog.y * TILE) < 300 * 300)) {
+                this.fx({ t: 'poof', x: e.x, y: e.y }, 'over', e.x, e.y);
+                this.entities.delete(e.id);
+              }
+            this.recomputeStats(p);
+            this.fx({ t: 'bloodcast', pid: p.id, x: p.x, y: p.y }, 'over', p.x, p.y);
+            this.toast(p, '⛧ ПАКТ ЗАКЛЮЧЁН: −1 сердце навсегда, +10% всего урона навсегда. Болото помнит твоё имя');
+            this.events.push(this.world.day, `${p.name} заключил пакт с Голосом болот…`);
+            return;
+          }
+          this.toast(p, 'Идол молчит. Пока.');
           return;
         }
         const circle = this.world.pois.find(o => o.type === 'circle' && Math.abs(o.x - tx) < 3 && Math.abs(o.y - ty) < 3);
@@ -3583,6 +3735,97 @@ export class Game {
           this.events.push(this.world.day, `${p.name} стал огнеходцем Выжженных земель`);
         }
         break;
+      // ═══ ХВОРЬ ═══
+      case 'plague_accept':
+        if (!S.plague) { S.plague = 1; this.toast(p, '🌿 Принеси Богумилу 8 трав (кусты, поля, аптекари)'); }
+        break;
+      case 'plague_herbs':
+        if (S.plague === 1 && (p.inventory.herb || 0) >= 8) {
+          p.inventory.herb -= 8;
+          S.plague = 2;
+          this.addXp(p, 40);
+          this.toast(p, '🌿 Лекарство сварено… Но ночью ты видел: Богумил сыпал что-то В КОЛОДЕЦ');
+        }
+        break;
+      case 'plague_expose': {
+        if (S.plague !== 2) break;
+        S.plague = 3;
+        const s2 = this.world.settlements[2];
+        this.world.plagueExposed = true; // знахарь больше не появится в деревне
+        const doc = [...this.entities.values()].find(e => e.role === 'plaguedoc');
+        if (doc) { this.entities.delete(doc.id); this.fx({ t: 'poof', x: doc.x, y: doc.y }, 'over', doc.x, doc.y); }
+        const bx = (s2.x + 8) * TILE, by = (s2.y - 8) * TILE;
+        const bossId = this.spawnEnemy('necromancer', 'over', bx, by, { forceElite: true });
+        const boss = this.entities.get(bossId);
+        if (boss) { boss.name = 'Отравитель Богумил'; boss.plagueBoss = true; boss.aggro = true; }
+        for (let i = 0; i < 2; i++) this.spawnEnemy('ghoul', 'over', bx + 20 - i * 40, by + 14, { noElite: true });
+        this.toastAll(`⚔ ${p.name} разоблачил отравителя в ${s2.name} — знахарь сбросил личину!`);
+        this.events.push(this.world.day, `Знахарь ${s2.name} оказался отравителем`, { x: s2.x, y: s2.y });
+        break;
+      }
+      case 'plague_cover': {
+        if (S.plague !== 2) break;
+        S.plague = 11;
+        p.coins += 150;
+        this.addBounty(p, 20, 'сговор с отравителем');
+        const s2 = this.world.settlements[2];
+        if (s2) s2.population = Math.max(1, s2.population - 1);
+        this.toast(p, '🪙 +150 мон. Хворь продолжает косить деревню… но это не твоя забота. Так ведь?');
+        this.events.push(this.world.day, `Хворь в ${s2?.name} не отступает — знахарь бессилен…`);
+        break;
+      }
+      // ═══ ПРОПАВШИЙ КАРАВАНЩИК ═══
+      case 'car_accept': {
+        if (S.car) break;
+        S.car = 1;
+        const sites = this.carSites();
+        if (sites) this.fx({ t: 'marker', pid: p.id, x: sites.crash.x, y: sites.crash.y }, null);
+        this.toast(p, '🐎 След начинается у разбитого каравана — метка на карте (M)');
+        break;
+      }
+      case 'car_follow': {
+        if (S.car !== 2) break;
+        const man = [...this.entities.values()].find(e => e.role === 'lostman');
+        if (!man) break;
+        man.owner = p.id;
+        S.car = 4; // ведём домой
+        this.toast(p, '🐎 Милош идёт за тобой. Доведи его до деревни Весняны!');
+        break;
+      }
+      case 'car_truth': {
+        if (S.car !== 3 || (p.inventory.wedding_ring || 0) < 1) break;
+        delete p.inventory.wedding_ring;
+        S.car = 11;
+        p.coins += 40;
+        this.addXp(p, 60);
+        const s3 = this.world.settlements[3];
+        if (s3) p.rep[s3.faction] = Math.min(100, (p.rep[s3.faction] || 0) + 15);
+        this.toast(p, '🕯 Горькая правда дороже золота: +40 мон., +15 репутации');
+        this.events.push(this.world.day, `${p.name} принёс Весняне последнюю весть о муже`);
+        break;
+      }
+      case 'car_lie': {
+        if (S.car !== 3 || (p.inventory.wedding_ring || 0) < 1) break;
+        delete p.inventory.wedding_ring;
+        S.car = 12;
+        p.coins += 200;
+        this.addBounty(p, 25, 'ложь вдове караванщика');
+        this.toast(p, '🪙 +200 мон. на «поиски беглеца». Кольцо ты оставил себе… зачем?');
+        this.events.push(this.world.day, 'Весняна нанимает людей искать сбежавшего мужа. Зря.');
+        break;
+      }
+      // ═══ ГОЛОС БОЛОТ ═══
+      case 'bog_accept': {
+        if (S.bog) break;
+        S.bog = 1;
+        const spot = this.bogAltarSpot();
+        if (spot) {
+          this.chunks.setTile('over', spot.x, spot.y, T.DARK_ALTAR);
+          this.fx({ t: 'marker', pid: p.id, x: spot.x, y: spot.y }, null);
+        }
+        this.toast(p, '🕯 Чёрный идол в топи — метка на карте. Возьми 5 сырого мяса');
+        break;
+      }
       case 'rado_accept':
         if (S.rado === 0) { S.rado = 1; this.toast(p, '✦ Радогост: принеси 5 кристаллов'); }
         break;
@@ -3955,6 +4198,139 @@ export class Game {
     this.toast(p, '✦ Обелиск шепчет о былом: +15 опыта');
   }
 
+  // ═══ цепочка «ХВОРЬ»: знахарь Богумил (деревня 3) ═══
+  storyDialogPlague(p, npc) {
+    const st = p.story.plague || 0;
+    const lines = [];
+    const choices = [];
+    if (st === 0) {
+      lines.push('«Путник! Деревню косит хворь — люди сохнут на глазах.',
+        'Я знахарь, но без трав бессилен. Принеси 8 болотных трав —',
+        'сварю лекарство, и деревня тебя не забудет»');
+      choices.push({ id: 'story:plague_accept', label: '🌿 Помочь знахарю' });
+    } else if (st === 1) {
+      if ((p.inventory.herb || 0) >= 8) choices.push({ id: 'story:plague_herbs', label: '🌿 Отдать 8 трав' });
+      else lines.push(`«Травы, путник, травы! (${p.inventory.herb || 0}/8)»`);
+    } else if (st === 2) {
+      lines.push('«Лекарство почти готово… Что смотришь так? СЛУХИ? Байки!',
+        'Ну… хорошо. Твоя правда: хворь — моих рук дело. Порошок в колодце.',
+        'Но и лекарство — моё! Деревня платит, я лечу. Все живы. Почти.',
+        'Молчи — и получишь долю. Или что, побежишь звонить в колокол?»');
+      choices.push({ id: 'story:plague_expose', label: '⚔ Разоблачить отравителя' });
+      choices.push({ id: 'story:plague_cover', label: '🪙 Взять долю и молчать (+150 мон.)' });
+    } else if (st === 10) {
+      lines.push('…'); // разоблачён и мёртв — сюда не попасть
+    } else {
+      lines.push('«Тс-с. Мы друг друга поняли». Богумил отсыпает «лекарство» страждущим.');
+    }
+    choices.push({ id: 'close', label: STR.close });
+    this.sendDialog(p, npc.id, '🌿 Знахарь Богумил', lines.length ? lines : ['«Хворь отступает… не так ли?»'], choices);
+  }
+
+  // ═══ цепочка «ПРОПАВШИЙ КАРАВАНЩИК»: Весняна (деревня 4) ═══
+  // судьба мужа решена сидом мира: жив в плену или погиб в глуши
+  carSites() {
+    const s = this.world.settlements[3];
+    if (!s) return null;
+    if (!this.world.carSites) {
+      const a1 = (hash2(this.world.seed, 401, 1) % 628) / 100;
+      const a2 = a1 + 1.2 + (hash2(this.world.seed, 401, 2) % 100) / 100;
+      const spot = (ang, d) => {
+        for (let r = d; r > 10; r -= 4) {
+          const tx = Math.round(s.x + Math.cos(ang) * r), ty = Math.round(s.y + Math.sin(ang) * r);
+          if (tx > 20 && ty > 20 && tx < WORLD_TILES - 20 && ty < WORLD_TILES - 20
+            && !SOLID.has(this.chunks.tileAt('over', tx, ty))) return { x: tx, y: ty };
+        }
+        return { x: s.x + 20, y: s.y + 20 };
+      };
+      this.world.carSites = {
+        crash: spot(a1, 34), trail: spot(a2, 55),
+        alive: hash2(this.world.seed, 777, 3) % 2 === 0,
+      };
+    }
+    return this.world.carSites;
+  }
+
+  storyDialogCaravan(p, npc) {
+    const st = p.story.car || 0;
+    const lines = [];
+    const choices = [];
+    if (st === 0) {
+      lines.push('«Мой Милош повёл караван на юг три недели назад…',
+        'Ни весточки. Стража руками разводит. Найди его, путник.',
+        'Живым или… — она сжимает платок — просто найди»');
+      choices.push({ id: 'story:car_accept', label: '🐎 Взяться за поиски' });
+    } else if (st === 1) lines.push('«След начинается у южной дороги — метка на твоей карте»');
+    else if (st === 2) lines.push('«Следы волочения?.. Иди по ним. Прошу, быстрее!»');
+    else if (st === 3) {
+      lines.push('Ты кладёшь кольцо на стол. Весняна долго молчит.',
+        '«Это его. Скажи мне правду. Какой бы она ни была»');
+      choices.push({ id: 'story:car_truth', label: '🕯 Сказать правду: Милош погиб' });
+      choices.push({ id: 'story:car_lie', label: '🪙 Солгать: «он сбежал с золотом» (+200 мон.)' });
+    } else if (st === 10) lines.push('«Дом снова полон. Ты вернул мне жизнь, путник»');
+    else if (st === 11) lines.push('Весняна смотрит сквозь тебя. «Спасибо за правду». В доме тихо.');
+    else if (st === 12) lines.push('«Сбежал?! С золотом?! Найму людей — из-под земли достанут…»');
+    choices.push({ id: 'close', label: STR.close });
+    this.sendDialog(p, npc.id, '🐎 Весняна, жена караванщика', lines, choices);
+  }
+
+  storyDialogLostman(p, npc) {
+    const foes = [...this.entities.values()].some(e =>
+      e.entType === 'enemy' && e.mapId === npc.mapId && dist2(e.x, e.y, npc.x, npc.y) < 200 * 200);
+    if (foes) {
+      this.sendDialog(p, npc.id, '⛓ Милош, караванщик',
+        ['«Тише! Они рядом. Перебей этих псов — и я твой должник»'],
+        [{ id: 'close', label: STR.close }]);
+      return;
+    }
+    if (npc.owner) {
+      this.sendDialog(p, npc.id, '⛓ Милош', ['«Веди. Я за тобой — только не быстро, ноги затекли»'],
+        [{ id: 'close', label: STR.close }]);
+      return;
+    }
+    this.sendDialog(p, npc.id, '⛓ Милош, караванщик',
+      ['«Свободен… Хвала небесам! Весняна, поди, извелась.',
+       'Проводи меня до дома — одному через глушь не дойти»'],
+      [{ id: 'story:car_follow', label: '🐎 «Держись за мной» (проводить домой)' }, { id: 'close', label: STR.close }]);
+  }
+
+  // ═══ цепочка «ГОЛОС БОЛОТ»: рыбак Тихон (деревня 5) ═══
+  bogAltarSpot() {
+    const s = this.world.settlements[4];
+    if (!s) return null;
+    if (!this.world.bogAltar) {
+      let best = { x: s.x + 26, y: s.y + 26 };
+      for (let r = 14; r < 60; r += 3) {
+        let found = null;
+        for (let a = 0; a < 12; a++) {
+          const tx = s.x + Math.round(Math.cos(a / 12 * 6.28) * r);
+          const ty = s.y + Math.round(Math.sin(a / 12 * 6.28) * r);
+          if (baseTile(this.world.seed, tx, ty) === T.SWAMP) { found = { x: tx, y: ty }; break; }
+        }
+        if (found) { best = found; break; }
+      }
+      this.world.bogAltar = best;
+    }
+    return this.world.bogAltar;
+  }
+
+  storyDialogBog(p, npc) {
+    const st = p.story.bog || 0;
+    const lines = [];
+    const choices = [];
+    if (st === 0) {
+      lines.push('«Из топи по ночам ГОЛОС зовёт. Рыба ушла. Сети рвёт…',
+        'Старики говорят — болотный дух гневается. Отнеси ему',
+        'подношение: 5 сырого мяса к чёрному идолу. Может, уймётся»');
+      choices.push({ id: 'story:bog_accept', label: '🕯 Отнести подношение' });
+    } else if (st === 1) lines.push(`«Идол в топи — метка на карте. Мяса-то хватает? (${p.inventory.meat || 0}/5)»`);
+    else if (st === 2) lines.push('«Ты РАЗБУДИЛ его?! Беги, бей или клянись — но реши это!»');
+    else if (st === 10) lines.push('«Туман ушёл! Рыба вернулась! Век тебя помнить будем»');
+    else if (st === 11) lines.push('Тихон отшатывается: «Глаза… у тебя болотные глаза. Уходи».');
+    choices.push({ id: 'close', label: STR.close });
+    this.sendDialog(p, npc.id, '🎣 Рыбак Тихон', lines, choices);
+  }
+
   // ---------- диалоги / магазин / квесты / слухи ----------
   // NPC помнят знакомых: первая встреча — представление, дальше — приветствие
   npcGreeting(p, npc) {
@@ -4027,6 +4403,10 @@ export class Game {
         [{ id: 'free_prisoner', label: '⛓ Освободить пленника' }, { id: 'close', label: STR.close }]);
       return;
     }
+    if (npc.role === 'plaguedoc') { this.storyDialogPlague(p, npc); return; }
+    if (npc.role === 'caravanwife') { this.storyDialogCaravan(p, npc); return; }
+    if (npc.role === 'fisherman') { this.storyDialogBog(p, npc); return; }
+    if (npc.role === 'lostman') { this.storyDialogLostman(p, npc); return; }
     if (npc.role === 'hermit') { this.storyDialogHermit(p, npc); return; }
     if (npc.role === 'captain') { this.storyDialogCaptain(p, npc); return; }
     if (npc.role === 'wanderer') { this.storyDialogWanderer(p, npc); return; }

@@ -1094,6 +1094,9 @@
     },
     "ab_guardian": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/extension.png"
+    },
+    "item_wedding_ring": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/ring/gold.png"
     }
   }
 }
