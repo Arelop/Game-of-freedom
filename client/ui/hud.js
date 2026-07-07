@@ -42,6 +42,22 @@ export class Hud {
         ctx.fillRect(5 + i * 6, 13, 4, 2);
       }
     }
+    // классовый ресурс: ярость воина / комбо вора / благодать жреца
+    if (you.rsc !== undefined) {
+      if (you.cls === 'warrior') { // оранжевая полоска ярости
+        ctx.fillStyle = '#2c2a38';
+        ctx.fillRect(5, 13, 30, 2);
+        ctx.fillStyle = you.rsc >= 30 ? '#df7126' : '#6e3a1e';
+        ctx.fillRect(5, 13, Math.round(30 * you.rsc / 100), 2);
+      } else { // пипсы комбо (5) и благодати (3)
+        const n = you.cls === 'rogue' ? 5 : 3;
+        const col = you.cls === 'rogue' ? '#d9574a' : '#fbf236';
+        for (let i = 0; i < n; i++) {
+          ctx.fillStyle = i < you.rsc ? col : '#2c2a38';
+          ctx.fillRect(5 + i * 6, 13, 4, 2);
+        }
+      }
+    }
     // голод
     ctx.fillStyle = '#222034';
     ctx.fillRect(5, 21, 42, 5);

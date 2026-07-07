@@ -21,6 +21,7 @@ export const MSG = {
   STASH: 'stash',              // { op: 'put'|'take', item } общий сундук отряда
   GIVE: 'give',                // { item } передать предмет союзнику рядом
   BESTIARY: 'bestiary',        // запросить свой бестиарий (счётчики убийств)
+  DROP_QUEST: 'dropQuest',     // { i } вычеркнуть задание из журнала
 
   // сервер -> клиент
   WELCOME: 'welcome',     // { id, worldSeed, worldMeta, tick }

@@ -122,6 +122,7 @@ export class Net {
       case MSG.STASH: game.stashOp(p, m.op === 'take' ? 'take' : 'put', String(m.item || ''), m.box === 'home' ? 'home' : 'team'); break;
       case MSG.GIVE: game.giveItem(p, String(m.item || '')); break;
       case MSG.BESTIARY: game.fx({ t: 'bestiary', pid: p.id, k: p.bestiary || {} }, null); break;
+      case MSG.DROP_QUEST: game.dropQuest(p, m.i | 0); break;
     }
   }
 
@@ -214,6 +215,9 @@ export class Net {
         ab: (p.abCd || []).map(v => r1(v)), abl: p.abilities, blk: p.blocking ? 1 : 0, inv2: r1(p.invisT || 0),
         oc: r1(p.offCd || 0), sh: p.shieldHp || 0, cb: p.canBlock ? 1 : 0,
         mp: Math.floor(p.mana), mpm: p.manaMax, arc: p.arcaneN || 0,
+        rsc: p.cls === 'warrior' ? Math.round(p.rage || 0)
+          : p.cls === 'rogue' ? (p.combo || 0)
+          : p.cls === 'priest' ? (p.grace || 0) : undefined,
         bnt: p.bounty || 0,
         ctr: p.contract ? { tp: p.contract.type, t: Math.round(p.contract.t) } : undefined,
         hnt: p.hintStage < 5 ? p.hintStage : undefined,

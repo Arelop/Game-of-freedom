@@ -6,6 +6,15 @@ import { moveWithCollision, dist2 } from '../../shared/simCore.js';
 const AGGRO_R2 = 190 * 190;
 const FORGET_R2 = 320 * 320;
 
+let flankSeq = 0; // чередование сторон обхода при фланкировании
+
+// бесстрашные: нежить, конструкты, демоны и войско Тьмы не бегут от ран
+const FEARLESS = new Set([
+  'skeleton', 'ghoul', 'necromancer', 'golem', 'magmaGolem', 'fireElemental',
+  'demon', 'imp', 'demonologist', 'gasSpore', 'mimic', 'turret', 'spiralTurret', 'dasher',
+  'darkSoldier', 'darkArcher', 'darkMage', 'darkKnight', 'darkLord', 'heartKeeper',
+]);
+
 // npcs — жители/стража: монстры враждебны им так же, как игрокам
 export function updateEnemy(e, dt, map, players, rand, npcs = []) {
   const def = ENEMIES[e.kind];
@@ -56,6 +65,29 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
   const dist = Math.sqrt(bestD);
   e.aim = ang;
 
+  // раненый зверь дрогнул: раз за жизнь отступает на 2 с (нежить и Тьма бесстрашны)
+  if (e.fleeT > 0) {
+    e.fleeT -= dt;
+    const away = ang + Math.PI + (rand() - 0.5) * 0.6;
+    moveWithCollision(e, Math.cos(away) * def.speed * 1.3 * slowF * dt, Math.sin(away) * def.speed * 1.3 * slowF * dt, def.radius, map);
+    return shots;
+  }
+  if (!e.fled && def.archetype !== 'boss' && !FEARLESS.has(e.kind)
+    && e.hp > 0 && e.hp < (e.maxHp || def.hp) * 0.2) {
+    e.fled = true;
+    e.fleeT = 2;
+  }
+
+  // сайд-степ ловких: быстрые твари дёргаются вбок — попробуй попади издалека
+  if (def.speed >= 70 && dist > 60 && dist < 240) {
+    e.stepT = (e.stepT ?? rand() * 1.5) - dt;
+    if (e.stepT <= 0) {
+      e.stepT = 1.2 + rand() * 0.8;
+      const side = ang + Math.PI / 2 * (rand() < 0.5 ? 1 : -1);
+      moveWithCollision(e, Math.cos(side) * 18, Math.sin(side) * 18, def.radius, map);
+    }
+  }
+
   switch (def.archetype) {
     case 'chaser': {
       if (e.state === 'windup') {
@@ -68,7 +100,22 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
       } else {
         e.cd = Math.max(0, (e.cd || 0) - dt);
         if (dist < def.lungeRange && e.cd <= 0) { e.state = 'windup'; e.stateT = def.lungeWindup; }
-        else moveWithCollision(e, Math.cos(ang) * def.speed * slowF * dt, Math.sin(ang) * def.speed * slowF * dt, def.radius, map);
+        else {
+          // фланкирование: издали каждый заходит по СВОЕЙ дуге — стая окружает,
+          // а не выстраивается в очередь за спиной друг у друга
+          let moveA = ang;
+          if (dist > 60) {
+            // персональный угол обхода: знак чередуем по счётчику, чтобы стая
+            // гарантированно расходилась в обе стороны, а не куда упадёт кубик
+            if (e.flankA === undefined)
+              e.flankA = (0.5 + rand() * 0.9) * ((flankSeq++ % 2) ? 1 : -1);
+            const fromTarget = Math.atan2(e.y - target.y, e.x - target.x);
+            const wantA = fromTarget + e.flankA;
+            const tx = target.x + Math.cos(wantA) * 55, ty = target.y + Math.sin(wantA) * 55;
+            moveA = Math.atan2(ty - e.y, tx - e.x);
+          }
+          moveWithCollision(e, Math.cos(moveA) * def.speed * slowF * dt, Math.sin(moveA) * def.speed * slowF * dt, def.radius, map);
+        }
       }
       break;
     }

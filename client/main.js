@@ -322,6 +322,10 @@ net.handlers.onFx = (kind, m) => {
       addFloatText(m.x, m.y - 12, '+ ' + m.text, '#fbf236');
       if (m.pid === net.myId) SFX.ui();
       break;
+    case 'react': // реакции стихий и всплески ресурсов: крупный текст
+      addFloatText(m.x, m.y - 10, m.name, '#df7126', true);
+      particles.burst(m.x, m.y, '#df7126', 10, 70, 0.3);
+      break;
     case 'nova': // ледяная/огненная нова реликвий и сетов
       ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 46, t: 0, dur: 0.4, color: '#df7126' });
       particles.burst(m.x, m.y, '#df7126', 14, 90, 0.35);

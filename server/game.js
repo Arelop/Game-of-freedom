@@ -213,6 +213,9 @@ export class Game {
       mana: C.manaBase || 20, manaMax: C.manaBase || 20, // настоящая мана (не боеприпас)
       combatT: 0,                 // сек с последнего каста/выстрела — реген вне боя быстрее
       arcaneN: 0, arcaneT: 0,     // Чародейские заряды мага
+      rage: 0,                    // ЯРОСТЬ воина: растёт в бою, сжигается способностями
+      combo: 0, comboT: 0,        // КОМБО вора: серия попаданий усиливает приёмы
+      grace: 0,                   // БЛАГОДАТЬ жреца: лечение заряжает кару
       abCd: [0, 0, 0], invisT: 0, offCd: 0, shieldHp: 0, shieldT: 0,
       abilities: defaultLoadout(cls), // раскладка Q/X/R — настраивается в Книге способностей (K)
       coins: 20, hunger: HUNGER_MAX,
@@ -254,6 +257,13 @@ export class Game {
 
   // ---------- экипировка, характеристики, таланты ----------
   hasTalent(p, flag) { return p.talents.some(id => findTalent(p.cls, id)?.flag === flag); }
+
+  // БЛАГОДАТЬ жреца: каждое настоящее лечение союзника заряжает кару
+  gainGrace(p) {
+    if (p.cls !== 'priest') return;
+    if ((p.grace || 0) >= 3) return;
+    p.grace = (p.grace || 0) + 1;
+  }
 
   // сидит ли герой у огня (3×3 тайла вокруг) — тепло ускоряет медитацию
   nearCampfire(p) {
@@ -707,6 +717,13 @@ export class Game {
     // ---- реликвии-проки ----
     p.blT = Math.max(0, (p.blT || 0) - dt); // заряды «Жажды крови» тают
     p.stepBonusT = Math.max(0, (p.stepBonusT || 0) - dt); // бонус Шага сквозь тень
+    // классовые ресурсы: ярость остывает вне боя, комбо рвётся от простоя
+    if (p.cls === 'warrior' && p.combatT > 3 && p.rage > 0)
+      p.rage = Math.max(0, p.rage - 5 * dt);
+    if (p.cls === 'rogue' && p.combo > 0) {
+      p.comboT -= dt;
+      if (p.comboT <= 0) p.combo = 0;
+    }
     // «Гнев небес»: в бою молния сама находит ближайшего врага
     if (p.procs?.smite && p.combatT < 5) {
       p.smiteT = (p.smiteT ?? 0) - dt;
@@ -742,6 +759,7 @@ export class Game {
           if (dist2(p.x, p.y, q.x, q.y) < 70 * 70) {
             q.hp = Math.min(q.maxHp, q.hp + 1);
             this.fx({ t: 'heal', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
+            this.gainGrace(p);
           }
         }
       }
@@ -752,7 +770,7 @@ export class Game {
       if (p.procs?.frostroll) { // «Кольцо инея»: нова стужи
         for (const e of this.entities.values()) {
           if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
-          if (dist2(p.x, p.y, e.x, e.y) < 50 * 50) { e.slowT = 1.6; e.slowMult = 0.5; }
+          if (dist2(p.x, p.y, e.x, e.y) < 50 * 50) { e.slowT = 1.6; e.slowMult = 0.5; e.chillT = Math.max(e.chillT || 0, 1.6); }
         }
         this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
       }
@@ -999,6 +1017,7 @@ export class Game {
         knockback: w.knockback, slow, school: w.school,
         explode: w.explode, chain: w.chain, structDmg, fiery,
         holy: w.holy ? w.holy + (this.hasTalent(p, 'lightheal') ? 1 : 0) : 0,
+        chill: w.chill, fire: w.fire, poison: w.poison, // стихии для реакций
         owner: p.id, friendly: true, mapId: p.mapId,
       });
     }
@@ -1268,6 +1287,7 @@ export class Game {
 
       const map = this.mapFor(e.mapId);
       if (e.entType === 'enemy') {
+        if ((e.chillT || 0) > 0) e.chillT -= dt; // метка льда тает
         // доты: яд и горение тикают раз в секунду
         if ((e.dotT || 0) > 0) {
           e.dotT -= dt;
@@ -1509,7 +1529,31 @@ export class Game {
     const aim = p.aim || 0;
     // Чародейские заряды усиливают и способности мага
     const arcMult = p.cls === 'mage' ? 1 + 0.04 * (p.arcaneN || 0) : 1;
-    const d = { ...(p.derived || {}), dmgMagic: (p.derived?.dmgMagic || 1) * arcMult };
+    // классовые ресурсы: способность сжигает запас и бьёт сильнее
+    let resMult = 1;
+    if (p.cls === 'warrior' && (p.rage || 0) >= 30
+      && ['power_strike', 'whirlwind', 'heroic_charge'].includes(ab.id)) {
+      resMult = 1 + p.rage / 150; // до +66% на полной ярости
+      this.fx({ t: 'react', name: 'ЯРОСТЬ!', x: p.x, y: p.y - 10 }, p.mapId, p.x, p.y);
+      p.rage = 0;
+    }
+    if (p.cls === 'rogue' && (p.combo || 0) > 0) {
+      resMult = 1 + p.combo * 0.12; // +12% за очко комбо
+      if (p.combo >= 3) this.fx({ t: 'react', name: `КОМБО ×${p.combo}`, x: p.x, y: p.y - 10 }, p.mapId, p.x, p.y);
+      p.combo = 0;
+    }
+    if (p.cls === 'priest' && (p.grace || 0) > 0
+      && ['judgement', 'consecration'].includes(ab.id)) {
+      resMult = 1 + p.grace * 0.2; // +20% за заряд благодати
+      this.fx({ t: 'react', name: 'БЛАГОДАТЬ!', x: p.x, y: p.y - 10 }, p.mapId, p.x, p.y);
+      p.grace = 0;
+    }
+    const d = {
+      ...(p.derived || {}),
+      dmgMagic: (p.derived?.dmgMagic || 1) * arcMult * resMult,
+      dmgMelee: (p.derived?.dmgMelee || 1) * resMult,
+      dmgRanged: (p.derived?.dmgRanged || 1) * resMult,
+    };
     this.gainArcane(p);
     const map = this.mapFor(p.mapId);
     // урон всем врагам в радиусе (опц. фильтр по конусу)
@@ -1590,6 +1634,7 @@ export class Game {
           if (dist2(p.x, p.y, e.x, e.y) > 85 * 85) continue;
           e.slowT = deep ? 4 : 3;
           e.slowMult = deep ? 0.08 : 0.35;
+          e.chillT = Math.max(e.chillT || 0, 2.5); // метка льда для реакций
           this.damageEnemy(e, Math.round(4 * (d.dmgMagic || 1) * 10) / 10,
             { vx: 0, vy: 0, knockback: 0, owner: p.id, school: 'magic' });
         }
@@ -1658,6 +1703,7 @@ export class Game {
           if (q.hp < q.maxHp) {
             q.hp = Math.min(q.maxHp, q.hp + amount);
             this.fx({ t: 'heal', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
+            if (q !== p) this.gainGrace(p);
           }
         }
         // капстоун Света: волна поднимает павшего союзника (раз в 60 с)
@@ -1782,7 +1828,11 @@ export class Game {
         }
         for (const q of this.players.values()) {
           if (q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > 75 * 75) continue;
-          if (q.hp < q.maxHp) { q.hp = Math.min(q.maxHp, q.hp + 1); this.fx({ t: 'heal', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y); }
+          if (q.hp < q.maxHp) {
+            q.hp = Math.min(q.maxHp, q.hp + 1);
+            this.fx({ t: 'heal', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
+            if (q !== p) this.gainGrace(p);
+          }
         }
         this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
         break;
@@ -1963,6 +2013,7 @@ export class Game {
                 if (q.hp < q.maxHp) {
                   q.hp = Math.min(q.maxHp, q.hp + pr.holy);
                   this.fx({ t: 'heal', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
+                  this.gainGrace(this.players.get(pr.owner)); // свет вернулся благодатью
                 }
               } else this.damagePlayer(q, pr.dmg, null);
               hit = true; break;
@@ -2030,9 +2081,42 @@ export class Game {
     // таланты атакующего: казнь, засада, абсолютный ноль, яды и поджог
     const attacker = pr && !pr.isDot ? this.players.get(pr.owner) : null;
     if (attacker) {
+      // классовые ресурсы растут от попаданий
+      if (attacker.cls === 'warrior' && pr.school === 'melee')
+        attacker.rage = Math.min(100, (attacker.rage || 0) + 8);
+      if (attacker.cls === 'rogue') {
+        attacker.combo = Math.min(5, (attacker.combo || 0) + 1);
+        attacker.comboT = 4;
+      }
       if (e.hp >= e.maxHp && this.hasTalent(attacker, 'ambush')) dmg *= 1.4;          // Засада
       if (e.hp / (e.maxHp || 1) <= 0.25 && this.hasTalent(attacker, 'execute')) dmg *= 1.5; // Палач
-      if ((e.slowT || 0) > 0 && this.hasTalent(attacker, 'deepfreeze')) dmg *= 1.35;  // Абсолютный ноль
+      // ═══ РЕАКЦИИ СТИХИЙ ═══
+      // РАСКОЛ: удар ближнего боя по ЗАМОРОЖЕННОМУ — лёд крошится вместе с врагом
+      if ((e.chillT || 0) > 0 && pr.school === 'melee') {
+        dmg *= this.hasTalent(attacker, 'deepfreeze') ? 1.6 : 1.35;
+        e.chillT = 0;
+        this.fx({ t: 'react', name: 'РАСКОЛ!', x: e.x, y: e.y - 8 }, e.mapId, e.x, e.y);
+      }
+      // ПАР: огонь по ЗАМОРОЖЕННОМУ — паровой взрыв по области
+      if ((e.chillT || 0) > 0 && (pr.fire || pr.fiery)) {
+        e.chillT = 0; e.slowT = 0;
+        this.explodeAt(e.mapId, e.x, e.y, Math.round(dmg * 1.5 * 10) / 10, 40, pr.owner, 0);
+        this.fx({ t: 'react', name: 'ПАР!', x: e.x, y: e.y - 8 }, e.mapId, e.x, e.y);
+        this.fx({ t: 'boom', x: e.x, y: e.y, r: 40 }, e.mapId, e.x, e.y);
+      }
+      // ТОКСИН: огонь по ОТРАВЛЕННОМУ — токсичная вспышка, яд летит на соседей
+      if ((pr.fire || pr.fiery) && e.dotKind === 'venom' && (e.dotT || 0) > 0) {
+        dmg += (e.dotDmg || 1) * 4;
+        for (const o of this.entities.values()) {
+          if (o === e || o.entType !== 'enemy' || o.mapId !== e.mapId) continue;
+          if (dist2(e.x, e.y, o.x, o.y) > 50 * 50) continue;
+          o.dotT = 3; o.dotDmg = e.dotDmg || 1; o.dotSrc = pr.owner; o.dotKind = 'venom';
+        }
+        e.dotT = 0;
+        this.fx({ t: 'react', name: 'ТОКСИН!', x: e.x, y: e.y - 8 }, e.mapId, e.x, e.y);
+      }
+      // «Абсолютный ноль» без реакции: просто по замедленному
+      if ((e.slowT || 0) > 0 && (e.chillT || 0) <= 0 && this.hasTalent(attacker, 'deepfreeze')) dmg *= 1.35;
       // сет «Ночная тень» (4): удар в спину — враг смотрит прочь от атакующего
       if (attacker.setFlags?.set_backstab) {
         let da = Math.atan2(e.y - attacker.y, e.x - attacker.x) - (e.aim || 0);
@@ -2045,6 +2129,7 @@ export class Game {
       // сет «Ледяной чертог» (4): магия студит врагов
       if (pr.school === 'magic' && attacker.setFlags?.set_chill && (e.slowT || 0) <= 0) {
         e.slowT = 1.4; e.slowMult = 0.65;
+        e.chillT = Math.max(e.chillT || 0, 1.4);
       }
       // обсидиановое оружие: раны горят
       const aw = this.weapon(attacker);
@@ -2071,8 +2156,23 @@ export class Game {
       const dx = Math.cos(a) * kb, dy = Math.sin(a) * kb;
       if (!map.isSolid(Math.floor((e.x + dx) / TILE), Math.floor((e.y + dy) / TILE))) { e.x += dx; e.y += dy; }
     }
-    // замедление льдом
+    // зов подмоги: первый удар — и сородичи поблизости вступают в бой
+    if (!e.criedHelp && pr && !pr.isDot) {
+      e.criedHelp = true;
+      const myFac = ENEMIES[e.kind]?.faction || 'monsters';
+      for (const o of this.entities.values()) {
+        if (o === e || o.entType !== 'enemy' || o.mapId !== e.mapId || o.aggro) continue;
+        if ((ENEMIES[o.kind]?.faction || 'monsters') !== myFac) continue;
+        if (dist2(e.x, e.y, o.x, o.y) < 150 * 150) o.aggro = true;
+      }
+    }
+    // замедление льдом (+ метка ЛЬДА для реакций стихий)
     if (pr && pr.slow) { e.slowT = Math.max(e.slowT || 0, pr.slow.time); e.slowMult = pr.slow.mult; }
+    if (pr && pr.chill) e.chillT = Math.max(e.chillT || 0, 1.6);
+    // яд посоха: вязкий дот (если враг ещё не отравлен/не горит)
+    if (pr && pr.poison && (e.dotT || 0) <= 0) {
+      e.dotT = pr.poison.time; e.dotDmg = pr.poison.dmg; e.dotSrc = pr.owner; e.dotKind = 'venom';
+    }
     this.fx({ t: 'hurt', id: e.id, x: e.x, y: e.y, dmg: Math.round(dmg * 10) / 10, crit: pr?.crit ? 1 : 0 }, e.mapId, e.x, e.y);
     if (e.hp <= 0) this.killEnemy(e, pr);
   }
@@ -2392,6 +2492,8 @@ export class Game {
     }
     p.hp -= dmg;
     p.hurtT = PLAYER_HURT_INVULN;
+    // боль кормит ярость воина
+    if (p.cls === 'warrior') p.rage = Math.min(100, (p.rage || 0) + 5);
     // урон вблизи: обоих отбрасывает друг от друга — не залипаем в тушке
     if (source && source.x !== undefined && dist2(p.x, p.y, source.x, source.y) < 40 * 40) {
       const a = Math.atan2(p.y - source.y, p.x - source.x);
@@ -4724,6 +4826,19 @@ export class Game {
     }
     if (!quest) { this.toast(p, '«Пока новых дел нет — загляни позже»'); return; }
     this.addQuest(p, quest);
+  }
+
+  // вычеркнуть задание из журнала (кнопка ✖ в J)
+  dropQuest(p, i) {
+    const q = p.quests[i];
+    if (!q) return;
+    // именной зверь остаётся жить в глуши, но больше не твой заказ
+    if (q.type === 'slay' && q.eid) {
+      const e = this.entities.get(q.eid);
+      if (e) e.slayFor = null;
+    }
+    p.quests.splice(i, 1);
+    this.toast(p, `📖✖ Вычеркнуто: ${q.title}`);
   }
 
   completeQuestObjective(p, q) {

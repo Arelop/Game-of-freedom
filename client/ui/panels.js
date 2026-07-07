@@ -375,14 +375,26 @@ export class Panels {
       e.textContent = 'Пусто. Задания дают старейшины, охотники и доска заказов у столба.';
       el.appendChild(e);
     }
-    for (const q of qs) {
+    qs.forEach((q, i) => {
       const row = document.createElement('div');
       row.className = 'jrquest' + (q.done ? ' done' : '');
       row.innerHTML = `<div class="jrtitle">${q.done ? '✓' : '•'} ${q.title}</div>
         ${q.d ? `<div class="jrstate" style="font-style:italic;color:#9a9285">${q.d}</div>` : ''}
         <div class="jrstate">${q.done ? 'Выполнено — вернись к заказчику за наградой' : 'В работе' + (q.tx ? ' · цель отмечена на карте (M)' : '')}</div>`;
+      const drop = document.createElement('button');
+      drop.className = 'jrdrop';
+      drop.textContent = '✖';
+      drop.title = 'Отказаться от задания';
+      drop.onclick = () => {
+        if (!confirm(`Вычеркнуть «${q.title}» из журнала?`)) return;
+        SFX.ui();
+        this.net.send({ t: MSG.DROP_QUEST, i });
+        setTimeout(() => this.renderJournal(), 200);
+        setTimeout(() => this.renderJournal(), 500);
+      };
+      row.appendChild(drop);
       el.appendChild(row);
-    }
+    });
     const hintEl = document.createElement('div');
     hintEl.className = 'jrempty';
     hintEl.textContent = 'Можно вести до трёх заданий одновременно.';

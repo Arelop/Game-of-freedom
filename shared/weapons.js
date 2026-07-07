@@ -46,6 +46,7 @@ export const WEAPONS = {
     knockback: 12, recoilShake: 0.1,
     sprite: 'wpn_staff_fire', projSprite: 'proj_fire', sound: 'shot_fire',
     projRadius: 3, projLife: 1.0, price: 100,
+    fire: true, // стихия огня: реакции с заморозкой и ядом
   },
   froststaff: {
     id: 'froststaff', name: 'Посох льда', school: 'magic', damage: 6, projectilesPerShot: 1,
@@ -54,6 +55,7 @@ export const WEAPONS = {
     sprite: 'wpn_staff_frost', projSprite: 'proj_frost', sound: 'shot_frost',
     projRadius: 3, projLife: 1.3, price: 120,
     slow: { mult: 0.65, time: 1.5 },      // лёд замедляет врагов
+    chill: true, // метка ЛЬДА: огонь по замороженному — ПАР, мили — РАСКОЛ
   },
   fireball: {
     id: 'fireball', structDmg: 10, name: 'Посох огненных шаров', school: 'magic', damage: 9, projectilesPerShot: 1,
@@ -62,6 +64,7 @@ export const WEAPONS = {
     sprite: 'wpn_staff_bomb', projSprite: 'proj_fireball', sound: 'shot_fire',
     projRadius: 4, projLife: 1.6, price: 170,
     explode: { radius: 30 },              // взрыв бьёт всех вокруг
+    fire: true,
   },
   stormstaff: {
     id: 'stormstaff', structDmg: 1, name: 'Посох бури', school: 'magic', damage: 6, projectilesPerShot: 1,
@@ -100,6 +103,7 @@ export const WEAPONS = {
     sprite: 'wpn_staff_venom', projSprite: 'proj_venom', sound: 'shot_frost',
     projRadius: 3, projLife: 1.1, price: 150,
     slow: { mult: 0.8, time: 1.2 },      // яд вязкий: слегка замедляет
+    poison: { time: 3, dmg: 1 },         // и въедается: дот; огонь по яду — ТОКСИН
   },
   bombs: {
     id: 'bombs', structDmg: 14, name: 'Огненные бомбы', school: 'ranged', damage: 10, projectilesPerShot: 1,
@@ -160,6 +164,7 @@ export const WEAPONS = {
     sprite: 'wpn_ashstaff', projSprite: 'proj_fireball', sound: 'shot_fire',
     projRadius: 3, projLife: 1.3, price: 210,
     explode: { radius: 22 },
+    fire: true,
   },
 
   // --- ЛЕГЕНДАРНОЕ оружие: не выпадает в мире — только награда за
