@@ -254,6 +254,15 @@ export class Game {
   // ---------- экипировка, характеристики, таланты ----------
   hasTalent(p, flag) { return p.talents.some(id => findTalent(p.cls, id)?.flag === flag); }
 
+  // сидит ли герой у огня (3×3 тайла вокруг) — тепло ускоряет медитацию
+  nearCampfire(p) {
+    const tx = Math.floor(p.x / TILE), ty = Math.floor(p.y / TILE);
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        if (this.chunks.tileAt(p.mapId, tx + dx, ty + dy) === T.CAMPFIRE) return true;
+    return false;
+  }
+
   recomputeStats(p) {
     const C = CLASSES[p.cls] || CLASSES.warrior;
     // 1-й проход: экипировка может давать сами атрибуты (СИЛ/ЛОВ/ИНТ/УДЧ)
@@ -661,9 +670,12 @@ export class Game {
     }
     if (buffEnded) this.recomputeStats(p);
 
-    // Реген маны: непрерывный; вне боя (5 с без каста) — в 2.5 раза быстрее
+    // Реген маны: в бою — тонкая струйка; на отдыхе (5 с без каста) «медитация»
+    // разгоняет реген постепенно до ×4 за ~11 секунд; у костра — ещё в полтора раза щедрее
     p.combatT += dt;
-    const regen = (0.5 + 0.4 * (p.derived?.manaRegen || 0)) * (p.combatT > 5 ? 2.5 : 1);
+    let regen = 0.2 + 0.12 * (p.derived?.manaRegen || 0);
+    if (p.combatT > 5) regen *= 1 + Math.min(3, (p.combatT - 5) / 2);
+    if (this.nearCampfire(p)) regen *= 1.5;
     p.mana = Math.min(p.manaMax, p.mana + regen * dt);
     // Чародейские заряды мага спадают при простое
     if (p.arcaneT > 0) {
