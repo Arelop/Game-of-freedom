@@ -201,7 +201,10 @@ export class Game {
       dead: false, downT: 0,
       quests: [], // журнал: до 3 активных заданий
       // сюжетные цепочки именных NPC: стадии, счётчики, осколки
-      story: { rado: 0, capt: 0, mira: 0, bandits: 0, banditsGoal: 0, shards: [], captCamp: null },
+      story: {
+        rado: 0, capt: 0, mira: 0, bandits: 0, banditsGoal: 0, shards: [], captCamp: null,
+        smith: 0, widow: 0, well: 0, // новые цепочки: Творимир, Милица, Голос из колодца
+      },
       hintStage: 0, hintKills: 0, // онбординг: цепочка первых целей в HUD
       bestiary: {},               // счётчики убийств по видам монстров
       lastSeq: 0, inputs: [],
@@ -244,6 +247,8 @@ export class Game {
     }
     // божественность: +4 ко всем атрибутам
     if (p.ascended) for (const k of STAT_KEYS) eff[k] = (eff[k] || 0) + 4;
+    // дар запечатанного колодца: +1 ИНТ и +1 УДЧ навсегда
+    if (p.story?.wellBlessed) { eff.int = (eff.int || 0) + 1; eff.lck = (eff.lck || 0) + 1; }
     p.effStats = eff;
     const sb = statBonuses(eff);
     const d = {
@@ -975,6 +980,20 @@ export class Game {
           cpt.name = 'Ярослава';
           cpt.hp = cpt.maxHp = 24;
           ids.push(cid);
+          // вдова Милица ждёт вестей у таверны
+          const wx = (a.tavern?.x ?? s.x) * TILE, wy = (a.tavern?.y ?? s.y) * TILE;
+          const wid = this.spawnNpc('widow', s.id, 'over', wx - 14, wy + 12, { kind: 'npc_villager2' });
+          const wd = this.entities.get(wid);
+          wd.name = 'Милица';
+          ids.push(wid);
+        }
+        // именной NPC: кузнец-мастер Творимир во второй деревне
+        if (s === this.world.settlements[1]) {
+          const mid = this.spawnNpc('mastersmith', s.id, 'over', sx - 30, sy + 18, { kind: 'npc_smith' });
+          const ms = this.entities.get(mid);
+          ms.name = 'Творимир';
+          ms.hp = ms.maxHp = 20;
+          ids.push(mid);
         }
         ids.push(this.spawnNpc('merchant', s.id, 'over', (a.stalls[0]?.x ?? s.x) * TILE + 8, (a.stalls[0]?.y ?? s.y) * TILE + 8));
         // ремесленники и служители — если деревня их «выучила»
@@ -1686,6 +1705,28 @@ export class Game {
     }
     // элита: щедрый дроп экипировки
     if (e.elite && this.rand() < 0.45) this.dropRandomGear(e.mapId, e.x, e.y, false, luck + 4);
+    // сюжет Творимира: Сердце горы из груди Каменного короля
+    if (e.kind === 'rockKing' && gainers.some(q => q.story?.smith === 2)) {
+      this.spawnDrop('mountain_heart', 1, e.mapId, e.x, e.y, 300);
+      this.toastAll('⛰ Сердце горы выпало из груди Каменного короля!');
+    }
+    // сюжет Милицы: конвой перебит — Ждан свободен
+    if (e.widowFight && this.world.widowFight) {
+      const wf = this.world.widowFight;
+      if (!wf.ids.some(id => this.entities.has(id))) {
+        const savior = this.players.get(wf.pid);
+        this.world.widowFight = null;
+        if (savior && savior.story?.widow === 3) this.finishWidowGood(savior);
+      }
+    }
+    // узник колодца повержен: трофеи древнего демона
+    if (e.wellDemon) {
+      this.dropRandomGear(e.mapId, e.x, e.y, true, 5);
+      this.spawnDrop('crystal', 4, e.mapId, e.x + 10, e.y, 300);
+      this.spawnDrop('coin', 60, e.mapId, e.x - 10, e.y, 300);
+      this.toastAll('★ Древний демон колодца развеян — трофеи победителю!');
+      this.events.push(this.world.day, 'Узник колодца повержен путниками');
+    }
     // мини-босс данжа: роняет ключ от двери босса
     if (e.dropKey) {
       this.spawnDrop('dungeon_key', 1, e.mapId, e.x, e.y);
@@ -2052,6 +2093,11 @@ export class Game {
     for (const p of this.players.values()) {
       for (const q of p.quests)
         if (q.type === 'clear' && q.poi === poi.id && !q.done) this.completeQuestObjective(p, q);
+      // сюжет Милицы: в разорённом лагере — записка Ждана
+      if (poi.type === 'camp' && p.story?.widow === 1) {
+        p.story.widow = 2;
+        this.toast(p, '🕯 Записка среди хлама: «Ждан. Долговая яма. 150 монет». Он ЖИВ — расскажи Милице!');
+      }
     }
   }
 
@@ -2070,7 +2116,7 @@ export class Game {
     // NPC рядом: приоритет «полезным» ролям над стражей/жителями
     const ROLE_PRIO = {
       elder: 3, merchant: 2, trader: 2, blacksmith: 2, priest: 2, innkeeper: 2, hunter: 2,
-      hermit: 4, wanderer: 4, captain: 4, darkheart: 5, // именные и Сердце — важнее всех
+      hermit: 4, wanderer: 4, captain: 4, mastersmith: 4, widow: 4, darkheart: 5, // именные важнее всех
     };
     let npc = null, bestScore = -Infinity;
     const R2 = 26 * 26; // ближе — иначе NPC перехватывают колодцы и доски
@@ -2144,6 +2190,10 @@ export class Game {
         return;
       }
       if (t === T.WELL) {
+        // заброшенный колодец в глуши: из глубины шепчет голос
+        const ow = this.world.pois.find(o => o.type === 'oldwell'
+          && Math.abs(o.x - (tx + dx)) <= 2 && Math.abs(o.y - (ty + dy)) <= 2);
+        if (ow) { this.openWellDialog(p, ow); return; }
         if (!cdReady('well', 45)) return;
         p.hunger = Math.min(HUNGER_MAX, p.hunger + 8);
         this.toast(p, '💧 Свежая вода: +сытость');
@@ -2552,6 +2602,121 @@ export class Game {
     this.sendDialog(p, npc.id, '🔮 Странница Мирослава', lines, ch);
   }
 
+  // Творимир (кузнец-мастер): материалы -> сердце Каменного короля -> ВЫБОР:
+  // легендарная ковка себе или дар деревне (ковка дешевле всем навсегда).
+  storyDialogSmith(p, npc) {
+    const st = p.story.smith;
+    const ch = [];
+    let lines;
+    if (st === 0) {
+      lines = ['«Творимир я. Всю жизнь куюсь к одному — к Молоту гор.',
+        'Наковальня готова, руки помнят. Нужны материалы:',
+        '8 металла и 2 кристалла. Принесёшь — начнём великое».'];
+      ch.push({ id: 'story:smith_accept', label: '⚒ Помочь мастеру (принести 8 металла и 2 кристалла)' });
+    } else if (st === 1) {
+      if ((p.inventory.metal || 0) >= 8 && (p.inventory.crystal || 0) >= 2) {
+        lines = ['«Металл звенит верно, кристаллы чисты. Отдашь?»'];
+        ch.push({ id: 'story:smith_give', label: '⚒ Отдать материалы (8 металла, 2 кристалла)' });
+      } else {
+        lines = [`«Металла ${p.inventory.metal || 0}/8, кристаллов ${p.inventory.crystal || 0}/2.`,
+          'Металл — в шахтах и скалах, кристаллы — у болот и в жилах данжей».'];
+      }
+    } else if (st === 2) {
+      if ((p.inventory.mountain_heart || 0) >= 1) {
+        lines = ['«Сердце горы! Оно ещё тёплое… Теперь решай:',
+          'выкую Молот гор ТЕБЕ — или перестрою кузню деревни,',
+          'и всякая ковка в Пограничье станет вдвое дешевле».'];
+        ch.push({ id: 'story:smith_hammer', label: '⚒ Молот гор — мне (эпический молот высшей ковки)' });
+        ch.push({ id: 'story:smith_boon', label: '🏘 Дар деревне (ковка и перековка вдвое дешевле для всех)' });
+      } else {
+        lines = ['«Сердцевина. Сердце горы бьётся в груди Каменного короля.',
+          'Его трон — в скалах. Убей его, пока сердце горячо».'];
+        const lair = this.world.pois.find(o => o.name === 'Трон каменного короля');
+        if (lair) this.fx({ t: 'marker', pid: p.id, x: lair.x, y: lair.y }, null);
+      }
+    } else if (st === 10) {
+      lines = ['«Молот гор поёт в твоих руках. Слышишь? Гора помнит»'];
+    } else {
+      lines = ['«Кузня дышит жаром — весь край куёт дешевле. Спасибо, друг»'];
+    }
+    ch.push({ id: 'close', label: STR.bye });
+    this.sendDialog(p, npc.id, '⚒ Кузнец-мастер Творимир', lines, ch);
+  }
+
+  // Милица (вдова караванщика): найти следы -> ВЫБОР: выкуп / отбить / солгать.
+  storyDialogWidow(p, npc) {
+    const st = p.story.widow;
+    const ch = [];
+    let lines;
+    if (st === 0) {
+      lines = ['«Милица я… Муж мой Ждан с обозом ушёл на юг — и сгинул.',
+        'Стража руками разводит. Разбойники что-то знают, чую.',
+        'Разори их лагерь — вдруг найдёшь хоть весточку».'];
+      ch.push({ id: 'story:widow_accept', label: '🕯 Найти Ждана (разорить лагерь разбойников)' });
+    } else if (st === 1) {
+      lines = ['«Нашёл что-нибудь? Лагеря их — в глуши, у дорог…»'];
+      const camp = this.world.pois.find(o => o.type === 'camp' && !o.cleared);
+      if (camp) this.fx({ t: 'marker', pid: p.id, x: camp.x, y: camp.y }, null);
+    } else if (st === 2) {
+      lines = ['«Записка?! Жив! У бандитов в долговой яме — 150 монет долга…',
+        'Выкупить нечем, у меня и медяка не осталось. Что же делать?»'];
+      ch.push({ id: 'story:widow_pay', label: '🕯 Выкупить Ждана (150 мон.)' });
+      ch.push({ id: 'story:widow_fight', label: '⚔ Отбить силой (бандиты приведут его — и клинки)' });
+      ch.push({ id: 'story:widow_lie', label: '🏴 Солгать: «он мёртв» (забрать наследство 120 мон., розыск)' });
+    } else if (st === 3) {
+      lines = ['«Бандиты уже здесь?! Спаси его — перебей конвой!»'];
+    } else if (st === 10) {
+      lines = ['«Ждан дома! Отныне в нашей таверне тебе всегда постелено —',
+        'отдых для тебя бесплатный. Вечно буду молиться за тебя»'];
+    } else {
+      lines = ['Она смотрит сквозь тебя пустыми глазами. «Мёртв… значит, мёртв».'];
+    }
+    ch.push({ id: 'close', label: STR.bye });
+    this.sendDialog(p, npc.id, '🕯 Вдова Милица', lines, ch);
+  }
+
+  // Голос из колодца: подношения -> ВЫБОР: освободить (бой) или запечатать (дар).
+  openWellDialog(p, poi) {
+    const st = p.story.well;
+    const ch = [];
+    let lines;
+    if (st === 0) {
+      lines = ['Из чёрной глубины поднимается шёпот:',
+        '«Голоден… столетия голоден… брось хлеба, путник…»'];
+      if ((p.inventory.bread || 0) >= 2) ch.push({ id: 'story:well_feed', label: '🍞 Бросить 2 хлеба в колодец' });
+      else lines.push('(нужно 2 хлеба)');
+    } else if (st === 1) {
+      lines = ['Голос окреп: «Тепло… я вспоминаю себя…',
+        'Меня сковали кристаллами. Принеси три — и я покажу, кто я…»'];
+      if ((p.inventory.crystal || 0) >= 3) ch.push({ id: 'story:well_crystals', label: '💎 Опустить 3 кристалла' });
+      else lines.push('(нужно 3 кристалла)');
+    } else if (st === 2) {
+      lines = ['Вода кипит. Голос гремит: «ПОСЛЕДНЯЯ ЦЕПЬ! Разбей её — и я свободен!',
+        'Или залей металлом горло колодца — и я останусь тут навеки…',
+        'Но тогда прими мой дар, тюремщик».'];
+      ch.push({ id: 'story:well_free', label: '⛧ Освободить узника (бой с древним демоном, богатый трофей)' });
+      if ((p.inventory.metal || 0) >= 5) ch.push({ id: 'story:well_seal', label: '🔒 Запечатать навеки (5 металла; постоянный дар: +1 ИНТ, +1 УДЧ)' });
+      else ch.push({ id: 'close2', label: '🔒 Запечатать (нужно 5 металла)' });
+    } else if (st === 10) {
+      lines = ['Колодец молчит. На дне блестит выжженный круг.'];
+    } else {
+      lines = ['Металл запечатал глубину. Тёплое благословение гладит тебя по плечу.'];
+    }
+    ch.push({ id: 'close', label: 'Отойти от колодца' });
+    this.sendDialog(p, 'well:' + poi.id, '🕳 Голос из колодца', lines, ch);
+  }
+
+  // Добрый финал Милицы: Ждан дома, отдых в таверне навсегда бесплатный
+  finishWidowGood(p) {
+    p.story.widow = 10;
+    p.story.innFree = true;
+    const s0 = this.world.settlements[0];
+    if (s0) p.rep[s0.faction] = Math.min(100, (p.rep[s0.faction] || 0) + 15);
+    this.addXp(p, 80);
+    this.toast(p, '🕯✓ Ждан вернулся домой! Отдых в таверне для тебя теперь бесплатный');
+    this.toastAll(`🕯 ${p.name} вернул вдове Милице её мужа!`);
+  }
+
   // Развилки сюжета: выборы игрока, меняющие мир
   storyChoice(p, key, dialogId) {
     const S = p.story;
@@ -2652,6 +2817,125 @@ export class Game {
         this.toast(p, '🏆 +250 мон. и Колода фортуны [Эпическое]. Вольница считает тебя своим');
         this.toastAll('🪙 Главарь Вольницы откупился и вышел на свободу…');
         this.events.push(this.world.day, `${p.name} отпустил главаря Вольницы за выкуп — банды множатся`);
+        break;
+      }
+      // ═══ Творимир ═══
+      case 'smith_accept':
+        if (S.smith === 0) { S.smith = 1; this.toast(p, '⚒ Творимир: принеси 8 металла и 2 кристалла'); }
+        break;
+      case 'smith_give':
+        if (S.smith === 1 && (p.inventory.metal || 0) >= 8 && (p.inventory.crystal || 0) >= 2) {
+          p.inventory.metal -= 8;
+          p.inventory.crystal -= 2;
+          S.smith = 2;
+          this.addXp(p, 50);
+          this.toast(p, '⚒ Теперь — Сердце горы: срази Каменного короля (метка на карте)');
+          const lair = this.world.pois.find(o => o.name === 'Трон каменного короля');
+          if (lair) this.fx({ t: 'marker', pid: p.id, x: lair.x, y: lair.y }, null);
+        }
+        break;
+      case 'smith_hammer': { // Молот гор себе: эпик высшей ковки
+        if (S.smith !== 2 || (p.inventory.mountain_heart || 0) < 1) break;
+        p.inventory.mountain_heart--;
+        S.smith = 10;
+        p.inventory['weapon:warhammer@e'] = (p.inventory['weapon:warhammer@e'] || 0) + 1;
+        p.weaponUp = p.weaponUp || {};
+        p.weaponUp['warhammer@e'] = 3; // выкован сразу до предела
+        this.addXp(p, 120);
+        this.toast(p, '🏆 МОЛОТ ГОР: эпический молот высшей ковки (+30% урона) — твой');
+        this.events.push(this.world.day, `Творимир выковал Молот гор для ${p.name}`);
+        break;
+      }
+      case 'smith_boon': { // дар деревне: ковка дешевле всем и навсегда
+        if (S.smith !== 2 || (p.inventory.mountain_heart || 0) < 1) break;
+        p.inventory.mountain_heart--;
+        S.smith = 11;
+        this.world.smithBoon = true;
+        const s1 = this.world.settlements[1];
+        if (s1) p.rep[s1.faction] = Math.min(100, (p.rep[s1.faction] || 0) + 25);
+        this.addXp(p, 150);
+        this.toast(p, '🏘 Кузня перестроена! Вся ковка и перековка Пограничья — вдвое дешевле');
+        this.toastAll('⚒ Сердце горы бьётся в кузне: ковка вдвое дешевле для всех!');
+        this.events.push(this.world.day, `${p.name} отдал Сердце горы кузне — ремесло расцвело`);
+        break;
+      }
+      // ═══ Милица ═══
+      case 'widow_accept':
+        if (S.widow === 0) { S.widow = 1; this.toast(p, '🕯 Разори лагерь разбойников и ищи следы Ждана'); }
+        break;
+      case 'widow_pay': { // выкуп
+        if (S.widow !== 2) break;
+        if (p.coins < 150) { this.toast(p, STR.notEnoughCoins); return; }
+        p.coins -= 150;
+        this.finishWidowGood(p);
+        this.events.push(this.world.day, `${p.name} выкупил Ждана из долговой ямы`);
+        break;
+      }
+      case 'widow_fight': { // отбить силой: конвой приводит Ждана
+        if (S.widow !== 2) break;
+        S.widow = 3;
+        const s0 = this.world.settlements[0];
+        this.world.widowFight = { pid: p.id, ids: [] };
+        for (let i = 0; i < 4; i++) {
+          const a = i / 4 * Math.PI * 2;
+          const id = this.spawnEnemy(i === 0 ? 'banditHeavy' : 'bandit', 'over',
+            (s0.x + 20) * TILE + Math.cos(a) * 50, (s0.y + 14) * TILE + Math.sin(a) * 50,
+            { faction: 'bandits', forceElite: true, widowFight: true });
+          const b = this.entities.get(id);
+          if (b) { b.aggro = true; this.world.widowFight.ids.push(id); }
+        }
+        this.toast(p, '⚔ Конвой с Жданом у восточной окраины — перебей бандитов!');
+        this.fx({ t: 'marker', pid: p.id, x: s0.x + 20, y: s0.y + 14 }, null);
+        break;
+      }
+      case 'widow_lie': { // тёмный путь: наследство и грязная совесть
+        if (S.widow !== 2) break;
+        S.widow = 11;
+        p.coins += 120;
+        const s0 = this.world.settlements[0];
+        if (s0) p.rep[s0.faction] = Math.max(-100, (p.rep[s0.faction] || 0) - 10);
+        this.addBounty(p, 20, 'обман вдовы');
+        this.toast(p, '🏴 +120 монет «наследства». Ждан сгниёт в яме. Ты уверен, что оно того стоило?');
+        this.events.push(this.world.day, `${p.name} сказал вдове, что Ждан мёртв…`);
+        break;
+      }
+      // ═══ Голос из колодца ═══
+      case 'well_feed':
+        if (S.well === 0 && (p.inventory.bread || 0) >= 2) {
+          p.inventory.bread -= 2;
+          S.well = 1;
+          this.toast(p, '🕳 Хлеб канул во тьму. Голос стал крепче…');
+        }
+        break;
+      case 'well_crystals':
+        if (S.well === 1 && (p.inventory.crystal || 0) >= 3) {
+          p.inventory.crystal -= 3;
+          S.well = 2;
+          this.toast(p, '🕳 Вода вскипела. Древняя сила рвётся наружу!');
+        }
+        break;
+      case 'well_free': { // освободить: древний демон вырывается — бой!
+        if (S.well !== 2) break;
+        S.well = 10;
+        const poi = this.world.pois.find(o => o.type === 'oldwell');
+        const wx = (poi?.x ?? Math.round(p.x / TILE)) * TILE, wy = (poi?.y ?? Math.round(p.y / TILE)) * TILE;
+        const id = this.spawnEnemy('demon', 'over', wx, wy - 20, { forceElite: true, wellDemon: true, noElite: false });
+        const d = this.entities.get(id);
+        if (d) { d.hp = d.maxHp = 80; d.aggro = true; }
+        this.fx({ t: 'boom', x: wx, y: wy, r: 30 }, 'over', wx, wy);
+        this.toastAll('⛧ Из заброшенного колодца вырвался древний демон!');
+        this.events.push(this.world.day, `${p.name} освободил узника колодца`);
+        break;
+      }
+      case 'well_seal': { // запечатать: постоянный дар духа
+        if (S.well !== 2 || (p.inventory.metal || 0) < 5) break;
+        p.inventory.metal -= 5;
+        S.well = 11;
+        S.wellBlessed = true;
+        this.recomputeStats(p);
+        this.addXp(p, 100);
+        this.toast(p, '🔒✨ Колодец запечатан. Дар узника: +1 ИНТ и +1 УДЧ навсегда');
+        this.events.push(this.world.day, `${p.name} навеки запечатал Голос из колодца`);
         break;
       }
       case 'mira_accept':
@@ -2828,6 +3112,8 @@ export class Game {
     if (npc.role === 'hermit') { this.storyDialogHermit(p, npc); return; }
     if (npc.role === 'captain') { this.storyDialogCaptain(p, npc); return; }
     if (npc.role === 'wanderer') { this.storyDialogWanderer(p, npc); return; }
+    if (npc.role === 'mastersmith') { this.storyDialogSmith(p, npc); return; }
+    if (npc.role === 'widow') { this.storyDialogWidow(p, npc); return; }
     if (npc.role === 'darkheart') {
       const ch = this.world.war?.stage === 4
         ? [{ id: 'war_destroy', label: '☀ Уничтожить Сердце (Тьма падёт навсегда, слава героям)' },
@@ -2924,7 +3210,8 @@ export class Game {
       const choices = [];
       if (lvl >= 3) lines.push(`${w.name} +${lvl} — лучше уже не выковать.`);
       else {
-        const costM = 3 * (lvl + 1), costC = 30 * (lvl + 1);
+        const boon = this.world.smithBoon ? 0.5 : 1;
+        const costM = Math.max(1, Math.ceil(3 * (lvl + 1) * boon)), costC = Math.ceil(30 * (lvl + 1) * boon);
         lines.push(`${w.name}${lvl ? ' +' + lvl : ''} → +${(lvl + 1) * 10}% урона`);
         choices.push({ id: 'forge', label: `Улучшить оружие в руках (${costM} металла, ${costC} мон.)` });
       }
@@ -3038,8 +3325,13 @@ export class Game {
   // стоимость перековки: c->r и r->e; кольца/аксессуары платят кристаллами
   smithUpCost(it) {
     const jewelry = it.slot === 'acc' || it.slot === 'ring'; // украшения зачаровываются кристаллами
-    if (it.rarity === 'c') return jewelry ? { crystal: 3, coins: 50 } : { metal: 4, coins: 50 };
-    return jewelry ? { crystal: 7, coins: 150 } : { metal: 10, crystal: 2, coins: 150 };
+    let cost;
+    if (it.rarity === 'c') cost = jewelry ? { crystal: 3, coins: 50 } : { metal: 4, coins: 50 };
+    else cost = jewelry ? { crystal: 7, coins: 150 } : { metal: 10, crystal: 2, coins: 150 };
+    // дар Творимира: Сердце горы в кузне — всё вдвое дешевле
+    if (this.world.smithBoon)
+      cost = Object.fromEntries(Object.entries(cost).map(([k, v]) => [k, Math.max(1, Math.ceil(v / 2))]));
+    return cost;
   }
 
   openSmithUpgrade(p, npcId) {
@@ -3297,7 +3589,8 @@ export class Game {
       p.weaponUp = p.weaponUp || {};
       const lvl = p.weaponUp[w.id] || 0;
       if (!npc || lvl >= 3) return;
-      const costM = 3 * (lvl + 1), costC = 30 * (lvl + 1);
+      const boon = this.world.smithBoon ? 0.5 : 1;
+      const costM = Math.max(1, Math.ceil(3 * (lvl + 1) * boon)), costC = Math.ceil(30 * (lvl + 1) * boon);
       if ((p.inventory.metal || 0) < costM || p.coins < costC) {
         this.toast(p, `Нужно: ${costM} металла и ${costC} мон.`);
         return;
@@ -3326,12 +3619,14 @@ export class Game {
       return;
     }
     if (choice === 'rest') {
-      if (p.coins < 15) { this.toast(p, STR.notEnoughCoins); return; }
-      p.coins -= 15;
+      // благодарность Милицы: отдых бесплатный навсегда
+      const cost = p.story?.innFree ? 0 : 15;
+      if (p.coins < cost) { this.toast(p, STR.notEnoughCoins); return; }
+      p.coins -= cost;
       p.hp = p.maxHp;
       p.hunger = HUNGER_MAX;
       this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
-      this.toast(p, '☘ Выспался и наелся — как новенький');
+      this.toast(p, cost === 0 ? '☘ «Для спасителя Ждана — всё бесплатно!» Как новенький' : '☘ Выспался и наелся — как новенький');
       return;
     }
     if (choice === 'hire') {

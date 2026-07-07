@@ -358,6 +358,9 @@
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/gateways/stone_stairs_down.png",
       "down": 2
     },
+    "item_mountain_heart": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_stone.png"
+    },
     "item_key": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/UNUSED/other/key.png"
     },

@@ -47,6 +47,7 @@ export function saveWorld(game) {
         bounty: p.bounty || 0, contract: p.contract || null,
       })),
       banditsWeakT: w.banditsWeakT || 0,
+      smithBoon: w.smithBoon || false,
     };
     writeFileSync(FILE, JSON.stringify(data));
   } catch (e) { console.warn('[save] не удалось сохранить:', e.message); }
@@ -84,6 +85,7 @@ export function loadWorld(game) {
       w.citadel.owned = data.citadel.owned || false;
     }
     if (data.banditsWeakT) w.banditsWeakT = data.banditsWeakT;
+    if (data.smithBoon) w.smithBoon = true;
     if (data.wildChests) for (const rec of data.wildChests) {
       const c = w.wildChests?.find(x => x.x === rec.x && x.y === rec.y);
       if (c) c.opened = rec.opened;

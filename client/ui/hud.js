@@ -15,6 +15,12 @@ export class Hud {
     ctx.font = '8px monospace';
     ctx.textBaseline = 'top';
 
+    // подложка статов: полупрозрачная панель для читаемости
+    ctx.fillStyle = 'rgba(14,12,20,.55)';
+    ctx.fillRect(2, 2, 76, 30);
+    ctx.strokeStyle = 'rgba(217,160,102,.35)';
+    ctx.strokeRect(2.5, 2.5, 75, 29);
+
     // сердца
     for (let i = 0; i < Math.ceil(you.hm / 2); i++) {
       const v = you.hp - i * 2;
@@ -58,6 +64,10 @@ export class Hud {
     const w = getWeapon(you.w);
     if (w) {
       const gx = VIEW_W - 78, gy = VIEW_H - 26;
+      ctx.fillStyle = 'rgba(14,12,20,.55)';
+      ctx.fillRect(gx - 6, gy - 4, 82, 30);
+      ctx.strokeStyle = 'rgba(217,160,102,.35)';
+      ctx.strokeRect(gx - 5.5, gy - 3.5, 81, 29);
       const ws = this.atlas.map[w.sprite];
       this.atlas.draw(ctx, w.sprite, gx, gy + 6, { scale: ws && ws.w > 20 ? 0.5 : 1 });
       ctx.fillStyle = '#eee';

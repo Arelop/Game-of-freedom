@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>Пограничье — кооп-шутер</title>
+<title>Пограничье — кооп action RPG</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -10,7 +10,12 @@
   body { font-family: 'Courier New', monospace; color: #eee; }
   #game { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
   canvas#screen { image-rendering: pixelated; image-rendering: crisp-edges; cursor: none; }
-  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; background: rgba(10,8,16,.88); z-index: 10; }
+  /* фэнтези-рамки Kenney (CC0): 9-slice для всех панелей игры */
+  .fpanel { border: 12px solid transparent; border-image: url('/assets/ui/panel-gold.png') 16 round; background-clip: padding-box; }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; background: radial-gradient(ellipse at 50% 30%, #241f30 0%, #0e0c16 70%); z-index: 10; overflow: hidden; }
+  .overlay::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(1px 1px at 15% 25%, #fbf23644 50%, transparent 51%), radial-gradient(1px 1px at 75% 15%, #639bff44 50%, transparent 51%), radial-gradient(2px 2px at 45% 65%, #d9a06633 50%, transparent 51%), radial-gradient(1px 1px at 85% 75%, #fbf23633 50%, transparent 51%), radial-gradient(1px 1px at 30% 85%, #b06ee133 50%, transparent 51%); background-size: 240px 240px; animation: drift 60s linear infinite; pointer-events: none; }
+  @keyframes drift { from { background-position: 0 0; } to { background-position: 240px 480px; } }
+  .menubox { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 26px 40px; border: 14px solid transparent; border-image: url('/assets/ui/panel-gold.png') 16 round; background: rgba(20,17,28,.75); background-clip: padding-box; position: relative; }
   .overlay h1 { font-size: 42px; letter-spacing: 8px; color: #d9a066; text-shadow: 3px 3px 0 #3f2827; }
   .overlay .sub { color: #847e87; margin-bottom: 12px; }
   .overlay input { background: #222034; color: #eee; border: 2px solid #5b6ee1; padding: 10px 14px; font-family: inherit; font-size: 18px; text-align: center; outline: none; }
@@ -20,12 +25,15 @@
   #toasts { position: absolute; top: 14%; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; z-index: 5; }
   .toast { background: rgba(34,32,52,.92); border: 1px solid #5b6ee1; padding: 5px 14px; font-size: 14px; animation: fadeout 4s forwards; }
   @keyframes fadeout { 0%{opacity:0; transform:translateY(-6px)} 8%{opacity:1; transform:none} 80%{opacity:1} 100%{opacity:0} }
-  #dialog { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); min-width: 340px; max-width: 560px; background: rgba(20,18,26,.95); border: 2px solid #d9a066; padding: 12px 16px; z-index: 6; display: none; }
-  #dialog .dname { color: #d9a066; font-weight: bold; margin-bottom: 6px; }
+  #dialog { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); min-width: 340px; max-width: 560px; background: rgba(18,15,24,.96); border: 12px solid transparent; border-image: url(/assets/ui/panel-gold.png) 16 round; background-clip: padding-box; padding: 12px 16px; z-index: 6; display: none; }
+  #dialog .dhead { display: flex; gap: 10px; align-items: flex-start; }
+  #dialog .dportrait { image-rendering: pixelated; border: 2px solid #d9a066; background: radial-gradient(circle at 50% 40%, #2c2438, #16121f); flex-shrink: 0; }
+  #dialog .dnamebox { flex: 1; min-width: 0; }
+  #dialog .dname { color: #d9a066; font-weight: bold; margin-bottom: 6px; font-size: 15px; border-bottom: 1px solid #3f2c14; padding-bottom: 3px; }
   #dialog .dline { margin: 3px 0; font-size: 14px; line-height: 1.45; }
   #dialog .dchoice { display: block; width: 100%; text-align: left; background: #222034; color: #99e550; border: 1px solid #45444f; margin-top: 6px; padding: 6px 10px; font-family: inherit; font-size: 14px; cursor: pointer; }
   #dialog .dchoice:hover { background: #30303f; }
-  #inv { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 384px; max-height: 88vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 2px solid #5b6ee1; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 12px 16px; z-index: 6; display: none; }
+  #inv { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 384px; max-height: 88vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 12px solid transparent; border-image: url(/assets/ui/panel-blue.png) 16 round; background-clip: padding-box; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 10px 12px; z-index: 6; display: none; }
   #inv .sellbanner { background: #3f2c14; border: 1px solid #d9a066; color: #fbf236; font-size: 12px; padding: 6px 8px; margin-bottom: 4px; }
   #inv .eqslot.wslot.active { border-color: #fbf236; border-width: 2px; }
   #inv .eqslot .slotnum { position: absolute; left: 2px; top: 1px; font-size: 9px; color: #639bff; }
@@ -70,7 +78,7 @@
   .clscard.selected { border-color: #d9a066; background: #241f30; }
   .clscard .clsname { color: #d9a066; font-size: 16px; margin-bottom: 6px; }
   .clscard .clsdesc { color: #847e87; font-size: 11px; line-height: 1.4; }
-  #char { position: absolute; left: 12px; top: 60px; width: 300px; max-height: 82vh; overflow-y: auto; background: rgba(20,18,26,.96); border: 2px solid #d9a066; padding: 10px 14px; z-index: 6; display: none; }
+  #char { position: absolute; left: 12px; top: 60px; width: 300px; max-height: 82vh; overflow-y: auto; background: rgba(18,15,24,.96); border: 12px solid transparent; border-image: url(/assets/ui/panel-gold.png) 16 round; background-clip: padding-box; padding: 10px 14px; z-index: 6; display: none; }
   #char h3 { color: #d9a066; margin: 8px 0 6px; font-size: 14px; }
   #char .xpbar { height: 8px; background: #222034; border: 1px solid #45444f; margin: 4px 0 8px; }
   #char .xpfill { height: 100%; background: #99e550; }
@@ -96,7 +104,7 @@
   #char .specdesc { color: #696a6a; font-size: 10px; margin: 2px 0 4px; }
   #char .talent.partial { border-color: #d9a066; }
   #char .trank { font-size: 11px; }
-  #shop { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 460px; max-height: 86vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 2px solid #d9a066; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 12px 16px; z-index: 7; display: none; font-family: 'Courier New', monospace; color: #eee; }
+  #shop { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 460px; max-height: 86vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 12px solid transparent; border-image: url(/assets/ui/panel-gold.png) 16 round; background-clip: padding-box; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 10px 12px; z-index: 7; display: none; font-family: 'Courier New', monospace; color: #eee; }
   #shop .shophead { display: flex; justify-content: space-between; font-size: 16px; color: #d9a066; margin-bottom: 4px; }
   #shop .shopcoins { color: #fbf236; }
   #shop .shopgreet { font-size: 12px; color: #847e87; margin-bottom: 6px; }
@@ -112,7 +120,7 @@
   #shop .shopbtns { display: flex; gap: 8px; margin-top: 12px; }
   #shop .shopbtns button { flex: 1; background: #222034; color: #99e550; border: 1px solid #45444f; padding: 8px; font-family: inherit; font-size: 13px; cursor: pointer; }
   #shop .shopbtns button:hover { background: #30303f; }
-  #bestiary { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 430px; max-height: 86vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 2px solid #d9574a; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 12px 16px; z-index: 7; display: none; font-family: 'Courier New', monospace; color: #eee; }
+  #bestiary { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 430px; max-height: 86vh; overflow-y: auto; background: rgba(18,15,24,.96); border: 12px solid transparent; border-image: url(/assets/ui/panel-red.png) 16 round; background-clip: padding-box; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 10px 12px; z-index: 7; display: none; font-family: 'Courier New', monospace; color: #eee; }
   #bestiary h3 { color: #d9574a; font-size: 15px; margin-bottom: 4px; }
   #bestiary .becount { color: #847e87; font-size: 11px; float: right; }
   #bestiary .behint { color: #696a6a; font-size: 10px; margin-bottom: 8px; }
@@ -124,7 +132,7 @@
   #bestiary .bekills { color: #847e87; font-size: 10px; }
   #bestiary .bestats { color: #99e550; font-size: 11px; }
   #bestiary .behab { color: #847e87; font-size: 10px; font-style: italic; }
-  #journal { position: absolute; left: 12px; top: 60px; width: 330px; max-height: 70vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 2px solid #fbf236; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 12px 14px; z-index: 6; display: none; font-family: 'Courier New', monospace; color: #eee; }
+  #journal { position: absolute; left: 12px; top: 60px; width: 330px; max-height: 70vh; overflow-y: auto; background: rgba(18,15,24,.96); border: 12px solid transparent; border-image: url(/assets/ui/panel-gold.png) 16 round; background-clip: padding-box; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 12px 14px; z-index: 6; display: none; font-family: 'Courier New', monospace; color: #eee; }
   #journal h3 { color: #fbf236; margin-bottom: 8px; font-size: 14px; }
   #journal .jrquest { border: 1px solid #45444f; border-left: 3px solid #fbf236; padding: 7px 9px; margin-bottom: 7px; }
   #journal .jrquest.done { border-left-color: #99e550; }
@@ -132,7 +140,7 @@
   #journal .jrquest.done .jrtitle { color: #99e550; }
   #journal .jrstate { font-size: 11px; color: #847e87; margin-top: 3px; }
   #journal .jrempty { font-size: 11px; color: #696a6a; padding: 3px 0; }
-  #stash { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 440px; max-height: 84vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 2px solid #d9a066; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 12px 16px; z-index: 7; display: none; font-family: 'Courier New', monospace; color: #eee; }
+  #stash { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 440px; max-height: 84vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 12px solid transparent; border-image: url(/assets/ui/panel-gold.png) 16 round; background-clip: padding-box; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 10px 12px; z-index: 7; display: none; font-family: 'Courier New', monospace; color: #eee; }
   #stash .shophead { display: flex; justify-content: space-between; font-size: 16px; color: #d9a066; margin-bottom: 4px; }
   #stash .shopgreet { color: #847e87; font-size: 11px; }
   #stash h3 { color: #639bff; margin: 10px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #2c2a38; padding-bottom: 3px; }
@@ -145,7 +153,7 @@
   #stash .shopbtns button { flex: 1; background: #222034; color: #99e550; border: 1px solid #45444f; padding: 8px; font-family: inherit; font-size: 13px; cursor: pointer; }
   #inv .givebtn { width: 100%; background: #222034; color: #639bff; border: 1px solid #45444f; padding: 6px; font-family: inherit; font-size: 12px; cursor: pointer; margin-bottom: 6px; }
   #inv .givebtn:hover { background: #30303f; }
-  #factions { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 380px; max-height: 84vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 2px solid #99e550; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 12px 16px; z-index: 6; display: none; font-family: 'Courier New', monospace; color: #eee; }
+  #factions { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 380px; max-height: 84vh; overflow-y: auto; background: linear-gradient(160deg, rgba(26,22,38,.97), rgba(16,14,24,.97)); border: 12px solid transparent; border-image: url(/assets/ui/panel-green.png) 16 round; background-clip: padding-box; box-shadow: 0 6px 24px rgba(0,0,0,.55); padding: 10px 12px; z-index: 6; display: none; font-family: 'Courier New', monospace; color: #eee; }
   #factions h3 { color: #99e550; margin-bottom: 8px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px; }
   #factions .facblock.dark { border-color: #7b2fbe; background: rgba(40,16,60,.25); }
   #factions .facblock.dark .facname { color: #b57edc; }
@@ -167,27 +175,29 @@
 <div id="char"></div>
 <div id="help"></div>
 <div class="overlay" id="menu">
-  <h1>ПОГРАНИЧЬЕ</h1>
-  <div class="sub">кооп-шутер в живом открытом мире</div>
-  <input id="nameInput" maxlength="16" placeholder="Имя героя" value="">
-  <div id="classPick">
-    <div class="clscard selected" data-cls="warrior">
-      <div class="clsname">⚔ Воин</div>
-      <div class="clsdesc">Меч и упрямство. +1 сердце, силён в ближнем бою.</div>
+  <div class="menubox">
+    <h1>ПОГРАНИЧЬЕ</h1>
+    <div class="sub">кооперативная action RPG в живом открытом мире</div>
+    <input id="nameInput" maxlength="16" placeholder="Имя героя" value="">
+    <div id="classPick">
+      <div class="clscard selected" data-cls="warrior">
+        <div class="clsname">⚔ Воин</div>
+        <div class="clsdesc">Меч и упрямство. +1 сердце, силён в ближнем бою.</div>
+      </div>
+      <div class="clscard" data-cls="mage">
+        <div class="clsname">✦ Маг</div>
+        <div class="clsdesc">Посох огня и мана. Хрупок, но испепеляет издалека.</div>
+      </div>
+      <div class="clscard" data-cls="rogue">
+        <div class="clsname">🗡 Вор</div>
+        <div class="clsdesc">Лук и ножи. Быстрый, меткий, удачливый.</div>
+      </div>
     </div>
-    <div class="clscard" data-cls="mage">
-      <div class="clsname">✦ Маг</div>
-      <div class="clsdesc">Посох огня и мана. Хрупок, но испепеляет издалека.</div>
-    </div>
-    <div class="clscard" data-cls="rogue">
-      <div class="clsname">🗡 Вор</div>
-      <div class="clsdesc">Лук и ножи. Быстрый, меткий, удачливый.</div>
-    </div>
+    <button id="joinBtn">В игру</button>
   </div>
-  <button id="joinBtn">В игру</button>
-  <div class="hint" id="menuHint">WASD — движение · ЛКМ — атака · ПКМ — блок щитом · Пробел — перекат ·
+  <div class="hint" id="menuHint">WASD — движение · ЛКМ — атака · ПКМ — предмет левой руки · Пробел — перекат ·
     Q/X/R — способности · E — действие · T — перезарядка · 1-4 — оружие · Tab — инвентарь ·
-    C — персонаж · J — журнал · B — бестиарий · P — дипломатия · M — карта · F3 — отладка<br>
+    C — персонаж · J — журнал · B — бестиарий · P — дипломатия · M — карта · N — музыка<br>
     ⚠ Дружественный огонь включён — не стой на линии выстрела!<br><br>
     Для кооп-игры друг открывает этот же адрес в своём браузере.</div>
 </div>

@@ -153,6 +153,7 @@ export function makeWorld(seed) {
     { type: 'obelisk', name: 'Древний обелиск', n: 2 },
     { type: 'spring', name: 'Целебный источник', n: 2 },
     { type: 'barrow', name: 'Древний курган', n: 2 },
+    { type: 'oldwell', name: 'Заброшенный колодец', n: 1 },
   ];
   let si = 0;
   for (const spec of SPECIALS) {
@@ -292,6 +293,11 @@ function stampSpecial(world, poi, rand) {
     set(2, -2, T.PILLAR);
     set(-2, 2, T.PILLAR);
     set(2, 2, T.PILLAR);
+  } else if (type === 'oldwell') {
+    // забытый колодец: из глубины шепчет голос
+    set(0, 0, T.WELL);
+    set(1, 1, T.BLOOD); set(-1, -1, T.BLOOD);
+    set(2, 0, T.BUSH); set(-2, 1, T.BUSH); set(0, -2, T.RUBBLE);
   } else if (type === 'barrow') {
     // курган: кольцо валунов, 4 статуи по сторонам света, сундук в центре
     for (let a = 0; a < 10; a++) {

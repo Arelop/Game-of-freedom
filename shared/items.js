@@ -228,6 +228,10 @@ export const ITEMS = {
     stats: { lck: 2 }, price: 105, icon: 'item_ring_fortune',
   },
 
+  mountain_heart: {
+    id: 'mountain_heart', name: 'Сердце горы',
+    price: 250, icon: 'item_mountain_heart', // бьётся в груди Каменного короля
+  },
   dungeon_key: {
     id: 'dungeon_key', name: 'Ключ подземелья',
     price: 40, icon: 'item_key', // отпирает дверь босса; падает с мини-босса

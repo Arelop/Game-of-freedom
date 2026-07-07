@@ -106,14 +106,35 @@ export class Panels {
   showDialog(m) {
     const d = this.dialogEl;
     d.innerHTML = '';
+    // портрет собеседника: спрайт NPC крупно в рамке (если сущность рядом)
+    const ent = this.net.remotes?.get(m.id);
+    const spr = ent?.data?.k;
+    const head = document.createElement('div');
+    head.className = 'dhead';
+    if (spr && this.atlas.map[spr]) {
+      const port = document.createElement('canvas');
+      port.width = 72; port.height = 72;
+      port.className = 'dportrait';
+      const c = port.getContext('2d');
+      c.imageSmoothingEnabled = false;
+      const s = this.atlas.map[spr];
+      const k = Math.min(64 / s.w, 64 / s.h);
+      const w = Math.round(s.w * k), h = Math.round(s.h * k);
+      c.drawImage(this.atlas.img, s.x, s.y, s.w, s.h, (72 - w) >> 1, (72 - h) >> 1, w, h);
+      head.appendChild(port);
+    }
+    const nameBox = document.createElement('div');
+    nameBox.className = 'dnamebox';
     const name = document.createElement('div');
     name.className = 'dname'; name.textContent = m.name;
-    d.appendChild(name);
+    nameBox.appendChild(name);
     for (const line of m.lines) {
       const el = document.createElement('div');
       el.className = 'dline'; el.textContent = line;
-      d.appendChild(el);
+      nameBox.appendChild(el);
     }
+    head.appendChild(nameBox);
+    d.appendChild(head);
     for (const ch of m.choices) {
       const b = document.createElement('button');
       b.className = 'dchoice'; b.textContent = ch.label;
