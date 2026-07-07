@@ -977,10 +977,15 @@ function renderBigMap() {
   const py = wy => y0 + (wy - vT) * k;
   const seen = (x, y) => x > x0 - 4 && x < x0 + S + 4 && y > y0 - 4 && y < y0 + S + 4;
 
-  ctx.fillStyle = 'rgba(14,12,20,.93)';
-  ctx.fillRect(x0 - 6, y0 - 18, S + 12, S + 24);
+  // фон: карта + панель легенды слева единым полотном
+  const LW = 108; // ширина легенды
+  const panelX = x0 - LW - 10;
+  ctx.fillStyle = 'rgba(14,12,20,.95)';
+  ctx.fillRect(panelX - 6, y0 - 18, LW + S + 24, S + 24);
   ctx.strokeStyle = dim === 'ash' ? '#df7126' : '#5b6ee1';
-  ctx.strokeRect(x0 - 5.5, y0 - 5.5, S + 11, S + 11);
+  ctx.strokeRect(panelX - 5.5, y0 - 17.5, LW + S + 23, S + 23);
+  ctx.strokeStyle = '#2c2a38';
+  ctx.strokeRect(x0 - 2.5, y0 - 0.5, S + 4, S + 1); // внутренняя рамка самой карты
   // вкладки измерений
   ctx.font = '8px monospace';
   ctx.textAlign = 'left';
@@ -989,9 +994,45 @@ function renderBigMap() {
   if (net.mapInfo.ash) {
     ctx.fillStyle = dim === 'ash' ? '#df7126' : '#696a6a';
     ctx.fillText('◈ Выжженные земли', x0 + 70, y0 - 9);
-    ctx.fillStyle = '#696a6a';
-    ctx.fillText('Tab · колесо · ЛКМ', x0 + S - 88, y0 - 9);
   }
+
+  // ---- легенда слева: шапка, обстановка, знаки, управление ----
+  let ly = y0 + 2;
+  const line = (text, color = '#b8b8b8') => { ctx.fillStyle = color; ctx.fillText(text, panelX + 12, ly); ly += 10; };
+  const key = (color, text) => {
+    ctx.fillStyle = color; ctx.fillRect(panelX + 2, ly - 5, 5, 5);
+    ctx.fillStyle = '#b8b8b8'; ctx.fillText(text, panelX + 12, ly); ly += 10;
+  };
+  ctx.fillStyle = dim === 'ash' ? '#df7126' : '#fbf236';
+  ctx.fillText(dim === 'ash' ? 'ВЫЖЖЕННЫЕ ЗЕМЛИ' : 'ПОГРАНИЧЬЕ', panelX + 2, ly); ly += 12;
+  line(`День ${net.day} · ${['Весна', 'Лето', 'Осень', 'Зима'][Math.floor(((net.day || 1) - 1) / 3) % 4]}`, '#847e87');
+  ly += 4;
+  if (dim === 'over') {
+    key('#99e550', 'деревня живёт');
+    key('#d9574a', 'захвачена / данж');
+    key('#7b2fbe', 'форт Тьмы');
+    key('#696a6a', 'руины / зачищено');
+    key('#df7126', 'лагерь · портал');
+    key('#fbf236', 'обелиск · метка');
+    key('#63c5ff', 'источник');
+    key('#b06ee1', 'каменный круг');
+    key('#639bff', 'союзник');
+    key('#ffffff', 'ты');
+    ly += 2;
+    key('#fbf236', '✚ цель задания');
+  } else {
+    key('#df7126', 'лава');
+    key('#16141f', 'обсидиан');
+    key('#fbf236', 'жилы кристалла');
+    key('#99e550', 'лагерь огнеходцев');
+    key('#d9574a', 'логово големов');
+    key('#b06ee1', 'портал домой');
+    key('#ffffff', 'ты');
+  }
+  ly = y0 + S - 22;
+  line('Tab — измерение', '#696a6a');
+  line('колесо — зум', '#696a6a');
+  line('ЛКМ — тащить', '#696a6a');
 
   // подложка: рельеф выбранного измерения с учётом зума и сдвига
   const base = dim === 'ash' ? ashCanvas : biomeCanvas;
@@ -1090,11 +1131,6 @@ function renderBigMap() {
     ctx.fillStyle = '#696a6a';
     ctx.fillText(youDim === null ? 'ты — в подземелье' : 'ты — в другом измерении', x0 + 4, y0 + 10);
   }
-  // легенда
-  ctx.fillStyle = '#847e87';
-  ctx.fillText(dim === 'over'
-    ? '■ деревня  ■ данж  ■ лагерь  ▲ обелиск  ⛧ круг/Тьма  ~ источник  🔥 портал  ● ты'
-    : '▩ пепел  ▩ лава  ▩ обсидиан  ▪ тлеющие жилы  ● ты', x0 + 4, y0 + S - 8);
 }
 
 function blit() {

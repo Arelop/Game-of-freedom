@@ -29,7 +29,12 @@ const http = createServer(async (req, res) => {
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
   try {
     const data = await readFile(file);
-    res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[extname(file)] || 'application/octet-stream',
+      // без кэша: после обновления игры браузер не должен держать старый
+      // atlas.png при новом atlas.json — иначе спрайты «съезжают» в невидимость
+      'Cache-Control': 'no-cache',
+    });
     res.end(data);
   } catch {
     res.writeHead(404); res.end('404');

@@ -168,7 +168,71 @@ export function generateDungeon(seed, difficulty, withBoss, depth = 1) {
   // выход = вход (портал наружу)
   g[entrance.y * SIZE + entrance.x] = T.DUNGEON_EXIT;
 
+  // ГАРАНТИЯ ПРОХОДИМОСТИ: декор (колонны, мебель, решётки) не смеет
+  // перегораживать путь. BFS от входа сквозь декор — всё, через что
+  // пришлось бы пройти к комнате, сносится в пол.
+  repairConnectivity(g, entrance, rooms);
+
   return { size: SIZE, grid: g, rooms, entrance, seed, difficulty, depth, cursed };
+}
+
+// декоративные преграды, которые можно снести ради прохода
+const DECOR_SOLID = new Set([T.PILLAR, T.STATUE, T.TABLE, T.STALL, T.FENCE, T.CRYSTAL_WALL, T.WELL, T.BED, T.ANVIL]);
+
+function repairConnectivity(g, entrance, rooms) {
+  const S = SIZE;
+  // сначала честная проверка: если всё достижимо БЕЗ сноса — не трогаем декор
+  const clean = t => !DECOR_SOLID.has(t) && !(t === T.DUNGEON_WALL || t === T.CHEST || t === T.OBELISK
+    || t === T.DARK_ALTAR || t === T.MINE || t === T.TOWER || t === T.SHRINE);
+  const cvis = new Uint8Array(S * S);
+  cvis[entrance.y * S + entrance.x] = 1;
+  const cq = [entrance.y * S + entrance.x];
+  for (let qi = 0; qi < cq.length; qi++) {
+    const i = cq[qi], x = i % S, y = (i / S) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 1 || ny < 1 || nx >= S - 1 || ny >= S - 1) continue;
+      const ni = ny * S + nx;
+      if (cvis[ni] || !clean(g[ni])) continue;
+      cvis[ni] = 1; cq.push(ni);
+    }
+  }
+  const stuck = rooms.some(r => {
+    for (let y = r.y - r.h + 1; y <= r.y + r.h - 1; y++)
+      for (let x = r.x - r.w + 1; x <= r.x + r.w - 1; x++)
+        if (cvis[y * S + x]) return false;
+    return true;
+  });
+  if (!stuck) return;
+
+  const walkable = t => !(t === T.DUNGEON_WALL || t === T.CHEST || t === T.OBELISK
+    || t === T.DARK_ALTAR || t === T.MINE || t === T.TOWER || t === T.SHRINE);
+  // BFS: декор проходим, но помечаем родителя, чтобы потом вытоптать путь
+  const parent = new Int32Array(S * S).fill(-1);
+  const vis = new Uint8Array(S * S);
+  const start = entrance.y * S + entrance.x;
+  vis[start] = 1;
+  const q = [start];
+  for (let qi = 0; qi < q.length; qi++) {
+    const i = q[qi], x = i % S, y = (i / S) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 1 || ny < 1 || nx >= S - 1 || ny >= S - 1) continue;
+      const ni = ny * S + nx;
+      if (vis[ni] || !walkable(g[ni])) continue;
+      vis[ni] = 1; parent[ni] = i;
+      q.push(ni);
+    }
+  }
+  for (const r of rooms) {
+    // ищем достижимую клетку комнаты; декор на пути к ней — в щебень
+    let cell = -1;
+    outer: for (let y = r.y - r.h + 1; y <= r.y + r.h - 1; y++)
+      for (let x = r.x - r.w + 1; x <= r.x + r.w - 1; x++)
+        if (vis[y * S + x]) { cell = y * S + x; break outer; }
+    for (let i = cell; i >= 0 && i !== start; i = parent[i])
+      if (DECOR_SOLID.has(g[i])) g[i] = T.RUBBLE;
+  }
 }
 
 // Арена-колизей: круглый зал для волновых боёв (отдельный инстанс)
