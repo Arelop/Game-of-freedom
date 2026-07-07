@@ -52,6 +52,23 @@ export const ABILITIES = {
       desc: 'Веер из 12 клинков во все стороны',
     },
   ],
+  priest: [
+    {
+      id: 'holy_wave', key: 'Q', lvl: 2, cd: 8, mana: 10,
+      name: 'Волна света', icon: 'ab_holy_wave',
+      desc: 'Лечит союзников вокруг на 2 сердца (себя — на 1), опаляет врагов',
+    },
+    {
+      id: 'judgement', key: 'X', lvl: 5, cd: 12, mana: 10,
+      name: 'Кара небес', icon: 'ab_judgement',
+      desc: 'Столб света у прицела: ×2.5 урона магии и оглушение 1 с',
+    },
+    {
+      id: 'faith_shield', key: 'R', lvl: 9, cd: 25, mana: 18,
+      name: 'Щит веры', icon: 'ab_faith_shield',
+      desc: 'Барьер на 4 урона всем союзникам рядом (6 с)',
+    },
+  ],
 };
 
 export function abilitiesOf(cls) { return ABILITIES[cls] || ABILITIES.warrior; }

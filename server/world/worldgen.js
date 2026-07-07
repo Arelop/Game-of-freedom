@@ -79,11 +79,11 @@ export function makeWorld(seed) {
     weather: 'clear',           // погода дня: clear | rain | snow
   };
 
-  // Поселения: 6 сайтов, три городские фракции по кругу
+  // Поселения: 9 сайтов, три городские фракции по кругу
   const townFactions = ['severane', 'ozerny', 'stepnyaki'];
   const sites = [];
-  for (let i = 0; i < 6; i++) {
-    const site = findFlatSite(seed, rand, sites, 90);
+  for (let i = 0; i < 9; i++) {
+    const site = findFlatSite(seed, rand, sites, 95);
     if (!site) break;
     sites.push(site);
   }
@@ -126,7 +126,7 @@ export function makeWorld(seed) {
   });
 
   // POI: данжи и лагеря
-  const poiCount = 12;
+  const poiCount = 20;
   const allSites = [...sites];
   for (let i = 0; i < poiCount; i++) {
     const site = findFlatSite(seed, rand, allSites, 45);
@@ -149,10 +149,10 @@ export function makeWorld(seed) {
   // Необычные места: хижина отшельника, каменные круги, обелиски, источники
   const SPECIALS = [
     { type: 'hermit', name: 'Хижина отшельника', n: 1 },
-    { type: 'circle', name: 'Каменный круг', n: 2 },
-    { type: 'obelisk', name: 'Древний обелиск', n: 2 },
-    { type: 'spring', name: 'Целебный источник', n: 2 },
-    { type: 'barrow', name: 'Древний курган', n: 2 },
+    { type: 'circle', name: 'Каменный круг', n: 3 },
+    { type: 'obelisk', name: 'Древний обелиск', n: 3 },
+    { type: 'spring', name: 'Целебный источник', n: 3 },
+    { type: 'barrow', name: 'Древний курган', n: 3 },
     { type: 'oldwell', name: 'Заброшенный колодец', n: 1 },
     { type: 'ashportal', name: 'Обсидиановый портал', n: 1 },
   ];
@@ -181,7 +181,7 @@ export function makeWorld(seed) {
 
   // Дикие сундуки: редкие тайники в глуши — награда исследователям
   world.wildChests = [];
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 14; i++) {
     const site = findFlatSite(seed, rand, allSites, 30);
     if (!site) break;
     allSites.push(site);
@@ -230,7 +230,7 @@ export function makeWorld(seed) {
       }
     if (ok && !sites.some(s => (s.x - x) ** 2 + (s.y - y) ** 2 < 80 * 80)) cSite = { x, y };
   }
-  if (!cSite) cSite = { x: 256, y: WORLD_TILES - 60 }; // крайний случай: юг по центру
+  if (!cSite) cSite = { x: Math.floor(WORLD_TILES / 2), y: WORLD_TILES - 60 }; // крайний случай: юг по центру
   world.citadel = {
     x: cSite.x, y: cSite.y, name: 'Чернокаменная Цитадель',
     power: 8,        // мощь Тьмы: растёт каждый цив-тик, питает рейды
@@ -372,6 +372,7 @@ function stampRoad(world, a, b, rand) {
 // Карта биомов для клиентской карты мира: 128x128 (шаг 4 тайла), коды 0..6
 export function buildBiomeMap(world) {
   const N = 128;
+  const step = WORLD_TILES / N; // карта-миниатюра 128×128 при любом размере мира
   const out = new Uint8Array(N * N);
   const CODE = {
     [T.DEEP_WATER]: 0, [T.WATER]: 1, [T.SAND]: 2, [T.GRASS]: 3,
@@ -379,6 +380,6 @@ export function buildBiomeMap(world) {
   };
   for (let my = 0; my < N; my++)
     for (let mx = 0; mx < N; mx++)
-      out[my * N + mx] = CODE[baseTile(world.seed, mx * 4 + 2, my * 4 + 2)] ?? 3;
+      out[my * N + mx] = CODE[baseTile(world.seed, Math.floor(mx * step + step / 2), Math.floor(my * step + step / 2))] ?? 3;
   return out;
 }

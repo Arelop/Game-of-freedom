@@ -42,6 +42,16 @@ export const CLASSES = {
     ammo: { arrow: 50, bolt: 0, knife: 15 },
     sprite: 'player_rogue',
   },
+  priest: {
+    id: 'priest', name: 'Жрец',
+    desc: 'Свет, что лечит своих и карает чужих. Душа отряда.',
+    baseStats: { str: 1, agi: 0, int: 2, lck: 1 },
+    maxHpBonus: 1,
+    manaBase: 45, // свету нужен глубокий колодец маны
+    weapons: ['lightstaff', 'mace'],
+    ammo: { arrow: 0, bolt: 0, knife: 0 },
+    sprite: 'player_priest',
+  },
 };
 
 // Кривая опыта: сколько нужно до следующего уровня

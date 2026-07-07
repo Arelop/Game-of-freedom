@@ -21,6 +21,11 @@ export const SPECS = {
     { id: 'marksman', name: 'Стрелок', color: '#99e550', desc: 'Меткость, темп и град стали' },
     { id: 'trickster', name: 'Плут', color: '#fbf236', desc: 'Удача, золото и невидимость' },
   ],
+  priest: [
+    { id: 'light', name: 'Свет', color: '#fbf236', desc: 'Исцеление, аура и воскрешение' },
+    { id: 'wrath', name: 'Кара', color: '#df7126', desc: 'Гнев небес и палящий свет' },
+    { id: 'bastion', name: 'Оплот', color: '#5fcde4', desc: 'Барьеры, стойкость и вера' },
+  ],
 };
 
 export const TALENTS = {
@@ -108,6 +113,32 @@ export const TALENTS = {
     { id: 'r_ghost', spec: 'trickster', tier: 3, ranks: 1, name: 'Призрак', desc: '+4% уворота и −15% кулдауна переката', effects: { dodge: 0.04, rollCd: 0.15 } },
     { id: 'r_gold', spec: 'trickster', tier: 3, ranks: 2, name: 'Деловая хватка', desc: '+10% монет и +2% крита за ранг', effects: { coinMult: 0.1, critChance: 0.02 } },
     { id: 'r_gambler', spec: 'trickster', tier: 4, ranks: 1, name: 'Игрок', desc: '+30% монет, +5% крита и +3% уворота', effects: { coinMult: 0.3, critChance: 0.05, dodge: 0.03 } },
+  ],
+  priest: [
+    // ═══ СВЕТ: целитель отряда ═══
+    { id: 'p_grace', spec: 'light', tier: 1, ranks: 3, name: 'Благодать', desc: '+1 к регену маны за ранг', effects: { manaRegen: 1 } },
+    { id: 'p_touch', spec: 'light', tier: 1, ranks: 1, name: 'Тёплый свет', desc: 'Посох света лечит союзников на 2 вместо 1', flag: 'lightheal' },
+    { id: 'p_wavebig', spec: 'light', tier: 2, ranks: 1, name: 'Прилив света', desc: 'Волна света лечит на 3 сердца', flag: 'ab_wavebig' },
+    { id: 'p_aura', spec: 'light', tier: 2, ranks: 1, name: 'Аура света', desc: 'Союзники рядом получают +1 хп каждые 6 с', flag: 'aura' },
+    { id: 'p_mend', spec: 'light', tier: 3, ranks: 2, name: 'Милосердие', desc: '+1 сердце и +5% скорости за ранг', effects: { maxHp: 2, speed: 0.05 } },
+    { id: 'p_echo2', spec: 'light', tier: 3, ranks: 1, name: 'Эхо молитвы', desc: '20% шанс: способность почти без кулдауна', flag: 'echo' },
+    { id: 'p_rez', spec: 'light', tier: 4, ranks: 1, name: 'Длань Света', desc: 'Волна света поднимает павшего союзника (раз в 60 с)', flag: 'ab_waverez' },
+    // ═══ КАРА: боевой жрец ═══
+    { id: 'p_zeal', spec: 'wrath', tier: 1, ranks: 3, name: 'Рвение', desc: '+6% урона магии за ранг', effects: { dmgMagic: 0.06 } },
+    { id: 'p_haste', spec: 'wrath', tier: 1, ranks: 2, name: 'Пыл', desc: '+4% скорости атаки за ранг', effects: { atkSpeed: 0.04 } },
+    { id: 'p_judgewide', spec: 'wrath', tier: 2, ranks: 1, name: 'Широкая кара', desc: 'Столб Кары небес шире в полтора раза', flag: 'ab_judgewide' },
+    { id: 'p_searing', spec: 'wrath', tier: 2, ranks: 1, name: 'Палящий свет', desc: 'Магические атаки поджигают: 1 урона/с на 3 с', flag: 'ignite' },
+    { id: 'p_fervor', spec: 'wrath', tier: 3, ranks: 2, name: 'Праведный гнев', desc: '+8% урона магии за ранг', effects: { dmgMagic: 0.08 } },
+    { id: 'p_crit', spec: 'wrath', tier: 3, ranks: 1, name: 'Суд небес', desc: '+6% шанса крита', effects: { critChance: 0.06 } },
+    { id: 'p_storm', spec: 'wrath', tier: 4, ranks: 1, name: 'Гнев небес', desc: '+1 снаряд света и +15% урона магии', effects: { magicProj: 1, dmgMagic: 0.15 } },
+    // ═══ ОПЛОТ: защитник ═══
+    { id: 'p_body', spec: 'bastion', tier: 1, ranks: 3, name: 'Крепость духа', desc: '+1 сердце за ранг', effects: { maxHp: 2 } },
+    { id: 'p_calm', spec: 'bastion', tier: 1, ranks: 2, name: 'Смирение', desc: '+3% уворота за ранг', effects: { dodge: 0.03 } },
+    { id: 'p_shieldbig', spec: 'bastion', tier: 2, ranks: 1, name: 'Твёрдая вера', desc: 'Щит веры держит 6 урона', flag: 'ab_shieldbig' },
+    { id: 'p_manawall', spec: 'bastion', tier: 2, ranks: 1, name: 'Стена маны', desc: 'Четверть урона уходит в ману (3 маны за 1)', flag: 'manashield' },
+    { id: 'p_vigil', spec: 'bastion', tier: 3, ranks: 2, name: 'Бдение', desc: '+1 сердце и +1 реген маны за ранг', effects: { maxHp: 2, manaRegen: 1 } },
+    { id: 'p_cdr', spec: 'bastion', tier: 3, ranks: 1, name: 'Собранность', desc: 'Способности перезаряжаются на 20% быстрее', flag: 'cdr' },
+    { id: 'p_martyr', spec: 'bastion', tier: 4, ranks: 1, name: 'Несокрушимость', desc: '+2 сердца, смертельный удар оставляет 1 ХП (раз в 60 с)', flag: 'laststand', effects: { maxHp: 4 } },
   ],
 };
 

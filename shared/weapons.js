@@ -137,6 +137,15 @@ export const WEAPONS = {
     sprite: 'wpn_halberd', sound: 'swing', swingColor: '#d9a066', price: 125,
   },
 
+  lightstaff: {
+    id: 'lightstaff', structDmg: 1, name: 'Посох света', school: 'magic', damage: 3,
+    projectilesPerShot: 1, spreadDeg: 2, projectileSpeed: 300, fireRate: 2.0, manaCost: 1,
+    knockback: 10, recoilShake: 0.1,
+    sprite: 'wpn_lightstaff', projSprite: 'proj_light', sound: 'shot_frost',
+    projRadius: 3, projLife: 1.1, price: 90,
+    holy: 1, // снаряд света ЛЕЧИТ союзника, в которого попал (вместо урона)
+  },
+
   // --- арсенал Выжженных земель ---
   obsidianblade: {
     id: 'obsidianblade', structDmg: 6, name: 'Обсидиановый клинок', melee: true, school: 'melee',

@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { TILE } from '../shared/constants.js';
 import { getItem, getWeapon, splitId } from '../shared/rarity.js';
-import { saveWorld, applyWorldData, applySavedPlayer, SAVE_FILE } from './persist.js';
+import { saveWorld, applyWorldData, applySavedPlayer, SAVE_FILE, WORLD_VER } from './persist.js';
 
 export class Admin {
   constructor(game) {
@@ -157,6 +157,8 @@ export class Admin {
     if (!data || typeof data !== 'object') return { error: 'это не сейв' };
     if (data.seed !== g.world.seed)
       return { error: `сид сейва (${data.seed}) не совпадает с сидом сервера (${g.world.seed})` };
+    if ((data.worldVer || 1) !== WORLD_VER)
+      return { error: `сейв от мира старого устройства (v${data.worldVer || 1}, сейчас v${WORLD_VER})` };
     // снести всё живое и инстансы — мир пересобирается из сейва
     g.entities.clear();
     g.hydratedSettlements.clear();

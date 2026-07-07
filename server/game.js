@@ -2,6 +2,7 @@
 import {
   TICK_DT, TILE, SOLID, BULLET_SOLID, T, PLAYER_MAX_HP, PLAYER_HURT_INVULN,
   HUNGER_MAX, HUNGER_RATE, DAY_LENGTH, PLAYER_RADIUS, DESTRUCTIBLE, seasonOf,
+  WORLD_TILES,
 } from '../shared/constants.js';
 import { WEAPONS } from '../shared/weapons.js';
 import { ENEMIES, tierTouchBonus, tierProjDmg, enemiesOfTier, ASH_KINDS } from '../shared/enemies.js';
@@ -564,7 +565,7 @@ export class Game {
         break;
       }
       case 'meteor': { // метеорит: кристаллы под охраной големов
-        const mx = 60 + Math.floor(this.rand() * 390), my = 60 + Math.floor(this.rand() * 390);
+        const mx = 60 + Math.floor(this.rand() * (WORLD_TILES - 120)), my = 60 + Math.floor(this.rand() * (WORLD_TILES - 120));
         for (let i = 0; i < 6; i++)
           this.spawnDrop('crystal', 1, 'over', mx * TILE + (this.rand() - 0.5) * 50, my * TILE + (this.rand() - 0.5) * 50, 600);
         for (let i = 0; i < 2; i++)
@@ -588,7 +589,7 @@ export class Game {
         const NAMES_H = ['Кровавый Клык', 'Старый Хрыч', 'Гроза Дорог', 'Косматый Ужас', 'Одноглазый'];
         const KINDS_H = ['bear', 'orcWarlord', 'ogre', 'ironTroll', 'minotaur']; // боссы в логовах — охота на элитных зверей
         const i = Math.floor(this.rand() * NAMES_H.length);
-        const hx = 60 + Math.floor(this.rand() * 390), hy = 60 + Math.floor(this.rand() * 390);
+        const hx = 60 + Math.floor(this.rand() * (WORLD_TILES - 120)), hy = 60 + Math.floor(this.rand() * (WORLD_TILES - 120));
         this.abstract.tokens.push({
           id: 'tok' + this.abstract.nextId++, type: 'pack', name: NAMES_H[i],
           faction: 'monsters', units: [KINDS_H[i]], hunt: NAMES_H[i],
@@ -694,6 +695,20 @@ export class Game {
           p.smiteT = p.procs.smite.cd;
           this.damageEnemy(best, p.procs.smite.dmg, { vx: 0, vy: 0, knockback: 20, owner: p.id, school: 'magic' });
           this.fx({ t: 'chain', pts: [[p.x, p.y - 12], [best.x, best.y]] }, p.mapId, p.x, p.y);
+        }
+      }
+    }
+    // Аура света: жрец лечит союзников одним присутствием
+    if (this.hasTalent(p, 'aura')) {
+      p.auraT = (p.auraT ?? 6) - dt;
+      if (p.auraT <= 0) {
+        p.auraT = 6;
+        for (const q of this.players.values()) {
+          if (q === p || q.dead || q.mapId !== p.mapId || q.hp >= q.maxHp) continue;
+          if (dist2(p.x, p.y, q.x, q.y) < 70 * 70) {
+            q.hp = Math.min(q.maxHp, q.hp + 1);
+            this.fx({ t: 'heal', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
+          }
         }
       }
     }
@@ -949,6 +964,7 @@ export class Game {
         life: w.projLife, radius: w.projRadius, dmg, crit: atk.crit,
         knockback: w.knockback, slow, school: w.school,
         explode: w.explode, chain: w.chain, structDmg, fiery,
+        holy: w.holy ? w.holy + (this.hasTalent(p, 'lightheal') ? 1 : 0) : 0,
         owner: p.id, friendly: true, mapId: p.mapId,
       });
     }
@@ -1421,7 +1437,7 @@ export class Game {
         const a = Math.atan2(e.y - cy, e.x - cx);
         this.damageEnemy(e, dmg, {
           vx: Math.cos(a), vy: Math.sin(a), knockback: kb, owner: p.id,
-          school: p.cls === 'mage' ? 'magic' : 'melee',
+          school: p.cls === 'mage' || p.cls === 'priest' ? 'magic' : 'melee',
         });
       }
     };
@@ -1545,6 +1561,53 @@ export class Game {
             life: 0.6, radius: 2, dmg: Math.round(3 * (d.dmgRanged || 1) * 10) / 10, crit: atk.crit,
             knockback: 40, school: 'ranged', owner: p.id, friendly: true, mapId: p.mapId,
           });
+        }
+        break;
+      }
+      case 'holy_wave': { // жрец Q: волна света — лечит своих, опаляет чужих
+        const heal = this.hasTalent(p, 'ab_wavebig') ? 3 : 2;
+        const r = 85;
+        for (const q of this.players.values()) {
+          if (q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > r * r) continue;
+          const amount = q === p ? Math.ceil(heal / 2) : heal;
+          if (q.hp < q.maxHp) {
+            q.hp = Math.min(q.maxHp, q.hp + amount);
+            this.fx({ t: 'heal', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
+          }
+        }
+        // капстоун Света: волна поднимает павшего союзника (раз в 60 с)
+        if (this.hasTalent(p, 'ab_waverez') && (p.rezCd || 0) <= this.tick) {
+          for (const q of this.players.values()) {
+            if (!q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > r * r) continue;
+            q.dead = false; q.hp = 3; q.hurtT = 2; q.downT = 0;
+            p.rezCd = this.tick + 60 * 30;
+            this.fx({ t: 'ascend', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
+            this.toastMap(p.mapId, `✨ Свет вернул ${q.name} в строй!`);
+            break;
+          }
+        }
+        hitAround(p.x, p.y, r * 0.7, Math.round(2 * (d.dmgMagic || 1) * 10) / 10, 40);
+        break;
+      }
+      case 'judgement': { // жрец X: столб света у прицела — урон и стан
+        const r = this.hasTalent(p, 'ab_judgewide') ? 44 : 32;
+        const tx = p.x + Math.cos(aim) * Math.min(120, 120), ty = p.y + Math.sin(aim) * 120;
+        hitAround(tx, ty, r, Math.round(4 * (d.dmgMagic || 1) * 2.5 * 10) / 10, 60);
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(tx, ty, e.x, e.y) < r * r) { e.stunT = Math.max(e.stunT || 0, 1); e.aggro = true; }
+        }
+        this.fx({ t: 'chain', pts: [[tx, ty - 60], [tx, ty]] }, p.mapId, tx, ty);
+        this.fx({ t: 'boom', x: tx, y: ty, r }, p.mapId, tx, ty);
+        break;
+      }
+      case 'faith_shield': { // жрец R: барьер всему отряду рядом
+        const hpS = this.hasTalent(p, 'ab_shieldbig') ? 6 : 4;
+        for (const q of this.players.values()) {
+          if (q.dead || q.mapId !== p.mapId || dist2(p.x, p.y, q.x, q.y) > 95 * 95) continue;
+          q.shieldHp = Math.max(q.shieldHp || 0, hpS);
+          q.shieldT = Math.max(q.shieldT || 0, 6);
+          this.fx({ t: 'barrier', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
         }
         break;
       }
@@ -1705,12 +1768,18 @@ export class Game {
             }
           }
         }
-        // friendly fire: пули игроков ранят и союзников — целься аккуратно
+        // friendly fire: пули игроков ранят и союзников — целься аккуратно.
+        // Исключение — снаряды СВЕТА: попадание в союзника ЛЕЧИТ его
         if (!hit && !pr.guard) {
           for (const q of this.players.values()) {
             if (q.dead || q.mapId !== pr.mapId || q.id === pr.owner) continue;
             if (circlesOverlap(pr.x, pr.y, pr.radius, q.x, q.y, PLAYER_RADIUS)) {
-              this.damagePlayer(q, pr.dmg, null);
+              if (pr.holy) {
+                if (q.hp < q.maxHp) {
+                  q.hp = Math.min(q.maxHp, q.hp + pr.holy);
+                  this.fx({ t: 'heal', pid: q.id, x: q.x, y: q.y }, q.mapId, q.x, q.y);
+                }
+              } else this.damagePlayer(q, pr.dmg, null);
               hit = true; break;
             }
           }
@@ -2638,7 +2707,7 @@ export class Game {
     const heroes = [...this.players.values()].filter(q =>
       !q.dead && q.mapId === 'over' && dist2(q.x, q.y, c.x * TILE, c.y * TILE) < 500 ** 2);
     const grp = heroes.length ? heroes : [p];
-    const LEG = { warrior: 'sunblade', mage: 'dawnstaff', rogue: 'windbow' };
+    const LEG = { warrior: 'sunblade', mage: 'dawnstaff', rogue: 'windbow', priest: 'dawnstaff' };
     for (const q of grp) {
       const lw = (LEG[q.cls] || 'sunblade') + '@l';
       q.inventory['weapon:' + lw] = (q.inventory['weapon:' + lw] || 0) + 1;

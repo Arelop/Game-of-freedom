@@ -39,7 +39,7 @@ export class Net {
       if (game.players.size >= MAX_PLAYERS) { ws.send(JSON.stringify({ t: 'full' })); return; }
       const id = this.nextPlayerId++;
       const name = String(m.name || 'Игрок').slice(0, 16) || 'Игрок';
-      const cls = ['warrior', 'mage', 'rogue'].includes(m.cls) ? m.cls : 'warrior';
+      const cls = ['warrior', 'mage', 'rogue', 'priest'].includes(m.cls) ? m.cls : 'warrior';
       const p = game.addPlayer(id, name, ws, cls);
       ws.playerId = id;
       console.log(`[net] ${name} (${cls}) вошёл (id=${id})`);

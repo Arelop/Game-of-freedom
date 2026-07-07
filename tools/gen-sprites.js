@@ -665,6 +665,14 @@ const GEN = {
     px(s, 9, 6, C.orange); px(s, 10, 7, C.yellow);
     return s;
   },
+  lightOrb() {
+    const s = make(8, 8);
+    // сгусток света: тёплое ядро с белой искрой
+    disc(s, 4, 4, 3, C.yellow, 200);
+    disc(s, 4, 4, 2, C.yellow);
+    px(s, 3, 3, C.white); px(s, 4, 3, C.white); px(s, 3, 4, C.white);
+    return s;
+  },
   flamePortal() {
     const s = make(16, 16);
     // огненное кольцо на обсидиановом основании

@@ -9,11 +9,17 @@ const SAVES = process.env.SAVES_DIR || join(dirname(fileURLToPath(import.meta.ur
 const FILE = join(SAVES, 'world.json');
 export const SAVE_FILE = FILE;
 
+// Версия устройства мира: растёт при несовместимых изменениях генерации
+// (размер карты и т.п.). Сейв старой версии не грузится целиком —
+// но ПРОФИЛИ ГЕРОЕВ переносятся в новый мир (без координат).
+export const WORLD_VER = 2;
+
 export function saveWorld(game) {
   try {
     mkdirSync(SAVES, { recursive: true });
     const w = game.world;
     const data = {
+      worldVer: WORLD_VER,
       seed: w.seed, time: w.time, day: w.day,
       edits: [...w.edits.entries()],
       settlements: w.settlements.map(s => ({
@@ -64,6 +70,15 @@ export function loadWorld(game) {
   try {
     const data = JSON.parse(readFileSync(FILE, 'utf8'));
     if (data.seed !== game.world.seed) return false;
+    // мир прежнего устройства: ландшафт не совпадает — берём только героев
+    if ((data.worldVer || 1) !== WORLD_VER) {
+      game.savedPlayers = new Map((data.players || []).map(p => {
+        const { x, y, home, homeStash, ...keep } = p; // позиции и дом — из старого мира
+        return [p.name, keep];
+      }));
+      console.log(`[save] мир пересоздан (новая версия ${WORLD_VER}), герои перенесены: ${game.savedPlayers.size}`);
+      return false;
+    }
     applyWorldData(game, data);
     console.log(`[save] мир загружен (день ${game.world.day})`);
     return true;
@@ -122,7 +137,8 @@ export function applySavedPlayer(game, p) {
   const rec = game.savedPlayers?.get(p.name);
   if (!rec) return;
   Object.assign(p, {
-    x: rec.x, y: rec.y, hp: Math.max(1, rec.hp), hunger: rec.hunger, coins: rec.coins,
+    x: rec.x ?? p.x, y: rec.y ?? p.y, // перенос из старого мира — позиция спавна
+    hp: Math.max(1, rec.hp), hunger: rec.hunger, coins: rec.coins,
     weapons: rec.weapons, ammo: rec.ammo, inventory: rec.inventory, rep: rec.rep,
   });
   if (rec.equipment) {

@@ -7,7 +7,7 @@ export const SNAPSHOT_EVERY = 2;      // снапшот каждые N тико�
 
 export const TILE = 16;               // пиксель-размер тайла
 export const CHUNK = 32;              // тайлов в чанке по стороне
-export const WORLD_CHUNKS = 16;       // мир 16x16 чанков = 512x512 тайлов
+export const WORLD_CHUNKS = 24;       // мир 24x24 чанка = 768x768 тайлов
 export const WORLD_TILES = WORLD_CHUNKS * CHUNK;
 
 export const VIEW_W = 480;            // нативное разрешение рендера

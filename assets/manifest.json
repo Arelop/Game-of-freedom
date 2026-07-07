@@ -1051,6 +1051,25 @@
     },
     "item_wind_legs": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/boots4_green.png"
+    },
+    "player_priest": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/holy/paladin.png",
+      "down": 2
+    },
+    "wpn_lightstaff": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/staff/staff05.png"
+    },
+    "proj_light": {
+      "proc": "lightOrb"
+    },
+    "ab_holy_wave": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/corona.png"
+    },
+    "ab_judgement": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/airstrike.png"
+    },
+    "ab_faith_shield": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/deflect_missiles.png"
     }
   }
 }
