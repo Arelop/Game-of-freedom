@@ -21,22 +21,37 @@ export class Hud {
       const spr = v >= 2 ? 'ui_heart_full' : v === 1 ? 'ui_heart_half' : 'ui_heart_empty';
       this.atlas.draw(ctx, spr, 10 + i * 11, 9);
     }
+    // мана: синяя полоска под сердцами (+ пипсы Чародейских зарядов у мага)
+    ctx.fillStyle = '#222034';
+    ctx.fillRect(5, 16, 42, 4);
+    ctx.fillStyle = '#639bff';
+    ctx.fillRect(6, 17, Math.round(40 * Math.min(1, (you.mp || 0) / (you.mpm || 1))), 2);
+    ctx.fillStyle = '#b8d0ff';
+    ctx.font = '7px monospace';
+    ctx.fillText(`${you.mp ?? 0}/${you.mpm ?? 0}`, 49, 15);
+    ctx.font = '8px monospace';
+    if (you.arc > 0) {
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = i < you.arc ? '#b06ee1' : '#2c2a38';
+        ctx.fillRect(5 + i * 6, 13, 4, 2);
+      }
+    }
     // голод
     ctx.fillStyle = '#222034';
-    ctx.fillRect(5, 16, 42, 5);
+    ctx.fillRect(5, 21, 42, 5);
     ctx.fillStyle = you.hunger < 20 ? '#d9574a' : '#d9a066';
-    ctx.fillRect(6, 17, Math.round(40 * you.hunger / 100), 3);
+    ctx.fillRect(6, 22, Math.round(40 * you.hunger / 100), 3);
 
     // уровень и опыт (бог отмечен звездой вечности)
     ctx.fillStyle = '#fbf236';
-    ctx.fillText(you.asc ? '✸БОГ' : 'Ур.' + (you.lvl || 1), 50, 8);
+    ctx.fillText(you.asc ? '✸БОГ' : 'Ур.' + (you.lvl || 1), 50, 5);
     ctx.fillStyle = '#222034';
-    ctx.fillRect(5, 22, 42, 3);
+    ctx.fillRect(5, 27, 42, 3);
     ctx.fillStyle = '#99e550';
-    ctx.fillRect(5, 22, Math.round(42 * Math.min(1, (you.xp || 0) / (you.xpn || 1))), 3);
+    ctx.fillRect(5, 27, Math.round(42 * Math.min(1, (you.xp || 0) / (you.xpn || 1))), 3);
     if ((you.sp || 0) + (you.tp2 || 0) > 0 && Math.floor(performance.now() / 600) % 2 === 0) {
       ctx.fillStyle = '#fbf236';
-      ctx.fillText('+C', 50, 17);
+      ctx.fillText('+C', 50, 21);
     }
 
     // оружие и патроны (справа снизу)
@@ -49,10 +64,14 @@ export class Hud {
       ctx.fillText(w.name, gx + 12, gy);
       let ammoTxt, col;
       if (w.melee) { ammoTxt = 'ближний бой'; col = '#99e550'; }
+      else if (w.manaCost) { // посох: пьёт ману напрямую
+        ammoTxt = `мана ${w.manaCost}/каст`;
+        col = (you.mp || 0) >= w.manaCost ? '#639bff' : '#d9574a';
+      }
       else if (w.infiniteAmmo) { ammoTxt = STR.ammoInf; col = '#99e550'; }
       else { ammoTxt = `${you.mag}/${you.ammo[w.ammoType] ?? 0}`; col = you.mag === 0 ? '#d9574a' : '#99e550'; }
       ctx.fillStyle = col;
-      ctx.fillText(you.rt > 0 && !w.melee ? STR.reloading : ammoTxt, gx + 12, gy + 9);
+      ctx.fillText(you.rt > 0 && !w.melee && !w.manaCost ? STR.reloading : ammoTxt, gx + 12, gy + 9);
       // слоты оружия
       for (let i = 0; i < you.ws.length; i++) {
         ctx.fillStyle = i === you.wi ? '#fbf236' : '#696a6a';
@@ -122,7 +141,7 @@ export class Hud {
       const x = x0 + i * (S + GAP);
       const locked = (you.lvl || 1) < ab.lvl;
       const cd = you.ab?.[i] || 0;
-      const noMana = ab.mana > 0 && (you.ammo?.mana || 0) < ab.mana;
+      const noMana = ab.mana > 0 && (you.mp || 0) < ab.mana;
       ctx.fillStyle = 'rgba(20,18,26,.85)';
       ctx.fillRect(x - 1, y0 - 1, S + 2, S + 2);
       this.atlas.draw(ctx, ab.icon, x + S / 2, y0 + S / 2, {

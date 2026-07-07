@@ -238,6 +238,11 @@ net.handlers.onFx = (kind, m) => {
       SFX.roll();
       break;
     case 'ability': spawnAbilityFx(m); break;
+    case 'bloodcast':
+      particles.blood(m.x, m.y, 8);
+      ringFx.push({ x: m.x, y: m.y, r0: 4, r1: 16, t: 0, dur: 0.3, color: '#d9574a' });
+      if (m.pid === net.myId) { addFloatText(m.x, m.y - 10, '🩸 КРОВАВЫЙ КАСТ', '#d9574a'); SFX.hurt(); }
+      break;
     case 'ascend':
       // вознесение: столп света и золотое сияние
       for (let i = 0; i < 3; i++)
@@ -340,7 +345,11 @@ function useAbility(slot) {
   if (!ab) return;
   if (you.lvl < ab.lvl) { panels.toast(`«${ab.name}» откроется на уровне ${ab.lvl}`); return; }
   if ((you.ab?.[slot] || 0) > 0.2) return;
-  if (ab.mana > 0 && (you.ammo?.mana || 0) < ab.mana) { panels.toast('Не хватает маны'); return; }
+  // кровавый каст мага пропускаем на сервер даже без маны
+  if (ab.mana > 0 && (you.mp || 0) < ab.mana && !(you.cls === 'mage' && you.hp > 2)) {
+    panels.toast('Не хватает маны');
+    return;
+  }
   net.send({ t: MSG.ABILITY, slot });
 }
 
@@ -403,7 +412,9 @@ function simStep() {
       swingAnim = 0.18;
       cam.addTrauma(w.recoilShake * 0.5);
       playWeaponSound(w.sound);
-    } else if (canAct && you.rt <= 0 && you.mag > 0) {
+    } else if (canAct && (w.manaCost
+      ? (you.mp >= w.manaCost || (you.cls === 'mage' && you.hp > 2)) // посох: мана или кровавый каст
+      : (you.rt <= 0 && you.mag > 0))) {
       fireCd = 1 / w.fireRate;
       net.spawnWeaponBullets(net.pred.x, net.pred.y, aim, w, (net.seq * 2654435761) >>> 0);
       particles.muzzle(net.pred.x + Math.cos(aim) * 8, net.pred.y - 4 + Math.sin(aim) * 8, aim);

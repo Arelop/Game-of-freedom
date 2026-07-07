@@ -253,7 +253,7 @@ export const ITEMS = {
     price: 30, icon: 'item_potion',
   },
   mana_potion: {
-    id: 'mana_potion', name: 'Зелье маны', use: { mana: 15 },
+    id: 'mana_potion', name: 'Зелье маны', use: { mana: 25 },
     price: 25, icon: 'item_potion_blue',
   },
   swift_potion: {

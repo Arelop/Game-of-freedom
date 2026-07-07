@@ -44,6 +44,7 @@ const RECIPES = [
   { id: 'cooked_meat', name: 'Жареное мясо (сырое мясо)', needs: { meat: 1 }, gives: { cooked_meat: 1 } },
   { id: 'ammo_arrow', name: 'Стрелы x10 (1 древесина)', needs: { wood: 1 }, gives: { ammo_arrow: 10 } },
   { id: 'ammo_knife', name: 'Ножи x4 (1 древесина, 1 шкура)', needs: { wood: 1, hide: 1 }, gives: { ammo_knife: 4 } },
+  { id: 'mana_potion', name: 'Зелье маны (1 кристалл, 1 трава)', needs: { crystal: 1, herb: 1 }, gives: { mana_potion: 1 } },
 ];
 
 // Крафт у наковальни: металл в дело
@@ -57,7 +58,7 @@ const SHOP = [
   { item: 'bread', price: 8 }, { item: 'bandage', price: 15 }, { item: 'wood', price: 6 },
   { item: 'heal_potion', price: 30 }, { item: 'swift_potion', price: 35 },
   { item: 'ammo_arrow', price: 10, count: 20 }, { item: 'ammo_bolt', price: 15, count: 8 },
-  { item: 'ammo_mana', price: 18, count: 15 }, { item: 'ammo_knife', price: 14, count: 8 },
+  { item: 'ammo_knife', price: 14, count: 8 }, { item: 'mana_potion', price: 28 },
   { item: 'leather_armor', price: 40 }, { item: 'wood_shield', price: 25 },
   { item: 'leather_boots', price: 30 }, { item: 'iron_greaves', price: 70 },
   { item: 'wizard_hat', price: 90 }, { item: 'ring_str', price: 70 },
@@ -182,7 +183,10 @@ export class Game {
       inventory: { bread: 2, bandage: 1 },
       equipment: { head: null, chest: null, legs: null, offhand: null, acc1: null, acc2: null, ring: null },
       buffs: {},                 // { speed: { mult, t } }
-      dmgMult: 1, shadowT: 0, prevRollT: 0, manaRegenT: 0,
+      dmgMult: 1, shadowT: 0, prevRollT: 0,
+      mana: C.manaBase || 20, manaMax: C.manaBase || 20, // настоящая мана (не боеприпас)
+      combatT: 0,                 // сек с последнего каста/выстрела — реген вне боя быстрее
+      arcaneN: 0, arcaneT: 0,     // Чародейские заряды мага
       abCd: [0, 0, 0], invisT: 0, offCd: 0, shieldHp: 0, shieldT: 0,
       coins: 20, hunger: HUNGER_MAX,
       rep: makeReputation(), aggroFactions: new Set(),
@@ -203,7 +207,7 @@ export class Game {
         'weapon:warhammer@r': 1, 'fox_amulet@r': 1, 'scale_armor@e': 1,
         fire_arrows: 2,
       });
-      p.ammo.mana = 60;
+      p.mana = 60;
       p.ammo.bomb = 12;
     }
     if (process.env.DEV_LEVEL) { // отладка: сразу N уровней
@@ -291,6 +295,9 @@ export class Game {
     p.hp = Math.min(p.hp, maxHp);
     p.speedMult = Math.max(0.4, speed);
     p.rollCdMult = Math.max(0.2, rollCd);
+    // запас маны: база класса + 4 за очко интеллекта (+20 богу)
+    p.manaMax = (C.manaBase || 20) + (eff.int || 0) * 4 + (p.ascended ? 20 : 0);
+    p.mana = Math.min(p.mana ?? p.manaMax, p.manaMax);
     // блок на ПКМ возможен только со щитом в левой руке
     p.canBlock = !!getItem(p.equipment.offhand)?.block;
   }
@@ -300,6 +307,9 @@ export class Game {
     const d = p.derived;
     const schoolMult = w.school === 'melee' ? d.dmgMelee : w.school === 'magic' ? d.dmgMagic : d.dmgRanged;
     let mult = schoolMult * (1 + 0.1 * (p.weaponUp?.[w.id] || 0));
+    // Чародейские заряды мага: +4% урона магии за заряд
+    if (w.school === 'magic' && p.cls === 'mage' && p.arcaneN)
+      mult *= 1 + 0.04 * p.arcaneN;
     if (this.hasTalent(p, 'rage') && p.hp <= p.maxHp * 0.3) mult *= 1.4;
     if (p.shadowT > 0 && this.hasTalent(p, 'shadow')) { mult *= 1.5; p.shadowT = 0; }
     const crit = this.rand() < d.critChance;
@@ -566,11 +576,14 @@ export class Game {
     }
     if (buffEnded) this.recomputeStats(p);
 
-    // Реген маны: 1 базово + интеллект + экипировка/таланты, каждые 5 секунд
-    p.manaRegenT -= dt;
-    if (p.manaRegenT <= 0) {
-      p.manaRegenT = 5;
-      p.ammo.mana = Math.min(99, (p.ammo.mana || 0) + 1 + Math.round(p.derived?.manaRegen || 0));
+    // Реген маны: непрерывный; вне боя (5 с без каста) — в 2.5 раза быстрее
+    p.combatT += dt;
+    const regen = (0.5 + 0.4 * (p.derived?.manaRegen || 0)) * (p.combatT > 5 ? 2.5 : 1);
+    p.mana = Math.min(p.manaMax, p.mana + regen * dt);
+    // Чародейские заряды мага спадают при простое
+    if (p.arcaneT > 0) {
+      p.arcaneT -= dt;
+      if (p.arcaneT <= 0) p.arcaneN = 0;
     }
     p.shadowT = Math.max(0, p.shadowT - dt);
     p.invisT = Math.max(0, (p.invisT || 0) - dt);
@@ -641,7 +654,7 @@ export class Game {
     p.inputs.length = 0;
 
     // сначала завершаем идущую перезарядку, потом при нужде запускаем новую
-    if (!w.melee) {
+    if (!w.melee && !w.manaCost) {
       if (p.reloadPending && p.reloadT <= 0) {
         p.mags[w.id] = this.finishReload(p, w);
         p.reloadPending = false;
@@ -652,6 +665,7 @@ export class Game {
 
   startReload(p) {
     const w = this.weapon(p);
+    if (w.manaCost) return; // посохи не перезаряжаются — они пьют ману
     if (w.melee || w.infiniteAmmo && p.mags[w.id] >= w.magSize) return;
     if (p.reloadPending || p.reloadT > 0) return;
     if (p.mags[w.id] >= w.magSize) return;
@@ -668,16 +682,51 @@ export class Game {
     return (p.mags[w.id] || 0) + take;
   }
 
+  // Оплата маной. Маг при нехватке доплачивает кровью: 1 сердце -> 10 маны.
+  // allowArcane — Архимаг (30% бесплатно) действует на посохи.
+  payMana(p, cost, allowArcane = false) {
+    p.combatT = 0;
+    if (allowArcane && this.hasTalent(p, 'arcane') && this.rand() < 0.3) return true;
+    if (p.mana < cost && p.cls === 'mage' && p.hp > 2) {
+      p.hp -= 2;
+      p.mana = Math.min(p.manaMax, p.mana + 10);
+      this.fx({ t: 'bloodcast', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      this.toast(p, '🩸 Кровавый каст: −1 сердце, +10 маны');
+    }
+    if (p.mana < cost) return false;
+    p.mana -= cost;
+    return true;
+  }
+
+  // Чародейский заряд мага: агрессивный ритм = больше урона магии
+  gainArcane(p) {
+    if (p.cls !== 'mage') return;
+    p.arcaneN = Math.min(5, (p.arcaneN || 0) + 1);
+    p.arcaneT = 4;
+  }
+
   tryFire(p, aim) {
     const w = this.weapon(p);
     if (p.fireCd > 0 || p.rollT > 0 || p.dead) return;
-    if (w.melee) { this.meleeSwing(p, w, aim); return; }
+    if (w.melee) { p.combatT = 0; this.meleeSwing(p, w, aim); return; }
+    if (w.manaCost) {
+      // посохи: кастуют из маны напрямую, без магазина и перезарядки
+      if (!this.payMana(p, w.manaCost, true)) {
+        if ((p.noManaT || 0) <= this.tick) { p.noManaT = this.tick + 45; this.toast(p, 'Не хватает маны'); }
+        return;
+      }
+      p.fireCd = 1 / (w.fireRate * (p.derived?.atkSpeed || 1));
+      const seed = hash2(this.world.seed, this.tick, p.id);
+      this.spawnPlayerBullets(p, w, aim, seed);
+      this.gainArcane(p);
+      this.fx({ t: 'shot', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, seed, tick: this.tick }, p.mapId, p.x, p.y);
+      return;
+    }
     if (p.reloadT > 0) return;
     if ((p.mags[w.id] || 0) <= 0) { this.startReload(p); return; }
+    p.combatT = 0;
     p.fireCd = 1 / (w.fireRate * (p.derived?.atkSpeed || 1));
-    // Архимаг: шанс не потратить ману
-    if (!(w.ammoType === 'mana' && this.hasTalent(p, 'arcane') && this.rand() < 0.3))
-      p.mags[w.id]--;
+    p.mags[w.id]--;
     const seed = hash2(this.world.seed, this.tick, p.id);
     this.spawnPlayerBullets(p, w, aim, seed);
     // событие остальным клиентам (стрелявший рисует свои пули сам)
@@ -1080,8 +1129,8 @@ export class Game {
     if (!ab || p.level < ab.lvl) return;
     p.abCd = p.abCd || [0, 0, 0];
     if ((p.abCd[slot] || 0) > 0) return;
-    if (ab.mana > 0 && (p.ammo.mana || 0) < ab.mana) { this.toast(p, 'Не хватает маны'); return; }
-    if (ab.mana > 0) p.ammo.mana -= ab.mana;
+    if (ab.mana > 0 && !this.payMana(p, ab.mana)) { this.toast(p, 'Не хватает маны'); return; }
+    p.combatT = 0;
     // Ледяные жилы и божественность: способности перезаряжаются быстрее
     p.abCd[slot] = ab.cd * (this.hasTalent(p, 'cdr') ? 0.8 : 1) * (p.ascended ? 0.75 : 1);
     // Эхо маны: иногда способность почти не уходит в кулдаун
@@ -1090,7 +1139,10 @@ export class Game {
       this.toast(p, '✨ Эхо маны!');
     }
     const aim = p.aim || 0;
-    const d = p.derived || {};
+    // Чародейские заряды усиливают и способности мага
+    const arcMult = p.cls === 'mage' ? 1 + 0.04 * (p.arcaneN || 0) : 1;
+    const d = { ...(p.derived || {}), dmgMagic: (p.derived?.dmgMagic || 1) * arcMult };
+    this.gainArcane(p);
     const map = this.mapFor(p.mapId);
     // урон всем врагам в радиусе (опц. фильтр по конусу)
     const hitAround = (cx, cy, radius, dmg, kb, filter) => {
@@ -1479,6 +1531,9 @@ export class Game {
       if (kw?.lifeOnKill && pr.school === kw.school)
         killer.hp = Math.min(killer.maxHp, killer.hp + kw.lifeOnKill);
     }
+    // Мана-всплеск: маг восполняет ману убийствами магией
+    if (killer && killer.cls === 'mage' && pr.school === 'magic')
+      killer.mana = Math.min(killer.manaMax, killer.mana + 3);
     // сюжет: счётчик бандитов для Ярославы — всем участникам боя
     if (['bandit', 'banditHeavy', 'archer'].includes(e.kind))
       for (const q of gainers) if (q.story) q.story.bandits++;
@@ -1605,10 +1660,10 @@ export class Game {
       }
     }
     // Ледяная кора: четверть урона уходит в ману (3 маны за 1 урона)
-    if (this.hasTalent(p, 'manashield') && (p.ammo.mana || 0) >= 3 && dmg >= 1) {
-      const abs = Math.min(Math.ceil(dmg * 0.25), Math.floor((p.ammo.mana || 0) / 3));
+    if (this.hasTalent(p, 'manashield') && p.mana >= 3 && dmg >= 1) {
+      const abs = Math.min(Math.ceil(dmg * 0.25), Math.floor(p.mana / 3));
       if (abs > 0) {
-        p.ammo.mana -= abs * 3;
+        p.mana -= abs * 3;
         dmg -= abs;
         this.fx({ t: 'barrierHit', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
         if (dmg <= 0) { p.hurtT = PLAYER_HURT_INVULN * 0.5; return; }
@@ -1939,12 +1994,12 @@ export class Game {
         return;
       }
       if (t === T.SHRINE) {
-        if ((p.inventory.crystal || 0) < 1 && (p.ammo.mana || 0) < 5) {
+        if ((p.inventory.crystal || 0) < 1 && p.mana < 5) {
           this.toast(p, 'Духи ждут подношения (5 маны)');
           return;
         }
         if (!cdReady('shrine', 60)) return;
-        p.ammo.mana = Math.max(0, (p.ammo.mana || 0) - 5);
+        p.mana = Math.max(0, p.mana - 5);
         // совместная молитва: если рядом союзники — благословение сильнее и на всех
         const allies = [...this.players.values()].filter(q =>
           !q.dead && q.mapId === p.mapId && dist2(q.x, q.y, p.x, p.y) < 70 * 70);
@@ -3171,7 +3226,7 @@ export class Game {
       // Чародейская кровь: зелья на 50% сильнее
       const alch = this.hasTalent(p, 'alchemy') ? 1.5 : 1;
       if (u.heal) p.hp = Math.min(p.maxHp, p.hp + Math.round(u.heal * alch));
-      if (u.mana) p.ammo.mana = (p.ammo.mana || 0) + Math.round(u.mana * alch);
+      if (u.mana) p.mana = Math.min(p.manaMax, p.mana + Math.round(u.mana * alch));
       if (u.buff) {
         p.buffs[u.buff] = { mult: u.mult * alch, t: Math.round(u.time * alch) };
         this.recomputeStats(p);

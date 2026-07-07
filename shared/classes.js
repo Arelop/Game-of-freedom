@@ -6,7 +6,7 @@ export const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Ин
 export const STAT_DESC = {
   str: '+8% урона ближнего боя, +½ сердца за очко',
   agi: '+4% скорость атаки, +2% шанс уворота',
-  int: '+1 к регену маны, +6% урона магии',
+  int: '+4 к запасу маны, +реген, +6% урона магии',
   lck: 'выше шанс, количество и редкость добычи',
 };
 
@@ -16,8 +16,9 @@ export const CLASSES = {
     desc: 'Крепкий боец ближнего боя. Меч, щит и упрямство.',
     baseStats: { str: 3, agi: 1, int: 0, lck: 1 },
     maxHpBonus: 2,
+    manaBase: 20, // мана — на способности
     weapons: ['sword', 'bow'],
-    ammo: { arrow: 30, bolt: 0, mana: 0, knife: 0 },
+    ammo: { arrow: 30, bolt: 0, knife: 0 },
     sprite: 'player_warrior',
   },
   mage: {
@@ -25,8 +26,9 @@ export const CLASSES = {
     desc: 'Повелитель стихий. Хрупок, но испепеляет издалека.',
     baseStats: { str: 0, agi: 1, int: 3, lck: 1 },
     maxHpBonus: 0,
+    manaBase: 40, // главный ресурс мага: посохи кастуют из маны
     weapons: ['firestaff', 'sword'],
-    ammo: { arrow: 0, bolt: 0, mana: 50, knife: 0 },
+    ammo: { arrow: 0, bolt: 0, knife: 0 },
     sprite: 'player_mage',
   },
   rogue: {
@@ -35,8 +37,9 @@ export const CLASSES = {
     baseStats: { str: 1, agi: 3, int: 0, lck: 2 },
     maxHpBonus: 0,
     speedBonus: 0.05,
+    manaBase: 25,
     weapons: ['bow', 'knives'],
-    ammo: { arrow: 50, bolt: 0, mana: 0, knife: 15 },
+    ammo: { arrow: 50, bolt: 0, knife: 15 },
     sprite: 'player_rogue',
   },
 };

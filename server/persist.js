@@ -42,6 +42,7 @@ export function saveWorld(game) {
         story: p.story,
         home: p.home || null, homeStash: p.homeStash || {}, hintStage: p.hintStage,
         ascended: p.ascended || false, bestiary: p.bestiary || {},
+        mana: Math.round(p.mana || 0),
       })),
       banditsWeakT: w.banditsWeakT || 0,
     };
@@ -126,6 +127,10 @@ export function applySavedPlayer(game, p) {
     else if (rec.quest) p.quests = [rec.quest];
     if (rec.ascended) p.ascended = true;
     if (rec.bestiary) p.bestiary = rec.bestiary;
+    // мана: новое поле; старые сейвы хранили её как боеприпас ammo.mana
+    if (rec.mana !== undefined) p.mana = rec.mana;
+    else if (rec.ammo?.mana) p.mana = rec.ammo.mana;
+    if (p.ammo?.mana !== undefined) delete p.ammo.mana;
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);
