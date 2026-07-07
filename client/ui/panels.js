@@ -5,7 +5,7 @@ import { ITEMS, GEAR_SLOTS, SLOT_NAMES, isGear, isPotion, describeItem, isWeapon
 import { AMMO_NAMES, WEAPONS } from '../../shared/weapons.js';
 import { getWeapon, getItem, rarityOf, sellPriceR, RARITIES } from '../../shared/rarity.js';
 import { CLASSES, STAT_KEYS, STAT_NAMES, STAT_DESC, xpNeed, MAX_LEVEL } from '../../shared/classes.js';
-import { ENEMIES, HABITATS, ARCHETYPE_NAMES } from '../../shared/enemies.js';
+import { ENEMIES, HABITATS, ARCHETYPE_NAMES, tierTouchBonus, tierProjDmg } from '../../shared/enemies.js';
 import { TALENTS, TIER_REQ, SPECS, specPoints, talentRank } from '../../shared/talents.js';
 import { SFX } from '../sfx.js';
 
@@ -180,10 +180,14 @@ export class Panels {
         const info = document.createElement('div');
         info.className = 'beinfo';
         if (n > 0) {
+          const touch = d.touchDamage ? d.touchDamage + tierTouchBonus(d.tier) : 0;
+          const shoots = ['shooter', 'turret', 'boss'].includes(d.archetype);
+          const dmgTxt = (touch ? `касание ${touch}` : '') + (touch && shoots ? ' / ' : '')
+            + (shoots ? `снаряд ${tierProjDmg(d.tier)}` : '') || '—';
           info.innerHTML = `<div class="bename">${d.name}${d.faction === 'darkness' ? ' ⛧' : ''}`
             + ` <span class="bekills">убито: ${n}</span></div>`
             + `<div class="bestats">${ARCHETYPE_NAMES[d.archetype] || d.archetype} · ${d.hp} ХП`
-            + ` · урон ${d.touchDamage || '—'} · опыт ${d.xp}</div>`
+            + ` · ${dmgTxt} · опыт ${d.xp}</div>`
             + `<div class="behab">${HABITATS[d.id] || ''}</div>`;
         } else {
           info.innerHTML = `<div class="bename" style="color:#696a6a">???</div>`

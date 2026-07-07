@@ -284,6 +284,11 @@ export const ENEMIES = {
   },
 };
 
+// Рост урона с тиром: старшие твари бьют больнее той же атакой.
+// Касание: +1 на тирах 3-4, +2 на тире 5. Снаряды: 2 урона с тира 4.
+export function tierTouchBonus(tier) { return Math.floor(((tier || 1) - 1) / 2); }
+export function tierProjDmg(tier) { return 1 + Math.floor(((tier || 1) - 1) / 3); }
+
 // Монстры тира min..max — для спавна по сложности (без боссов и войск Тьмы)
 export function enemiesOfTier(min, max) {
   return Object.values(ENEMIES)

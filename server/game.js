@@ -4,7 +4,7 @@ import {
   HUNGER_MAX, HUNGER_RATE, DAY_LENGTH, PLAYER_RADIUS, DESTRUCTIBLE, seasonOf,
 } from '../shared/constants.js';
 import { WEAPONS } from '../shared/weapons.js';
-import { ENEMIES } from '../shared/enemies.js';
+import { ENEMIES, tierTouchBonus, tierProjDmg } from '../shared/enemies.js';
 import { PATTERNS, emitDirections } from '../shared/patterns.js';
 import {
   makePlayerState, stepPlayer, stepProjectile, hasIFrames, circlesOverlap, dist2,
@@ -1054,18 +1054,19 @@ export class Game {
         // контактный урон
         const def = ENEMIES[e.kind];
         if (def.touchDamage > 0) {
+          const touch = def.touchDamage + tierTouchBonus(def.tier) + (e.dmgBonus || 0);
           for (const p of this.players.values()) {
             if (p.dead || p.mapId !== e.mapId) continue;
             if (circlesOverlap(e.x, e.y, def.radius, p.x, p.y, PLAYER_RADIUS))
-              this.damagePlayer(p, def.touchDamage + (e.dmgBonus || 0), e);
+              this.damagePlayer(p, touch, e);
           }
-        }
-        // стража дерётся с врагами
-        for (const n of this.entities.values()) {
-          if (n.entType !== 'npc' || n.mapId !== e.mapId) continue;
-          if (circlesOverlap(e.x, e.y, def.radius, n.x, n.y, 5) && def.touchDamage > 0) {
-            n.touchCd = (n.touchCd || 0) - dt;
-            if (n.touchCd <= 0) { n.touchCd = 1; this.damageNpc(n, def.touchDamage, null); }
+          // стража дерётся с врагами
+          for (const n of this.entities.values()) {
+            if (n.entType !== 'npc' || n.mapId !== e.mapId) continue;
+            if (circlesOverlap(e.x, e.y, def.radius, n.x, n.y, 5)) {
+              n.touchCd = (n.touchCd || 0) - dt;
+              if (n.touchCd <= 0) { n.touchCd = 1; this.damageNpc(n, touch, null); }
+            }
           }
         }
       } else if (e.entType === 'npc') {
@@ -1327,9 +1328,11 @@ export class Game {
     for (let b = 0; b < bursts; b++) {
       const delay = b * (pat.burstInterval || 0);
       for (const a of dirs) {
+        // урон снаряда растёт с тиром монстра (+ аффикс «Свирепый»)
+        const dmg = tierProjDmg(ENEMIES[e.kind]?.tier) + (e.dmgBonus || 0);
         this.projectiles.push({
           x: e.x, y: e.y - 3, vx: Math.cos(a) * pat.speed, vy: Math.sin(a) * pat.speed,
-          life: pat.life + delay, delay, radius: pat.projRadius, dmg: 1, knockback: 15,
+          life: pat.life + delay, delay, radius: pat.projRadius, dmg, knockback: 15,
           owner: e.id, friendly: false, mapId: e.mapId,
         });
       }
