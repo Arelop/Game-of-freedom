@@ -1467,14 +1467,14 @@ export class Game {
     const alive = ids.filter(id => this.entities.has(id));
     const fk = FACTION_KINDS[s.faction] || {};
     // стража: до целевого числа (найм в civ)
-    const guards = alive.filter(id => this.entities.get(id).role === 'guard'
-      && this.entities.get(id).kind !== 'npc_spirit');
+    const guards = alive.filter(id => this.entities.get(id)?.role === 'guard'
+      && this.entities.get(id)?.kind !== 'npc_spirit');
     for (let i = guards.length; i < (s.guards || 0); i++) {
       const id = this.spawnNpc('guard', s.id, 'over', sx + 20, sy + 20, fk.guard ? { kind: fk.guard } : {});
       ids.push(id);
     }
     // дух-хранитель: появляется с ритуалом, уходит по сроку
-    const spirit = alive.map(id => this.entities.get(id)).find(e => e.kind === 'npc_spirit');
+    const spirit = alive.map(id => this.entities.get(id)).find(e => e?.kind === 'npc_spirit');
     if (s.spiritT > 0 && !spirit) {
       const id = this.spawnNpc('guard', s.id, 'over', sx + 12, sy - 20, { kind: 'npc_spirit' });
       const sp = this.entities.get(id);
@@ -1485,7 +1485,8 @@ export class Game {
       this.entities.delete(spirit.id);
     }
     // жители: рост — новичок приходит к таверне; убыль — уходят лишь незаметно
-    const villagers = alive.filter(id => this.entities.get(id).role === 'villager');
+    // (?.— выше по ходу функции дух-хранитель мог быть удалён из entities)
+    const villagers = alive.filter(id => this.entities.get(id)?.role === 'villager');
     const target = Math.min(9, Math.max(2, s.population - 4));
     const a = s.anchors;
     for (let i = villagers.length; i < target; i++) {
