@@ -1420,7 +1420,7 @@ export class Game {
       const alive = poi.npcId && this.entities.has(poi.npcId);
       if (near && !alive) {
         poi.npcId = this.spawnNpc(role, poi.id, 'over', cx + 8, cy + 28, {
-          kind: 'npc_wizard',
+          kind: role === 'hermit' ? 'npc_hermit' : 'npc_wanderer',
         });
         const n = this.entities.get(poi.npcId);
         n.name = role === 'hermit' ? 'Радогост' : 'Мирослава';

@@ -247,8 +247,7 @@
       "down": 2
     },
     "enemy_necromancer": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/necromancer.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_necromancer.png"
     },
     "enemy_iron_troll": {
       "file": "assets/raw/ai/enemy_iron_troll.png"
@@ -484,9 +483,7 @@
       "file": "assets/raw/ai/player_rogue.png"
     },
     "npc_wizard": {
-      "pack": "d",
-      "tx": 0,
-      "ty": 7
+      "file": "assets/raw/ai/npc_wizard.png"
     },
     "npc_villager": {
       "pack": "d",
@@ -1266,8 +1263,7 @@
       "file": "assets/raw/ai/npc_villager_sev.png"
     },
     "npc_guard_sev": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/dwarf.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_guard_sev.png"
     },
     "npc_merchant_sev": {
       "file": "assets/raw/ai/npc_merchant_sev.png"
@@ -1334,17 +1330,24 @@
       "file": "assets/raw/ai/npc_elder2.png"
     },
     "npc_hunter2": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/harold.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_hunter2.png"
     },
     "npc_priest2": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/josephine.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_priest2.png"
     },
     "tile_pier": {
       "pack": "d",
       "tx": 1,
       "ty": 4
+    },
+    "npc_hermit": {
+      "file": "assets/raw/ai/npc_hermit.png"
+    },
+    "npc_wanderer": {
+      "file": "assets/raw/ai/npc_wanderer.png"
+    },
+    "npc_darkscout": {
+      "file": "assets/raw/ai/npc_darkscout.png"
     }
   }
 }

@@ -31,7 +31,7 @@ const MAP = {
   'ChatGPT Image 8 июл. 2026 г., 14_05_03 (9).png': { name: 'enemy_ogre', w: 18, h: 18 },
   // ═══ жители ═══
   'ChatGPT Image 8 июл. 2026 г., 14_07_16 (1).png': 'npc_villager_sev',
-  'ChatGPT Image 8 июл. 2026 г., 14_07_16 (2).png': 'npc_elder2',
+  'ChatGPT Image 8 июл. 2026 г., 14_07_16 (2).png': 'npc_hermit', // дед с косой — отшельник Радогост
   'ChatGPT Image 8 июл. 2026 г., 14_07_16 (3).png': 'npc_smith',
   'ChatGPT Image 8 июл. 2026 г., 14_07_16 (4).png': 'npc_merchant_sev',
   'ChatGPT Image 8 июл. 2026 г., 14_07_16 (5).png': 'npc_villager_oz',
@@ -53,6 +53,17 @@ const MAP = {
   'ChatGPT Image 8 июл. 2026 г., 16_59_55 (8).png': 'enemy_dark_knight',
   'ChatGPT Image 8 июл. 2026 г., 16_59_57 (9).png': 'enemy_spore',
   'ChatGPT Image 8 июл. 2026 г., 16_59_58 (10).png': { name: 'enemy_iron_troll', w: 18, h: 18 },
+  // ═══ важные люди ═══
+  'ChatGPT Image 8 июл. 2026 г., 17_18_00 (1).png': 'npc_elder2',       // король-старейшина
+  'ChatGPT Image 8 июл. 2026 г., 17_18_00 (2).png': 'npc_wanderer',     // Мирослава в синем
+  'ChatGPT Image 8 июл. 2026 г., 17_18_01 (3).png': 'npc_wizard',       // синий маг
+  'ChatGPT Image 8 июл. 2026 г., 17_18_01 (4).png': 'npc_priest2',      // верховная жрица
+  'ChatGPT Image 8 июл. 2026 г., 17_18_02 (5).png': 'npc_guard_sev',    // командир севера
+  'ChatGPT Image 8 июл. 2026 г., 17_18_02 (6).png': 'npc_smith',        // кузнец с клинком
+  'ChatGPT Image 8 июл. 2026 г., 17_18_02 (7).png': 'npc_darkscout',    // плут-наводчик (кампания)
+  'ChatGPT Image 8 июл. 2026 г., 17_18_03 (8).png': 'npc_hunter2',      // охотник с луком
+  'ChatGPT Image 8 июл. 2026 г., 17_18_03 (9).png': 'enemy_necromancer',// лич
+  'ChatGPT Image 8 июл. 2026 г., 17_18_03 (10).png': 'npc_innkeeper',   // трактирщик
 };
 
 function isMagenta(r, g, b) { return r > 150 && b > 150 && g < Math.min(r, b) - 40; }
