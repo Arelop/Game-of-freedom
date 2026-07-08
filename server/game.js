@@ -3010,9 +3010,9 @@ export class Game {
       this.toastAll('★ Древний демон колодца развеян — трофеи победителю!');
       this.events.push(this.world.day, 'Узник колодца повержен путниками');
     }
-    // мини-босс данжа: роняет ключ от двери босса
+    // мини-босс данжа: роняет ключ от двери босса (ключ НЕ исчезает)
     if (e.dropKey) {
-      this.spawnDrop('dungeon_key', 1, e.mapId, e.x, e.y);
+      this.spawnDrop('dungeon_key', 1, e.mapId, e.x, e.y, 100000);
       this.toastMap(e.mapId, '🗝 Хранитель ключа пал! Дверь босса ждёт');
       // кампания гл.1: в целевом данже хранитель носил Чёрный медальон
       if (this.dungeons.get(e.mapId)?.poi?.id === this.world.mq?.dungeon) {
@@ -3689,8 +3689,20 @@ export class Game {
       if (t === T.DUNGEON_EXIT && p.mapId !== 'over') { this.exitDungeon(p); return; }
       if (t === T.LOCKED_DOOR && p.mapId !== 'over') {
         if ((p.inventory.dungeon_key || 0) < 1) {
-          this.toast(p, '🔒 Заперто. Ключ носит хранитель — сильнейший страж этих залов');
-          return;
+          // страховка от вечного тупика: хранитель мёртв и ключа нигде нет —
+          // решётка поддаётся (ключ утерян среди тел)
+          const instD = this.dungeons.get(p.mapId);
+          const pendingBearer = instD?.dungeon.rooms.some(r =>
+            !r.cleared && !r.enemyIds && r.spawns?.some(sp => sp.keyBearer));
+          const keyExists = pendingBearer || [...this.entities.values()].some(e => e.mapId === p.mapId
+            && ((e.entType === 'enemy' && e.dropKey) || (e.entType === 'drop' && e.item === 'dungeon_key')));
+          if (!keyExists) {
+            p.inventory.dungeon_key = 1; // «нашёл ключ на теле у решётки»
+            this.toast(p, '🗝 У решётки — тело с ключом на поясе. Повезло');
+          } else {
+            this.toast(p, '🔒 Заперто. Ключ носит хранитель — сильнейший страж этих залов');
+            return;
+          }
         }
         p.inventory.dungeon_key--;
         if (p.inventory.dungeon_key <= 0) delete p.inventory.dungeon_key;
