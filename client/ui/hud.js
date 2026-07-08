@@ -187,30 +187,8 @@ export class Hud {
       ctx.fillText('📜 ' + you.mq.t, 5, qy);
     }
 
-    // живой квест-маркер кампании: светло-оранжевая стрелка к цели
-    if (you.mq?.x && net.mapId === 'over') {
-      const tx = you.mq.x * 16 + 8, ty = you.mq.y * 16 + 8;
-      const dx = tx - net.pred.x, dy = ty - net.pred.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > 170) {
-        const a = Math.atan2(dy, dx);
-        const cx2 = VIEW_W / 2 + Math.cos(a) * 74, cy2 = VIEW_H / 2 + Math.sin(a) * 58;
-        ctx.save();
-        ctx.translate(cx2, cy2);
-        ctx.rotate(a);
-        ctx.fillStyle = '#ffb26b';
-        ctx.beginPath();
-        ctx.moveTo(7, 0); ctx.lineTo(-4, -4); ctx.lineTo(-4, 4);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,.6)';
-        ctx.stroke();
-        ctx.restore();
-        ctx.fillStyle = '#ffb26b';
-        const tiles = Math.round(dist / 16);
-        ctx.fillText(tiles + 'т', cx2 - 6, cy2 + 8);
-      }
-    }
+    // (стрелку-указатель к цели кампании убрали по просьбе игрока —
+    // светло-оранжевые маркеры на карте M и миникарте остаются)
 
     this.renderAbilities(ctx, you);
     this.renderMinimap(ctx, net);
