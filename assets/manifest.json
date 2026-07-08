@@ -220,8 +220,7 @@
       "file": "assets/raw/ai/enemy_demonologist.png"
     },
     "enemy_spore": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/fungi_plants/giant_spore.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_spore.png"
     },
     "enemy_boar": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/hog.png",
@@ -233,8 +232,7 @@
       "ty": 10
     },
     "enemy_spider": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/wolf_spider.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_spider.png"
     },
     "enemy_scorpion": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/giant_scorpion.png",
@@ -253,8 +251,7 @@
       "down": 2
     },
     "enemy_iron_troll": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/iron_troll.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_iron_troll.png"
     },
     "enemy_frost_giant": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/frost_giant.png",
@@ -532,9 +529,7 @@
       "ty": 9
     },
     "enemy_skeleton": {
-      "pack": "d",
-      "tx": 1,
-      "ty": 10
+      "file": "assets/raw/ai/enemy_skeleton.png"
     },
     "enemy_dasher": {
       "pack": "d",
@@ -542,14 +537,10 @@
       "ty": 10
     },
     "enemy_demon": {
-      "pack": "d",
-      "tx": 2,
-      "ty": 9
+      "file": "assets/raw/ai/enemy_demon.png"
     },
     "enemy_imp": {
-      "pack": "d",
-      "tx": 0,
-      "ty": 10
+      "file": "assets/raw/ai/enemy_imp.png"
     },
     "enemy_rat": {
       "pack": "d",
@@ -562,9 +553,7 @@
       "ty": 9
     },
     "enemy_dark_knight": {
-      "pack": "d",
-      "tx": 3,
-      "ty": 10
+      "file": "assets/raw/ai/enemy_dark_knight.png"
     },
     "enemy_mimic": {
       "pack": "d",
@@ -584,8 +573,7 @@
       "down": 2
     },
     "enemy_dark_mage": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/undead/lich.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_dark_mage.png"
     },
     "enemy_dark_lord": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/undead/vampire_knight.png",
@@ -885,8 +873,7 @@
       "proc": "herb"
     },
     "enemy_wolf": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/animals/wolf.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_wolf.png"
     },
     "enemy_turret": {
       "proc": "totem",
@@ -901,7 +888,7 @@
       }
     },
     "enemy_boss": {
-      "proc": "ogre"
+      "file": "assets/raw/ai/enemy_boss.png"
     },
     "ui_heart_full": {
       "proc": "heart",

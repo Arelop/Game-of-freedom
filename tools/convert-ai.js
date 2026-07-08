@@ -42,6 +42,17 @@ const MAP = {
   // ═══ классы игроков ═══
   'Thief.png': 'player_rogue',
   'Priest.png': 'player_priest',
+  // ═══ монстры ═══
+  'ChatGPT Image 8 июл. 2026 г., 16_59_45 (1).png': 'enemy_skeleton',
+  'ChatGPT Image 8 июл. 2026 г., 16_59_45 (2).png': 'enemy_wolf',
+  'ChatGPT Image 8 июл. 2026 г., 16_59_47 (3).png': 'enemy_dark_mage',
+  'ChatGPT Image 8 июл. 2026 г., 16_59_48 (4).png': 'enemy_spider',
+  'ChatGPT Image 8 июл. 2026 г., 16_59_50 (5).png': 'enemy_demon',
+  'ChatGPT Image 8 июл. 2026 г., 16_59_52 (6).png': { name: 'enemy_boss', w: 20, h: 20 },
+  'ChatGPT Image 8 июл. 2026 г., 16_59_54 (7).png': 'enemy_imp',
+  'ChatGPT Image 8 июл. 2026 г., 16_59_55 (8).png': 'enemy_dark_knight',
+  'ChatGPT Image 8 июл. 2026 г., 16_59_57 (9).png': 'enemy_spore',
+  'ChatGPT Image 8 июл. 2026 г., 16_59_58 (10).png': { name: 'enemy_iron_troll', w: 18, h: 18 },
 };
 
 function isMagenta(r, g, b) { return r > 150 && b > 150 && g < Math.min(r, b) - 40; }
