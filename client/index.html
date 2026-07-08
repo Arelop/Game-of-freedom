@@ -24,6 +24,8 @@
   .overlay .hint { color: #696a6a; font-size: 12px; max-width: 480px; text-align: center; line-height: 1.6; }
   #toasts { position: absolute; top: 14%; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; z-index: 5; }
   .toast { background: rgba(34,32,52,.92); border: 1px solid #5b6ee1; padding: 5px 14px; font-size: 14px; animation: fadeout 4s forwards; }
+  /* вехи кампании: синие, заметные, живут дольше */
+  .toast-mq { color: #8fd3ff; border-color: #63c5ff; background: rgba(16,32,58,.95); font-weight: bold; animation: fadeout 6s forwards; }
   @keyframes fadeout { 0%{opacity:0; transform:translateY(-6px)} 8%{opacity:1; transform:none} 80%{opacity:1} 100%{opacity:0} }
   #dialog { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); min-width: 340px; max-width: 560px; background: rgba(18,15,24,.96); border: 12px solid transparent; border-image: url(/assets/ui/panel-gold.png) 16 round; background-clip: padding-box; padding: 12px 16px; z-index: 6; display: none; }
   #dialog .dhead { display: flex; gap: 10px; align-items: flex-start; }

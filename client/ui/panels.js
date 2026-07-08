@@ -109,10 +109,12 @@ export class Panels {
 
   toast(text) {
     const el = document.createElement('div');
-    el.className = 'toast';
+    // вехи кампании (📜) — синим и подольше: главный квест видно сразу
+    const mq = text.startsWith('📜');
+    el.className = mq ? 'toast toast-mq' : 'toast';
     el.textContent = text;
     this.toastsEl.appendChild(el);
-    setTimeout(() => el.remove(), 3200);
+    setTimeout(() => el.remove(), mq ? 5200 : 3200);
     if (this.toastsEl.children.length > 4) this.toastsEl.firstChild.remove();
   }
 
