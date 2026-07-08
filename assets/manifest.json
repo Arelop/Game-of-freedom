@@ -484,9 +484,7 @@
       "ty": 7
     },
     "player_rogue": {
-      "pack": "d",
-      "tx": 3,
-      "ty": 9
+      "file": "assets/raw/ai/player_rogue.png"
     },
     "npc_wizard": {
       "pack": "d",
@@ -1050,8 +1048,7 @@
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/armour/boots4_green.png"
     },
     "player_priest": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/holy/paladin.png",
-      "down": 2
+      "file": "assets/raw/ai/player_priest.png"
     },
     "wpn_lightstaff": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/staff/staff05.png"

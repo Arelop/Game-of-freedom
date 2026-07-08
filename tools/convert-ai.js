@@ -39,9 +39,12 @@ const MAP = {
   'ChatGPT Image 8 июл. 2026 г., 14_07_17 (7).png': 'npc_widow',
   'ChatGPT Image 8 июл. 2026 г., 14_07_17 (8).png': 'npc_innkeeper',
   'ChatGPT Image 8 июл. 2026 г., 14_08_55.png': { name: 'obj_tower', w: 16, h: 32 },
+  // ═══ классы игроков ═══
+  'Thief.png': 'player_rogue',
+  'Priest.png': 'player_priest',
 };
 
-function isMagenta(r, g, b) { return r > 160 && b > 160 && g < Math.min(r, b) - 60; }
+function isMagenta(r, g, b) { return r > 150 && b > 150 && g < Math.min(r, b) - 40; }
 
 function convert(srcPath, outPath, W = 16, H = 16) {
   const p = PNG.sync.read(readFileSync(srcPath));
