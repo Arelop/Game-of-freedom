@@ -92,7 +92,7 @@ export class Net {
       case 'shot': {
         if (m.pid === this.myId) break; // свои пули уже нарисованы
         const w = getWeapon(m.weapon);
-        if (w) this.spawnWeaponBullets(m.x, m.y, m.aim, w, m.seed);
+        if (w) this.spawnWeaponBullets(m.x, m.y, m.aim, w, m.seed, !!m.chg);
         this.handlers.onFx?.('shot', m);
         break;
       }
@@ -247,14 +247,16 @@ export class Net {
   }
 
   // косметические пули (свои горящие стрелы рисуются огнём)
-  spawnWeaponBullets(x, y, aim, w, seed) {
+  spawnWeaponBullets(x, y, aim, w, seed, chg = false) {
     const rand = mulberry32(seed >>> 0);
     const fiery = this.you?.bf?.fireArrows && (w.ammoType === 'arrow' || w.ammoType === 'bolt');
+    const spd = w.projectileSpeed * (chg ? 1.2 : 1); // заряженный снаряд мага — тяжелее и быстрее
     for (let i = 0; i < w.projectilesPerShot; i++) {
       const a = aim + (rand() - 0.5) * w.spreadDeg * Math.PI / 180;
       this.bullets.push({
-        x, y: y - 4, vx: Math.cos(a) * w.projectileSpeed, vy: Math.sin(a) * w.projectileSpeed,
+        x, y: y - 4, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
         life: w.projLife, sprite: fiery ? 'proj_fire' : w.projSprite, hostile: false, ang: a,
+        chg: chg ? 1 : 0,
       });
     }
   }

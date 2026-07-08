@@ -215,6 +215,7 @@ export class Net {
         ab: (p.abCd || []).map(v => r1(v)), abl: p.abilities, blk: p.blocking ? 1 : 0, inv2: r1(p.invisT || 0),
         oc: r1(p.offCd || 0), sh: p.shieldHp || 0, cb: p.canBlock ? 1 : 0,
         mp: Math.floor(p.mana), mpm: p.manaMax, arc: p.arcaneN || 0,
+        chg: p.chg ? r2(p.chg) : undefined, // заряд посоха мага (0..1)
         rsc: p.cls === 'warrior' ? Math.round(p.rage || 0)
           : p.cls === 'rogue' ? (p.combo || 0)
           : p.cls === 'priest' ? (p.grace || 0) : undefined,

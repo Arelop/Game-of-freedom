@@ -47,10 +47,12 @@ export function updateNpc(npc, dt, map, game) {
       if (bd > 60 * 60) walkTo(npc, target.x, target.y, GUARD_SPEED, dt, map);
       npc.fireT = (npc.fireT ?? 0.4) - dt;
       if (npc.fireT <= 0) {
-        npc.fireT = fiery ? 0.9 : 1.0;
+        // «Пылающий дух»: заряженный талантом дух бьёт вдвое чаще
+        npc.fireT = fiery ? 0.9 : npc.spirit2 ? 0.5 : 1.0;
         // характер призыва: огонь жжёт, лёд студит (метка!), свет лечит своих
         const shot = npc.frost ? { dmg: 2, weapon: 'froststaff', speed: 250, chill: { time: 2.5 }, slow: { mult: 0.65, time: 1.5 }, school: 'magic' }
-          : npc.holySpirit ? { dmg: 2, weapon: 'lightstaff', speed: 250, holy: 1, school: 'magic' }
+          : npc.holySpirit ? { dmg: 2, weapon: 'lightstaff', speed: 250, holy: 1, school: 'magic',
+            ignite: npc.spirit2 ? { time: 2, dmg: 1 } : undefined } // и его лучи жгут
           : fiery ? { dmg: 3, weapon: 'firestaff', speed: 240 } : {};
         game.npcShoot(npc, ang, shot);
       }

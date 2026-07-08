@@ -235,6 +235,7 @@ net.handlers.onFx = (kind, m) => {
   switch (kind) {
     case 'shot':
       particles.muzzle(m.x, m.y, m.aim);
+      if (m.chg) particles.burst(m.x, m.y - 4, '#63c5ff', 8, 60, 0.3); // вспышка заряженного выстрела
       remoteAtk.set(m.pid, performance.now() + 350);
       if (m.pid !== net.myId) playWeaponSound(getWeapon(m.weapon)?.sound);
       break;
@@ -563,8 +564,10 @@ function simStep() {
       : (you.rt <= 0 && you.mag > 0))) {
       fireCd = 1 / w.fireRate;
       atkShowT = 0.35;
-      net.spawnWeaponBullets(net.pred.x, net.pred.y, aim, w, (net.seq * 2654435761) >>> 0);
+      const chgShot = w.manaCost && (you.chg || 0) >= 1; // заряженный выстрел мага
+      net.spawnWeaponBullets(net.pred.x, net.pred.y, aim, w, (net.seq * 2654435761) >>> 0, chgShot);
       particles.muzzle(net.pred.x + Math.cos(aim) * 8, net.pred.y - 4 + Math.sin(aim) * 8, aim);
+      if (chgShot) { particles.burst(net.pred.x, net.pred.y - 4, '#63c5ff', 8, 60, 0.3); cam.addTrauma(0.25); }
       cam.addTrauma(w.recoilShake * 0.5);
       playWeaponSound(w.sound);
     }
@@ -595,6 +598,12 @@ function simStep() {
     } else if (z.kind === 'firestorm') {
       const a = Math.random() * Math.PI * 2;
       particles.burst(z.x + Math.cos(a) * 18, z.y + Math.sin(a) * 18, Math.random() < 0.5 ? '#df7126' : '#fbf236', 3, 70, 0.4, 2);
+    } else if (z.kind === 'holy') {
+      // святая земля: тихие золотые искры
+      if (Math.random() < 0.45) {
+        const a = Math.random() * Math.PI * 2, rr = Math.random() * 50;
+        particles.burst(z.x + Math.cos(a) * rr, z.y + Math.sin(a) * rr, '#fbf236', 2, 14, 0.7, 2);
+      }
     }
   }
   for (let i = activeZones.length - 1; i >= 0; i--) if (activeZones[i].t <= 0) activeZones.splice(i, 1);
@@ -714,11 +723,24 @@ function render(timeSec) {
     drawEntity(d.id, d.r, d.p, nowMs, timeSec);
   }
 
-  // пули
+  // кольцо заряда посоха мага: наливается вокруг героя, полное — золотое
+  if ((net.you?.chg || 0) > 0 && !net.you.dead) {
+    const c = cam.toScreen(net.pred.x, net.pred.y);
+    const k = Math.min(1, net.you.chg);
+    ctx.strokeStyle = k >= 1 ? '#fbf236' : '#63c5ff';
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y - 4, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // пули (заряженный снаряд мага — крупнее)
   for (const b of net.bullets) {
     if (b.delay > 0) continue;
     const s = cam.toScreen(b.x, b.y);
-    atlas.draw(ctx, b.sprite, s.x, s.y, { rot: b.ang });
+    atlas.draw(ctx, b.sprite, s.x, s.y, { rot: b.ang, scale: b.chg ? 1.7 : 1 });
   }
 
   // дуги ударов ближнего боя
