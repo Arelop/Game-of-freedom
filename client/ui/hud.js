@@ -111,6 +111,24 @@ export class Hud {
     ctx.fillStyle = '#fbf236';
     ctx.fillText(String(you.coins), 18, VIEW_H - 16);
 
+    // панель окон: какие клавиши что открывают (нижняя кромка, по центру)
+    {
+      const KEYS = [['Tab', 'сумка'], ['C', 'герой'], ['K', 'умения'], ['J', 'журнал'],
+        ['M', 'карта'], ['P', 'народы'], ['B', 'бестиарий'], ['L', 'летопись']];
+      let kx = VIEW_W / 2 - 126;
+      const ky = VIEW_H - 8;
+      for (const [key, label] of KEYS) {
+        const kw = key.length * 5 + 3;
+        ctx.fillStyle = 'rgba(20,18,28,.75)';
+        ctx.fillRect(kx - 1, ky - 1, kw, 8);
+        ctx.fillStyle = '#fbf236';
+        ctx.fillText(key, kx + 1, ky);
+        ctx.fillStyle = '#847e87';
+        ctx.fillText(label, kx + kw + 2, ky);
+        kx += kw + 2 + label.length * 5 + 8;
+      }
+    }
+
     // время суток и сезон
     const t = net.worldTime;
     const icon = (t > 0.22 && t < 0.85) ? '☀' : '☾';

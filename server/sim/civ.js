@@ -200,7 +200,7 @@ export class CivSim {
         s.guards++;
         s.prosperity -= 8;
         this.say(s, 'Нанят новый стражник (−2 металла)');
-        this.rehydrate(s);
+        this.game.syncSettlementNpcs(s, false); // новичок приходит, никто не телепортируется
       } else if (rand() < 0.3) {
         this.say(s, 'Не хватает металла для снаряжения стражи');
       }
@@ -221,7 +221,7 @@ export class CivSim {
         } else {
           s.spiritT = 20;
           this.say(s, '✦ Из иного мира призван дух-хранитель');
-          this.rehydrate(s);
+          this.game.syncSettlementNpcs(s, false);
         }
       } else if (s.wardT <= 0 && rand() < 0.25) {
         s.crystal -= 3;
@@ -230,7 +230,7 @@ export class CivSim {
       }
     }
     if (s.wardT > 0) s.wardT--;
-    if (s.spiritT > 0) { s.spiritT--; if (s.spiritT === 0) this.rehydrate(s); }
+    if (s.spiritT > 0) { s.spiritT--; if (s.spiritT === 0) this.game.syncSettlementNpcs(s, false); }
 
     // --- строительство ---
     if (s.project) {

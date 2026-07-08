@@ -603,6 +603,7 @@ export class Game {
     for (const p of this.players.values()) this.stepPlayerTick(p, dt);
 
     this.hydrateSettlements();
+    this.hydratePois();
     this.stepEntities(dt);
     this.separateEntities();
     this.stepProjectiles(dt);
@@ -1293,7 +1294,7 @@ export class Game {
         continue;
       }
       if (s.captured) { // в захваченной деревне хозяйничают бандиты или гарнизон Тьмы
-        if (near && !hyd) {
+        if (!hyd) {
           const ids = [];
           const darkFort = s.faction === 'darkness';
           const kinds = darkFort
@@ -1314,13 +1315,10 @@ export class Game {
               p.mapId === 'over' && dist2(p.x, p.y, sx, sy) < SETTLEMENT_HYDRATE_R ** 2);
             this.civ.liberateSettlement(s, liberator);
           }
-        } else if (!near && hyd) {
-          for (const id of hyd) this.entities.delete(id);
-          this.hydratedSettlements.delete(s.id);
         }
         continue;
       }
-      if (near && !hyd) {
+      if (!hyd) { // жители живут ПОСТОЯННО — никаких исчезновений за спиной
         const ids = [];
         const a = s.anchors;
         ids.push(this.spawnNpc('elder', s.id, 'over', sx + 20, sy - 10));
@@ -1418,26 +1416,62 @@ export class Game {
           ent.work = pick(this.rand, a.works);
           ids.push(npc);
         }
-        // жители возвращаются ТУДА, где их видели в прошлый раз (никакой телепортации)
-        if (s.savedNpcPos) {
-          ids.forEach((id, i) => {
-            const pos = s.savedNpcPos[i];
-            const e = this.entities.get(id);
-            if (pos && e) { e.x = pos.x; e.y = pos.y; }
-          });
-        }
         this.hydratedSettlements.set(s.id, ids);
-      } else if (!near && hyd) {
-        // запоминаем, где кто стоял — вернутся на свои места
-        s.savedNpcPos = hyd.map(id => {
-          const e = this.entities.get(id);
-          return e ? { x: e.x, y: e.y } : null;
-        });
-        for (const id of hyd) this.entities.delete(id);
-        this.hydratedSettlements.delete(s.id);
+      } else if (this.tick % 300 === 0) {
+        // деревня растёт/скудеет — мягкий досев без пересоздания живых
+        this.syncSettlementNpcs(s, near);
       }
     }
 
+    return;
+  }
+
+  // Мягкая синхронизация населения: досеваем новичков, лишних не трогаем
+  // (удаляем только вдали от глаз — жители «уезжают», а не испаряются)
+  syncSettlementNpcs(s, near) {
+    const ids = this.hydratedSettlements.get(s.id);
+    if (!ids || s.captured || s.ruined) return;
+    const sx = s.x * TILE, sy = s.y * TILE;
+    const alive = ids.filter(id => this.entities.has(id));
+    const fk = FACTION_KINDS[s.faction] || {};
+    // стража: до целевого числа (найм в civ)
+    const guards = alive.filter(id => this.entities.get(id).role === 'guard'
+      && this.entities.get(id).kind !== 'npc_spirit');
+    for (let i = guards.length; i < (s.guards || 0); i++) {
+      const id = this.spawnNpc('guard', s.id, 'over', sx + 20, sy + 20, fk.guard ? { kind: fk.guard } : {});
+      ids.push(id);
+    }
+    // дух-хранитель: появляется с ритуалом, уходит по сроку
+    const spirit = alive.map(id => this.entities.get(id)).find(e => e.kind === 'npc_spirit');
+    if (s.spiritT > 0 && !spirit) {
+      const id = this.spawnNpc('guard', s.id, 'over', sx + 12, sy - 20, { kind: 'npc_spirit' });
+      const sp = this.entities.get(id);
+      sp.hp = sp.maxHp = 24;
+      ids.push(id);
+    } else if (s.spiritT <= 0 && spirit) {
+      this.fx({ t: 'poof', x: spirit.x, y: spirit.y }, 'over', spirit.x, spirit.y);
+      this.entities.delete(spirit.id);
+    }
+    // жители: рост — новичок приходит к таверне; убыль — уходят лишь незаметно
+    const villagers = alive.filter(id => this.entities.get(id).role === 'villager');
+    const target = Math.min(9, Math.max(2, s.population - 4));
+    const a = s.anchors;
+    for (let i = villagers.length; i < target; i++) {
+      const bed = a.beds[i % Math.max(1, a.beds.length)];
+      const id = this.spawnNpc('villager', s.id, 'over', sx + (this.rand() - 0.5) * 60, sy + 30,
+        fk.villager && this.rand() < 0.65 ? { kind: fk.villager } : {});
+      const ent = this.entities.get(id);
+      ent.bed = bed ? { x: bed.x, y: bed.y } : { x: s.x, y: s.y };
+      ent.work = pick(this.rand, a.works);
+      ids.push(id);
+    }
+    if (!near && villagers.length > target + 1) {
+      const gone = this.entities.get(villagers[0]);
+      if (gone) this.entities.delete(gone.id);
+    }
+  }
+
+  hydratePois() {
     // лагеря, каменные круги и логова боссов: засада на подходе
     for (const poi of this.world.pois) {
       if ((poi.type !== 'camp' && poi.type !== 'circle' && poi.type !== 'lair') || poi.cleared) continue;
@@ -1474,20 +1508,14 @@ export class Game {
         : poi.type === 'obelisk' && this.world.pois.find(o => o.type === 'obelisk') === poi ? 'wanderer' : null;
       if (!role) continue;
       const cx = poi.x * TILE, cy = poi.y * TILE;
-      let near = false;
-      for (const p of this.players.values())
-        if (p.mapId === 'over' && dist2(p.x, p.y, cx, cy) < SETTLEMENT_HYDRATE_R ** 2) { near = true; break; }
       const alive = poi.npcId && this.entities.has(poi.npcId);
-      if (near && !alive) {
+      if (!alive) { // именные живут в мире постоянно
         poi.npcId = this.spawnNpc(role, poi.id, 'over', cx + 8, cy + 28, {
           kind: role === 'hermit' ? 'npc_hermit' : role === 'darkscout' ? 'npc_darkscout' : 'npc_wanderer',
         });
         const n = this.entities.get(poi.npcId);
         n.name = role === 'hermit' ? 'Радогост' : role === 'darkscout' ? 'Наводчик Тьмы' : 'Мирослава';
         n.hp = n.maxHp = role === 'darkscout' ? 10 : 20;
-      } else if (!near && alive) {
-        this.entities.delete(poi.npcId);
-        poi.npcId = null;
       }
     }
   }
@@ -1500,13 +1528,21 @@ export class Game {
         this.checkPickup(e);
         continue;
       }
-      // LOD: обновляем только рядом с игроками
+      // LOD: враги думают только рядом с игроками; ЖИТЕЛИ живут всегда —
+      // вдали просто реже (крупный шаг раз в полсекунды): распорядок дня
+      // идёт своим чередом, и никто не телепортируется за спиной
       let near = false;
       for (const p of this.players.values()) {
         if (p.mapId !== e.mapId || p.dead) continue;
         if (dist2(p.x, p.y, e.x, e.y) < HOT_RADIUS ** 2) { near = true; break; }
       }
-      if (!near) continue;
+      if (!near) {
+        if (e.entType === 'npc' && this.tick % 15 === 0) {
+          if (e.dieAtTick && this.tick >= e.dieAtTick) { this.entities.delete(e.id); continue; }
+          updateNpc(e, dt * 15, this.mapFor(e.mapId), this);
+        }
+        continue;
+      }
 
       const map = this.mapFor(e.mapId);
       if (e.entType === 'enemy') {
@@ -5389,7 +5425,7 @@ export class Game {
           s.prosperity = Math.min(100, s.prosperity + 15);
           s.guards++;
           s.wardT = Math.max(s.wardT, 20);
-          this.civ.rehydrate(s);
+          this.syncSettlementNpcs(s, false); // стража прибывает без телепорта жителей
         }
         p.inventory['rune_amulet@e'] = (p.inventory['rune_amulet@e'] || 0) + 1;
         this.addXp(p, 120);
