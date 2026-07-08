@@ -111,22 +111,40 @@ export class Hud {
     ctx.fillStyle = '#fbf236';
     ctx.fillText(String(you.coins), 18, VIEW_H - 16);
 
-    // панель окон: какие клавиши что открывают (нижняя кромка, по центру)
+    // микроменю в духе WoW: тёмный док справа внизу, слоты-иконки,
+    // буква клавиши в углу слота (ничего не наезжает на соседей)
     {
-      const KEYS = [['Tab', 'сумка'], ['C', 'герой'], ['K', 'умения'], ['J', 'журнал'],
-        ['M', 'карта'], ['P', 'народы'], ['B', 'бестиарий'], ['L', 'летопись']];
-      let kx = VIEW_W / 2 - 126;
-      const ky = VIEW_H - 8;
-      for (const [key, label] of KEYS) {
-        const kw = key.length * 5 + 3;
-        ctx.fillStyle = 'rgba(20,18,28,.75)';
-        ctx.fillRect(kx - 1, ky - 1, kw, 8);
+      const MM = [
+        ['Tab', 'obj_sack'], ['C', 'item_helmet'], ['K', 'item_tome_flame'], ['J', 'ui_mm_scroll'],
+        ['M', 'ui_mm_map'], ['P', 'item_shield_wood'], ['B', 'enemy_wolf'], ['L', 'ui_mm_book'],
+      ];
+      const bw = 18, gap = 2, total = MM.length * (bw + gap) - gap;
+      let bx = VIEW_W - total - 5;
+      const by = VIEW_H - 23;
+      // подложка дока
+      ctx.fillStyle = 'rgba(10,9,16,.85)';
+      ctx.fillRect(bx - 3, by - 3, total + 6, bw + 6);
+      ctx.strokeStyle = '#4a4460';
+      ctx.strokeRect(bx - 2.5, by - 2.5, total + 5, bw + 5);
+      ctx.font = '7px monospace';
+      for (const [key, icon] of MM) {
+        // слот
+        ctx.fillStyle = '#1c1a24';
+        ctx.fillRect(bx, by, bw, bw);
+        ctx.strokeStyle = '#5b556e';
+        ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bw - 1);
+        const spr = this.atlas.map[icon];
+        const sc = spr ? Math.min(1, 14 / Math.max(spr.w, spr.h)) : 1;
+        this.atlas.draw(ctx, icon, bx + bw / 2, by + bw / 2, { scale: sc });
+        // хоткей в верхнем правом углу слота, с тенью — как в WoW
+        const kw = key.length * 4;
+        ctx.fillStyle = 'rgba(0,0,0,.75)';
+        ctx.fillRect(bx + bw - kw - 2, by + 1, kw + 1, 7);
         ctx.fillStyle = '#fbf236';
-        ctx.fillText(key, kx + 1, ky);
-        ctx.fillStyle = '#847e87';
-        ctx.fillText(label, kx + kw + 2, ky);
-        kx += kw + 2 + label.length * 5 + 8;
+        ctx.fillText(key, bx + bw - kw - 1, by + 2);
+        bx += bw + gap;
       }
+      ctx.font = '8px monospace';
     }
 
     // время суток и сезон

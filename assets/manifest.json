@@ -1377,6 +1377,15 @@
     },
     "ab_summon_spirit": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/corona.png"
+    },
+    "ui_mm_scroll": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/scroll/scroll.png"
+    },
+    "ui_mm_map": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-misc/magicmap.png"
+    },
+    "ui_mm_book": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/book/gold.png"
     }
   }
 }
