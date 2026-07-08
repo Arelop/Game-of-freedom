@@ -225,6 +225,8 @@ export class Net {
         mpl: game.mplus && p.mapId === game.mplus.mapId
           ? { l: game.mplus.lvl, t: Math.max(0, Math.round((game.mplus.endTick - game.tick) / 30)) }
           : undefined,
+        // кампания: номер главы и текущая цель (HUD-строка)
+        mq: p.story.mq > 0 && p.story.mq < 10 ? { c: p.story.mq, t: game.mqObjective(p) } : undefined,
       },
       ents,
     };

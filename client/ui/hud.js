@@ -156,7 +156,14 @@ export class Hud {
       if (HINTS[you.hnt]) {
         ctx.fillStyle = '#63c5ff';
         ctx.fillText('➤ ' + HINTS[you.hnt], 5, qy);
+        qy += 9;
       }
+    }
+
+    // кампания «Тень над Пограничьем»: постоянная золотая строка цели
+    if (you.mq?.t) {
+      ctx.fillStyle = '#e8a33d';
+      ctx.fillText('📜 ' + you.mq.t, 5, qy);
     }
 
     this.renderAbilities(ctx, you);

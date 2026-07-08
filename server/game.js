@@ -277,6 +277,7 @@ export class Game {
         rado: 0, capt: 0, mira: 0, bandits: 0, banditsGoal: 0, shards: [], captCamp: null,
         smith: 0, widow: 0, well: 0, // цепочки: Творимир, Милица, Голос из колодца
         plague: 0, car: 0, bog: 0,   // цепочки дальних деревень: Хворь, Караванщик, Голос болот
+        mq: 0, mqS: 0,               // кампания «Тень над Пограничьем»: глава и подэтап
       },
       hintStage: 0, hintKills: 0, // онбординг: цепочка первых целей в HUD
       bestiary: {},               // счётчики убийств по видам монстров
@@ -410,6 +411,7 @@ export class Game {
 
     // кровавый пакт с Голосом болот: −1 сердце навсегда, +10% всего урона
     if (p.story?.bogPact) { maxHp = Math.max(4, maxHp - 2); gearDmg *= 1.1; }
+    if (p.story?.mqDark) gearDmg *= 1.05; // сила Угля Первой Тьмы — навсегда
 
     // амулеты с общим уроном (медвежий) усиливают все школы
     d.dmgMelee *= gearDmg; d.dmgRanged *= gearDmg; d.dmgMagic *= gearDmg;
@@ -814,6 +816,16 @@ export class Game {
           this.damageEnemy(best, p.procs.smite.dmg, { vx: 0, vy: 0, knockback: 20, owner: p.id, school: 'magic' });
           this.fx({ t: 'chain', pts: [[p.x, p.y - 12], [best.x, best.y]] }, p.mapId, p.x, p.y);
         }
+      }
+    }
+    // кампания гл.3: улика у отравленного родника
+    if (this.tick % 15 === 0 && p.mapId === 'over' && p.story.mq === 3 && p.story.mqS === 1 && this.world.mq.taint) {
+      const t = this.world.mq.taint;
+      if (dist2(p.x, p.y, t.x * TILE, t.y * TILE) < 45 * 45) {
+        p.story.mqS = 2;
+        this.toast(p, '📜 У воды — мешочек гнили. На шнурке выцарапан ЗНАК ЖРЕЦА деревни…');
+        const s4 = this.world.settlements[4];
+        if (s4) this.fx({ t: 'marker', pid: p.id, x: s4.x, y: s4.y }, null);
       }
     }
     // «Пропавший караванщик»: сюжет ведёт по следам
@@ -1328,6 +1340,14 @@ export class Game {
           th.name = 'Тихон';
           th.hp = th.maxHp = 14;
           ids.push(tid);
+          // жрец Лютобор (кампания гл.3) — пока не разоблачён
+          if (this.world.mq?.priest !== 'exposed') {
+            const lid = this.spawnNpc('priest', s.id, 'over', sx - 18, sy - 26, { mqPriest: true });
+            const lb = this.entities.get(lid);
+            lb.name = 'Лютобор';
+            lb.hp = lb.maxHp = 14;
+            ids.push(lid);
+          }
         }
         // лица народа: жители, стража и торговцы каждой фракции — свои
         const fk = FACTION_KINDS[s.faction] || {};
@@ -1336,7 +1356,9 @@ export class Game {
         // ремесленники и служители — если деревня их «выучила»
         if (a.smithy) ids.push(this.spawnNpc('blacksmith', s.id, 'over', a.smithy.x * TILE + 8, a.smithy.y * TILE + 8));
         if (a.tavern) ids.push(this.spawnNpc('innkeeper', s.id, 'over', a.tavern.x * TILE + 8, a.tavern.y * TILE + 8));
-        if (s.shrines > 0) ids.push(this.spawnNpc('priest', s.id, 'over', sx - 20, sy - 24));
+        // (в пятой деревне жрец именной — Лютобор, генерик не нужен)
+        if (s.shrines > 0 && s !== this.world.settlements[4])
+          ids.push(this.spawnNpc('priest', s.id, 'over', sx - 20, sy - 24));
         if (s.forestRich >= 2) ids.push(this.spawnNpc('hunter', s.id, 'over', sx - 40, sy + 30));
         for (let gi = 0; gi < (s.guards || 2); gi++) {
           const ga = gi / Math.max(1, s.guards) * Math.PI * 2;
@@ -1409,8 +1431,11 @@ export class Game {
 
     // именные NPC у особых мест: отшельник у хижины, странница у обелиска
     for (const poi of this.world.pois) {
-      if (!poi.special) continue;
-      const role = poi.type === 'hermit' ? 'hermit'
+      // наводчик кампании ждёт суда у павшего логова (переживает рестарты)
+      const scout = poi.id === this.world.mq?.lair && this.world.mq.lairDone && !this.world.mq.prisoner;
+      if (!poi.special && !scout) continue;
+      const role = scout ? 'darkscout'
+        : poi.type === 'hermit' ? 'hermit'
         : poi.type === 'obelisk' && this.world.pois.find(o => o.type === 'obelisk') === poi ? 'wanderer' : null;
       if (!role) continue;
       const cx = poi.x * TILE, cy = poi.y * TILE;
@@ -1420,11 +1445,11 @@ export class Game {
       const alive = poi.npcId && this.entities.has(poi.npcId);
       if (near && !alive) {
         poi.npcId = this.spawnNpc(role, poi.id, 'over', cx + 8, cy + 28, {
-          kind: role === 'hermit' ? 'npc_hermit' : 'npc_wanderer',
+          kind: role === 'hermit' ? 'npc_hermit' : role === 'darkscout' ? 'npc_darkscout' : 'npc_wanderer',
         });
         const n = this.entities.get(poi.npcId);
-        n.name = role === 'hermit' ? 'Радогост' : 'Мирослава';
-        n.hp = n.maxHp = 20;
+        n.name = role === 'hermit' ? 'Радогост' : role === 'darkscout' ? 'Наводчик Тьмы' : 'Мирослава';
+        n.hp = n.maxHp = role === 'darkscout' ? 10 : 20;
       } else if (!near && alive) {
         this.entities.delete(poi.npcId);
         poi.npcId = null;
@@ -2823,6 +2848,12 @@ export class Game {
       this.toastAll('🗿 Старший голем Выжженных земель повержен!');
       this.events.push(this.world.day, 'Пал Старший голем Выжженных земель');
     }
+    // кампания гл.5: из груди голема выпадает Уголь Первой Тьмы
+    if ((e.ashElder || e.mqEmber) && !this.world.mq?.emberDone
+      && [...this.players.values()].some(q => q.story?.mq === 5 && q.story.mqS === 1)) {
+      this.spawnDrop('first_ember', 1, e.mapId, e.x - 12, e.y, 600);
+      this.toastMap(e.mapId, '🔥 Средь обсидиановых осколков тлеет УГОЛЬ ПЕРВОЙ ТЬМЫ');
+    }
     // сюжет Творимира: Сердце горы из груди Каменного короля
     if (e.kind === 'rockKing' && gainers.some(q => q.story?.smith === 2)) {
       this.spawnDrop('mountain_heart', 1, e.mapId, e.x, e.y, 300);
@@ -2849,6 +2880,15 @@ export class Game {
     if (e.dropKey) {
       this.spawnDrop('dungeon_key', 1, e.mapId, e.x, e.y);
       this.toastMap(e.mapId, '🗝 Хранитель ключа пал! Дверь босса ждёт');
+      // кампания гл.1: в целевом данже хранитель носил Чёрный медальон
+      if (this.dungeons.get(e.mapId)?.poi?.id === this.world.mq?.dungeon) {
+        this.spawnDrop('black_medallion', 1, e.mapId, e.x + 12, e.y, 600);
+        for (const q of this.players.values())
+          if (q.mapId === e.mapId && q.story.mq === 1 && q.story.mqS === 0) {
+            q.story.mqS = 1;
+            this.toast(q, '📜 С хранителя пал ЧЁРНЫЙ МЕДАЛЬОН с чужой печатью. Покажи старейшине');
+          }
+      }
     }
     // Война с Тьмой: реликвии
     if (e.kind === 'heartKeeper') {
@@ -3001,6 +3041,8 @@ export class Game {
     if (p.contract?.type === 'glass') dmg *= 2;
     // Дух-хранитель жреца бережёт от боли
     if (p.buffs.guarded) dmg *= 1 - p.buffs.guarded.mult;
+    // Благословение Совета трёх огней: свет хранит на штурме Цитадели
+    if (p.story?.mqBlessed && this.world.war?.stage === 3) dmg *= 0.85;
     // уворот от ловкости и экипировки: урон полностью игнорируется
     // («Уклонение» вора добавляет свои 40% на время баффа)
     if (this.rand() < (p.derived?.dodge || 0) + (p.buffs.evasion?.mult || 0)) {
@@ -3150,6 +3192,12 @@ export class Game {
         if (drop.item === 'wedding_ring' && p.story.car === 2) {
           p.story.car = 3;
           this.toast(p, '🕯 Кольцо Милоша… Весняна ждёт вестей. Каких — решать тебе');
+        }
+        // кампания гл.5: Уголь Первой Тьмы подобран
+        if (drop.item === 'first_ember' && p.story.mq === 5 && p.story.mqS === 1) {
+          p.story.mqS = 2;
+          this.world.mq.emberDone = true;
+          this.toast(p, '🔥 Уголь обжигает ладонь даже сквозь тряпицу. Неси его Радогосту');
         }
       }
       this.entities.delete(drop.id);
@@ -3344,6 +3392,19 @@ export class Game {
   }
 
   onPoiCleared(poi) {
+    // кампания гл.2: логово пало — средь тел связанный Наводчик Тьмы
+    const MQ = this.world.mq;
+    if (MQ && poi.id === MQ.lair && !MQ.lairDone && !MQ.prisoner) {
+      MQ.lairDone = true;
+      const id = this.spawnNpc('darkscout', null, 'over', poi.x * TILE + 22, poi.y * TILE + 10, { kind: 'npc_darkscout' });
+      const n = this.entities.get(id);
+      if (n) { n.name = 'Наводчик Тьмы'; n.hp = n.maxHp = 10; }
+      for (const q of this.players.values())
+        if (q.story.mq === 2 && q.story.mqS === 1) {
+          q.story.mqS = 2;
+          this.toast(q, '📜 Средь тел — связанный человек с клеймом Тьмы. Реши его судьбу (E)');
+        }
+    }
     for (const p of this.players.values()) {
       for (const q of p.quests)
         if (q.type === 'clear' && q.poi === poi.id && !q.done) this.completeQuestObjective(p, q);
@@ -3371,7 +3432,7 @@ export class Game {
     const ROLE_PRIO = {
       elder: 3, merchant: 2, trader: 2, blacksmith: 2, priest: 2, innkeeper: 2, hunter: 2,
       hermit: 4, wanderer: 4, captain: 4, mastersmith: 4, widow: 4, arenamaster: 4, darkheart: 5,
-      dgtrader: 3, prisoner: 3,
+      dgtrader: 3, prisoner: 3, darkscout: 4,
     };
     let npc = null, bestScore = -Infinity;
     const R2 = 26 * 26; // ближе — иначе NPC перехватывают колодцы и доски
@@ -3693,15 +3754,23 @@ export class Game {
   warStep(p) {
     const w = this.world.war, c = this.world.citadel;
     if (!w || !c || c.dead) return;
+    // пороги доверия: горькая правда кампании (жрец разоблачён) сплотила
+    // Озёрный союз — им хватит 15 вместо 25
+    const NEED = {
+      severane: 25,
+      ozerny: this.world.mq?.priest === 'exposed' ? 15 : 25,
+      stepnyaki: 25,
+    };
     if (w.stage === 0) {
       w.stage = 1;
-      this.toast(p, '⚔ Война началась! Заручись доверием Северян, Озёрного союза и Степняков (репутация 25)');
+      this.toast(p, `⚔ Война началась! Заручись доверием Северян (${NEED.severane}), Озёрного союза (${NEED.ozerny}) и Степняков (${NEED.stepnyaki})`);
       this.toastAll('⚔ ВОЙНА С ТЬМОЙ: старейшины зовут героев объединить фракции!', true);
       this.events.push(this.world.day, `${p.name} поднял знамя Войны с Тьмой`);
     } else if (w.stage === 1) {
-      const reps = ['severane', 'ozerny', 'stepnyaki'].map(f => p.rep[f] || 0);
-      if (reps.some(r => r < 25)) {
-        this.toast(p, `⚔ Доверие фракций: Северяне ${reps[0]}, Озёрный союз ${reps[1]}, Степняки ${reps[2]} — нужно 25 у всех`);
+      const F = ['severane', 'ozerny', 'stepnyaki'];
+      const reps = F.map(f => p.rep[f] || 0);
+      if (F.some(f => (p.rep[f] || 0) < NEED[f])) {
+        this.toast(p, `⚔ Доверие фракций: Северяне ${reps[0]}/${NEED.severane}, Озёрный союз ${reps[1]}/${NEED.ozerny}, Степняки ${reps[2]}/${NEED.stepnyaki}`);
         return;
       }
       w.stage = 2;
@@ -4067,6 +4136,13 @@ export class Game {
       if (g) { g.ashElder = true; g.name = 'Старший голем'; g.hp = g.maxHp = Math.round(g.maxHp * 1.6); }
       for (let i = 0; i < 2; i++)
         this.spawnEnemy('magmaGolem', 'ash', (d.lair.x - 4 + i * 8) * TILE, (d.lair.y + 3) * TILE, { noElite: true });
+    } else if (this.ashElderDead && !this.world.mq?.emberDone && !this.mqEmberSpawned
+      && [...this.players.values()].some(q => q.story?.mq === 5 && q.story.mqS === 1)) {
+      // кампания гл.5: голем уже пал — Уголь стережёт Хранитель
+      this.mqEmberSpawned = true;
+      const gid = this.spawnEnemy('magmaGolem', 'ash', d.lair.x * TILE, d.lair.y * TILE, { forceElite: true });
+      const g = this.entities.get(gid);
+      if (g) { g.mqEmber = true; g.name = 'Хранитель Угля'; g.hp = g.maxHp = Math.round(g.maxHp * 1.4); }
     }
   }
 
@@ -4198,6 +4274,103 @@ export class Game {
   // ---------- сюжетные цепочки именных NPC ----------
   // Радогост (отшельник): кристаллы -> зачистить каменный круг -> ВЫБОР:
   // ритуал света (Тьма слабеет) или потребовать силу себе (бой с тенью).
+  // ═══════ КАМПАНИЯ «Тень над Пограничьем» — хелперы ═══════
+  // целевой данж гл.1: ближайший к стартовой деревне незачищенный
+  // (если успели зачистить до медальона — перевыбор)
+  mqPickDungeon() {
+    const MQ = this.world.mq;
+    const cur = this.world.pois.find(o => o.id === MQ.dungeon);
+    if (cur && !cur.cleared) return cur;
+    const s0 = this.world.settlements[0];
+    const pool = this.world.pois.filter(o => o.type === 'dungeon' && !o.cleared);
+    pool.sort((a, b) => dist2(a.x, a.y, s0.x, s0.y) - dist2(b.x, b.y, s0.x, s0.y));
+    MQ.dungeon = pool[0]?.id || null;
+    return pool[0] || null;
+  }
+
+  // цель гл.2: незачищенное логово владыки; фолбэк — данж с боссом
+  mqPickLair() {
+    const MQ = this.world.mq;
+    const cur = this.world.pois.find(o => o.id === MQ.lair);
+    if (cur && !cur.cleared) return cur;
+    const north = this.world.settlements.find(s => s.id === MQ.northId) || this.world.settlements[0];
+    const pool = this.world.pois.filter(o => (o.type === 'lair' || (o.type === 'dungeon' && o.boss)) && !o.cleared && o.id !== MQ.dungeon);
+    pool.sort((a, b) => dist2(a.x, a.y, north.x, north.y) - dist2(b.x, b.y, north.x, north.y));
+    MQ.lair = pool[0]?.id || null;
+    return pool[0] || null;
+  }
+
+  // «дальняя северная» деревня гл.2: из settlements[3] и [6] дальняя от стартовой
+  mqNorth() {
+    const MQ = this.world.mq;
+    if (MQ.northId) return this.world.settlements.find(s => s.id === MQ.northId);
+    const s0 = this.world.settlements[0];
+    const cand = [this.world.settlements[3], this.world.settlements[6]].filter(Boolean);
+    cand.sort((a, b) => dist2(b.x, b.y, s0.x, s0.y) - dist2(a.x, a.y, s0.x, s0.y));
+    const s = cand[0] || s0;
+    MQ.northId = s.id;
+    return s;
+  }
+
+  // точка улики гл.3: тихое место в стороне от пятой деревни
+  mqTaintSpot() {
+    const MQ = this.world.mq;
+    if (MQ.taint) return MQ.taint;
+    const s4 = this.world.settlements[4];
+    for (let tries = 0; tries < 40; tries++) {
+      const a = hash2(this.world.seed, 313, tries) % 628 / 100;
+      const r = 16 + (tries % 8);
+      const tx = Math.round(s4.x + Math.cos(a) * r), ty = Math.round(s4.y + Math.sin(a) * r);
+      if (tx < 20 || ty < 20 || tx > WORLD_TILES - 20 || ty > WORLD_TILES - 20) continue;
+      if (!SOLID.has(this.chunks.tileAt('over', tx, ty))) { MQ.taint = { x: tx, y: ty }; break; }
+    }
+    if (!MQ.taint) MQ.taint = { x: s4.x + 14, y: s4.y + 14 };
+    return MQ.taint;
+  }
+
+  // текст текущей цели кампании (HUD-строка)
+  mqObjective(p) {
+    const MQ = this.world.mq || {};
+    const S = p.story;
+    const sName = id => this.world.settlements.find(x => x.id === id)?.name || 'деревня';
+    switch (S.mq) {
+      case 1: {
+        const d = this.world.pois.find(o => o.id === MQ.dungeon);
+        if (S.mqS === 0) return `Гл.1 · Найди гнездо: ${d?.name || 'данж у дорог'}`;
+        if (S.mqS === 1) return 'Гл.1 · Покажи медальон старейшине стартовой деревни';
+        return 'Гл.1 · Отнеси медальон отшельнику Радогосту';
+      }
+      case 2: {
+        const north = this.world.settlements.find(s => s.id === MQ.northId);
+        if (north?.captured) return `Гл.2 · Освободи ${north.name} — Совету нужен её голос`;
+        if (S.mqS === 0) return `Гл.2 · Слово Севера: старейшина ${sName(MQ.northId)}`;
+        if (S.mqS === 1) return `Гл.2 · Зачисти: ${this.world.pois.find(o => o.id === MQ.lair)?.name || 'логово'}`;
+        if (S.mqS === 2) return 'Гл.2 · Реши судьбу Наводчика Тьмы (у логова)';
+        return `Гл.2 · Вернись к старейшине ${sName(MQ.northId)}`;
+      }
+      case 3: {
+        const s4 = this.world.settlements[4];
+        if (s4?.captured) return `Гл.3 · Освободи ${s4.name}`;
+        if (S.mqS === 0) return `Гл.3 · Спроси Тихона о порче (${s4?.name})`;
+        if (S.mqS === 1) return 'Гл.3 · Осмотри отравленный родник (метка на карте)';
+        return 'Гл.3 · Поговори со жрецом Лютобором';
+      }
+      case 4: {
+        const s2 = this.world.settlements[2];
+        if (s2?.captured) return `Гл.4 · Освободи ${s2.name}`;
+        return `Гл.4 · Рассуди спор степи: старейшина ${s2?.name}`;
+      }
+      case 5:
+        if (S.mqS === 0) return 'Гл.5 · Спроси Радогоста о силе Тьмы';
+        if (S.mqS === 1) return p.story.ashAttuned
+          ? 'Гл.5 · Добудь Уголь Первой Тьмы (Старший голем, север Пепла)'
+          : 'Гл.5 · Пепел: настрой печать огня (10 кристаллов у портала)';
+        return 'Гл.5 · Принеси Уголь Радогосту — и сделай выбор';
+      case 6: return 'Гл.6 · Созови Совет трёх огней у Радогоста';
+      default: return '';
+    }
+  }
+
   storyDialogHermit(p, npc) {
     const st = p.story.rado;
     const ch = [];
@@ -4233,6 +4406,24 @@ export class Game {
     } else {
       lines = ['Хижина пуста. Только пепел в очаге еще тёплый…'];
     }
+    // ─── кампания: Радогост — сердце «Тени над Пограничьем» ───
+    const mq = p.story.mq;
+    if (mq >= 1 && st >= 11) lines = ['Радогост хмур — меж вами легла тень. Но долг выше старых обид.'];
+    if (mq === 1 && p.story.mqS === 2) {
+      lines.push('', 'Взгляд отшельника цепляется за медальон на твоей ладони…');
+      ch.unshift({ id: 'story:mq1_rado', label: '📜 Показать чёрный медальон' });
+    } else if (mq === 5 && p.story.mqS === 0) {
+      ch.unshift({ id: 'story:mq5_go', label: '📜 (Кампания) «Чем ранить Тьму, Радогост?»' });
+    } else if (mq === 5 && p.story.mqS === 2 && (p.inventory.first_ember || 0) >= 1) {
+      lines.push('', '«Уголь Первой Тьмы… Я чувствую его жар отсюда.',
+        'Отдай его мне — и Совет благословит ваш поход.',
+        'Но знай: его силу можно вобрать и самому. Тьмой платят за тьму».');
+      ch.unshift({ id: 'story:mq5_absorb', label: '⛧ Вобрать силу Угля (+урон навсегда; Радогост отвернётся)' });
+      ch.unshift({ id: 'story:mq5_give', label: '📜 Отдать Уголь (Благословение Совета на штурм)' });
+    } else if (mq === 6) {
+      ch.unshift({ id: 'story:mq6_finish', label: '📜 Созвать Совет трёх огней' });
+    }
+    if (p.story.mqDark && mq >= 6) lines.push('', 'Радогост смотрит сквозь тебя. От тебя пахнет гарью.');
     ch.push({ id: 'close', label: STR.bye });
     this.sendDialog(p, npc.id, '🧙 Отшельник Радогост', lines, ch);
   }
@@ -4274,6 +4465,20 @@ export class Game {
       lines = ['«Дороги стали тише. Такое не забывается, воин»'];
     } else {
       lines = ['«…Говорят, главарь Вольницы гуляет на твои сребреники. Уйди с глаз»'];
+    }
+    // ─── кампания гл.1: «Тревожные вести» ───
+    if (p.story.mq === 0 && p.hintStage >= 5) {
+      lines.push('', '«И ещё одно. С южных застав третий день ни одного гонца.',
+        'Разведка нашла гнездо у дорог — но это не Вольница. Глянешь?»');
+      ch.unshift({ id: 'story:mq1_accept', label: '📜 (Кампания) Взяться за тревожные вести' });
+    } else if (p.story.mq === 1) {
+      const d = this.world.pois.find(o => o.id === this.world.mq.dungeon);
+      if (p.story.mqS === 0 && d) {
+        lines.push('', `«Гнездо — ${d.name}. Отметила на карте. Хранитель там носит что-то на шее…»`);
+        this.fx({ t: 'marker', pid: p.id, x: d.x, y: d.y }, null);
+      } else if (p.story.mqS >= 1) {
+        lines.push('', '«Чужая печать?.. Покажи её старейшине — он читал старые книги»');
+      }
     }
     ch.push({ id: 'close', label: STR.bye });
     this.sendDialog(p, npc.id, '🛡 Капитан Ярослава', lines, ch);
@@ -4438,7 +4643,226 @@ export class Game {
   // Развилки сюжета: выборы игрока, меняющие мир
   storyChoice(p, key, dialogId) {
     const S = p.story;
+    const MQ = this.world.mq || {};
     switch (key) {
+      // ═══ КАМПАНИЯ «Тень над Пограничьем» ═══
+      case 'mq1_accept': {
+        if (S.mq !== 0) break;
+        S.mq = 1; S.mqS = 0;
+        const d = this.mqPickDungeon();
+        if (d) this.fx({ t: 'marker', pid: p.id, x: d.x, y: d.y, text: d.name }, null);
+        this.toast(p, `📜 Глава 1: найди гнездо (${d?.name || 'метка на карте'}) и его хранителя ключа`);
+        this.events.push(this.world.day, `${p.name} взялся за тревожные вести Ярославы`);
+        break;
+      }
+      case 'mq1_elder':
+        if (S.mq !== 1 || S.mqS !== 1) break;
+        S.mqS = 2;
+        this.addXp(p, 25);
+        {
+          const h = this.world.pois.find(o => o.type === 'hermit');
+          if (h) this.fx({ t: 'marker', pid: p.id, x: h.x, y: h.y, text: 'Радогост' }, null);
+        }
+        this.toast(p, '📜 Старейшина бледнеет: «Такое я видел лишь в старых книгах. Неси Радогосту — он ЖИЛ в те годы»');
+        break;
+      case 'mq1_rado': {
+        if (S.mq !== 1 || S.mqS !== 2) break;
+        if (p.inventory.black_medallion) {
+          p.inventory.black_medallion--;
+          if (!p.inventory.black_medallion) delete p.inventory.black_medallion;
+        }
+        S.mq = 2; S.mqS = 0;
+        this.addXp(p, 50);
+        const north = this.mqNorth();
+        if (north) this.fx({ t: 'marker', pid: p.id, x: north.x, y: north.y, text: north.name }, null);
+        this.toast(p, '📜 Радогост: «Печать слуг Первой Тьмы… Она шевелится раньше срока. Собери Совет трёх огней — начни с Севера»');
+        this.events.push(this.world.day, 'Радогост опознал печать Тьмы — нужен Совет трёх огней');
+        break;
+      }
+      case 'mq2_task': {
+        if (S.mq !== 2 || S.mqS !== 0) break;
+        const lair = this.mqPickLair();
+        if (lair) {
+          S.mqS = 1;
+          this.fx({ t: 'marker', pid: p.id, x: lair.x, y: lair.y, text: lair.name }, null);
+          this.toast(p, `📜 «Слова — ветер. Зачисти ${lair.name} — и Север скажет своё слово»`);
+        } else { // в мире не осталось целей — Север верит на слово
+          S.mqS = 3;
+          this.toast(p, '📜 «Говоришь, все логова в округе уже пусты?.. Дело говоришь. Север с вами»');
+        }
+        break;
+      }
+      case 'mq2_execute': {
+        if (MQ.prisoner) { this.toast(p, 'Судьба наводчика уже решена'); break; }
+        const scout = this.entities.get(dialogId);
+        if (!scout || scout.role !== 'darkscout') break;
+        MQ.prisoner = 'dead';
+        this.entities.delete(scout.id);
+        this.fx({ t: 'poof', x: scout.x, y: scout.y }, 'over', scout.x, scout.y);
+        p.rep.severane = Math.min(100, (p.rep.severane || 0) + 8);
+        for (const q of this.players.values())
+          if (q.story.mq === 2 && q.story.mqS >= 1 && q.story.mqS < 3) q.story.mqS = 3;
+        this.toast(p, '📜 Клинок упал. Север таких решений не забывает (+8 репутации Северян)');
+        this.events.push(this.world.day, `${p.name} казнил Наводчика Тьмы — Север одобряет`);
+        break;
+      }
+      case 'mq2_free': {
+        if (MQ.prisoner) { this.toast(p, 'Судьба наводчика уже решена'); break; }
+        const scout = this.entities.get(dialogId);
+        if (!scout || scout.role !== 'darkscout') break;
+        MQ.prisoner = 'freed';
+        // тайник наводчика: дикий сундук неподалёку от логова
+        const lair = this.world.pois.find(o => o.id === MQ.lair);
+        if (lair) {
+          for (let tries = 0; tries < 30 && !MQ.cache; tries++) {
+            const a = hash2(this.world.seed, 717, tries) % 628 / 100;
+            const tx = Math.round(lair.x + Math.cos(a) * (8 + tries % 5));
+            const ty = Math.round(lair.y + Math.sin(a) * (8 + tries % 5));
+            if (!SOLID.has(this.chunks.tileAt('over', tx, ty))) {
+              MQ.cache = { x: tx, y: ty };
+              this.world.wildChests = this.world.wildChests || [];
+              this.world.wildChests.push({ x: tx, y: ty, opened: false });
+              this.chunks.setTile('over', tx, ty, T.CHEST);
+              this.fx({ t: 'tile', mapId: 'over', x: tx, y: ty, tile: T.CHEST }, null);
+              this.fx({ t: 'marker', pid: p.id, x: tx, y: ty, text: 'Тайник' }, null);
+            }
+          }
+        }
+        this.entities.delete(scout.id);
+        this.fx({ t: 'poof', x: scout.x, y: scout.y }, 'over', scout.x, scout.y);
+        p.rep.severane = Math.max(-100, (p.rep.severane || 0) - 5);
+        for (const q of this.players.values())
+          if (q.story.mq === 2 && q.story.mqS >= 1 && q.story.mqS < 3) q.story.mqS = 3;
+        this.toast(p, '📜 Наводчик растворился в кустах, шепнув про тайник (метка). Север хмурится (−5)');
+        this.events.push(this.world.day, `${p.name} отпустил Наводчика Тьмы за сведения`);
+        break;
+      }
+      case 'mq2_done': {
+        if (S.mq !== 2 || (S.mqS !== 3 && !MQ.prisoner)) break;
+        S.mq = 3; S.mqS = 0;
+        this.addXp(p, 60);
+        const s4 = this.world.settlements[4];
+        if (s4) this.fx({ t: 'marker', pid: p.id, x: s4.x, y: s4.y, text: s4.name }, null);
+        this.toast(p, `📜 «Север помнит дела». Глава 3: озёрные жалуются на порчу — ищи Тихона в ${s4?.name}`);
+        break;
+      }
+      case 'mq3_accept': {
+        if (S.mq !== 3 || S.mqS !== 0) break;
+        S.mqS = 1;
+        const t = this.mqTaintSpot();
+        this.fx({ t: 'marker', pid: p.id, x: t.x, y: t.y, text: 'Родник' }, null);
+        this.toast(p, '📜 Тихон: «Горчить началось от дальнего родника. Глянь там — я отметил»');
+        break;
+      }
+      case 'mq3_expose': {
+        if (MQ.priest) { this.toast(p, 'Судьба жреца уже решена'); break; }
+        if (S.mq !== 3 || S.mqS !== 2) break;
+        MQ.priest = 'exposed';
+        const lb = [...this.entities.values()].find(e => e.mqPriest);
+        if (lb) { this.fx({ t: 'poof', x: lb.x, y: lb.y }, 'over', lb.x, lb.y); this.entities.delete(lb.id); }
+        p.rep.ozerny = Math.max(-100, (p.rep.ozerny || 0) - 10);
+        for (const q of this.players.values()) if (q.story.mq === 3) { q.story.mq = 4; q.story.mqS = 0; }
+        const s2c = this.world.settlements[2];
+        if (s2c) this.fx({ t: 'marker', pid: p.id, x: s2c.x, y: s2c.y, text: s2c.name }, null);
+        this.toastAll('📜 Жрец Лютобор изгнан с позором — он травил воду для Тьмы!', true);
+        this.events.push(this.world.day, `${p.name} разоблачил одержимого жреца — озёрные скорбят, но правда дороже`);
+        break;
+      }
+      case 'mq3_cleanse': {
+        if (MQ.priest) { this.toast(p, 'Судьба жреца уже решена'); break; }
+        if (S.mq !== 3 || S.mqS !== 2) break;
+        MQ.priest = 'cleansed';
+        const relic = pick(this.rand, ['storm_amulet', 'phoenix_amulet']) + '@e';
+        p.inventory[relic] = (p.inventory[relic] || 0) + 1;
+        for (const q of this.players.values()) if (q.story.mq === 3) { q.story.mq = 4; q.story.mqS = 0; }
+        const s2d = this.world.settlements[2];
+        if (s2d) this.fx({ t: 'marker', pid: p.id, x: s2d.x, y: s2d.y, text: s2d.name }, null);
+        this.toast(p, `📜 Шёпот изгнан тайно. Лютобор суёт тебе свёрток: ${getItem(relic)?.name}. Но зерно лжи посеяно…`);
+        this.events.push(this.world.day, 'Порча в топях утихла. Отчего — молчат');
+        break;
+      }
+      case 'mq4_steppe': case 'mq4_north': case 'mq4_peace': {
+        if (MQ.dispute) { this.toast(p, 'Спор уже рассужен'); break; }
+        if (S.mq !== 4) break;
+        if (key === 'mq4_peace') {
+          if (p.coins < 100) { this.toast(p, STR.notEnoughCoins); break; }
+          p.coins -= 100;
+          MQ.dispute = 'peace';
+          RELATIONS.stepnyaki.severane = Math.min(100, (RELATIONS.stepnyaki.severane || 0) + 10);
+          RELATIONS.severane.stepnyaki = RELATIONS.stepnyaki.severane;
+          p.rep.stepnyaki = Math.min(100, (p.rep.stepnyaki || 0) + 5);
+          p.rep.severane = Math.min(100, (p.rep.severane || 0) + 5);
+          this.toast(p, '📜 Дары приняты с обеих сторон. Мир в степи — Совет будет полным');
+        } else {
+          const win = key === 'mq4_steppe' ? 'stepnyaki' : 'severane';
+          const lose = win === 'stepnyaki' ? 'severane' : 'stepnyaki';
+          MQ.dispute = win === 'stepnyaki' ? 'steppe' : 'north';
+          RELATIONS[win][lose] = Math.max(-100, (RELATIONS[win][lose] || 0) - 15);
+          RELATIONS[lose][win] = RELATIONS[win][lose];
+          p.rep[win] = Math.min(100, (p.rep[win] || 0) + 8);
+          p.rep[lose] = Math.max(-100, (p.rep[lose] || 0) - 5);
+          this.toast(p, `📜 Ты встал за ${FACTIONS[win].name} (+8). ${FACTIONS[lose].name} запомнят (−5)`);
+        }
+        S.mq = 5; S.mqS = 0;
+        this.addXp(p, 60);
+        this.events.push(this.world.day, `${p.name} рассудил спор степи и севера`);
+        {
+          const h = this.world.pois.find(o => o.type === 'hermit');
+          if (h) this.fx({ t: 'marker', pid: p.id, x: h.x, y: h.y, text: 'Радогост' }, null);
+        }
+        break;
+      }
+      case 'mq4_after':
+        if (S.mq !== 4 || !MQ.dispute) break;
+        S.mq = 5; S.mqS = 0;
+        this.toast(p, '📜 Степь уже в Совете. Радогост ждёт вестей');
+        break;
+      case 'mq5_go': {
+        if (S.mq !== 5 || S.mqS !== 0) break;
+        S.mqS = 1;
+        const ap = this.world.ashPortal;
+        if (ap) this.fx({ t: 'marker', pid: p.id, x: ap.x, y: ap.y, text: 'Портал' }, null);
+        this.toast(p, '📜 «Пепел помнит Первую войну. Принеси Уголь Первой Тьмы — его стережёт Старший голем»');
+        break;
+      }
+      case 'mq5_give':
+        if (S.mq !== 5 || S.mqS !== 2 || (p.inventory.first_ember || 0) < 1) break;
+        p.inventory.first_ember--;
+        if (!p.inventory.first_ember) delete p.inventory.first_ember;
+        S.mqBlessed = true;
+        S.mq = 6; S.mqS = 0;
+        this.addXp(p, 80);
+        this.toast(p, '✦ «Совет благословит ваш поход» — на штурме Цитадели тебя укроет свет (−15% урона)');
+        this.events.push(this.world.day, `${p.name} отдал Уголь Первой Тьмы Совету`);
+        break;
+      case 'mq5_absorb':
+        if (S.mq !== 5 || S.mqS !== 2 || (p.inventory.first_ember || 0) < 1) break;
+        p.inventory.first_ember--;
+        if (!p.inventory.first_ember) delete p.inventory.first_ember;
+        S.mqDark = true;
+        S.mq = 6; S.mqS = 0;
+        this.recomputeStats(p);
+        this.fx({ t: 'bloodcast', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        this.toast(p, '⛧ Жар растекается по жилам: +5% урона НАВСЕГДА. Радогост молча отворачивается');
+        this.events.push(this.world.day, `${p.name} вобрал силу Угля Первой Тьмы…`);
+        break;
+      case 'mq6_finish': {
+        if (S.mq !== 6) break;
+        S.mq = 10;
+        p.talentPts++;
+        p.inventory['council_seal@e'] = (p.inventory['council_seal@e'] || 0) + 1;
+        this.addXp(p, 250);
+        if (MQ.dispute === 'peace') {
+          for (const q of this.players.values())
+            for (const f of ['severane', 'ozerny', 'stepnyaki'])
+              q.rep[f] = Math.min(100, (q.rep[f] || 0) + 5);
+        }
+        this.toastAll(`📜 СОВЕТ ТРЁХ ОГНЕЙ СОЗВАН! ${p.name} завершил «Тень над Пограничьем»`, true);
+        this.toast(p, '🏆 Награда Совета: +1 очко таланта, Печать Совета и 250 опыта. Впереди — Война');
+        this.events.push(this.world.day, `${p.name} собрал Совет трёх огней — Пограничье готово к Войне`);
+        if (this.world.war?.stage === 0) this.warStep(p);
+        break;
+      }
       // испытания огнеходцев (Выжженные земли)
       case 'ash_accept':
         if (!S.ash) { S.ash = 1; S.ashN = 0; this.toast(p, '🔥 Первое испытание: усмири 6 саламандр'); }
@@ -5055,6 +5479,12 @@ export class Game {
     else if (st === 2) lines.push('«Ты РАЗБУДИЛ его?! Беги, бей или клянись — но реши это!»');
     else if (st === 10) lines.push('«Туман ушёл! Рыба вернулась! Век тебя помнить будем»');
     else if (st === 11) lines.push('Тихон отшатывается: «Глаза… у тебя болотные глаза. Уходи».');
+    // ─── кампания гл.3: «Гниль в топях» ───
+    if (p.story.mq === 3 && p.story.mqS === 0) {
+      lines.push('', 'Тихон трёт красные глаза: «А вода-то ГОРЧИТ, путник.',
+        'Дети хворают. Это не дух — духи так не пахнут…»');
+      choices.unshift({ id: 'story:mq3_accept', label: '📜 (Кампания) Спросить о порче в воде' });
+    }
     choices.push({ id: 'close', label: STR.close });
     this.sendDialog(p, npc.id, '🎣 Рыбак Тихон', lines, choices);
   }
@@ -5159,6 +5589,21 @@ export class Game {
       this.sendDialog(p, npc.id, '🔥 ' + npc.name, lines, choices);
       return;
     }
+    if (npc.role === 'darkscout') {
+      // кампания гл.2: пленный наводчик ждёт суда
+      if (this.world.mq?.prisoner) {
+        this.sendDialog(p, npc.id, '🕶 Наводчик Тьмы', ['Суд уже свершён.'], [{ id: 'close', label: 'Уйти' }]);
+        return;
+      }
+      this.sendDialog(p, npc.id, '🕶 Наводчик Тьмы',
+        ['Связанный человек с клеймом на шее скалится без страха:',
+         '«Я лишь метил дворы да караваны — Тьма платит кристаллами.',
+         'Отпусти — покажу их тайник. Слово вора!»'],
+        [{ id: 'story:mq2_execute', label: '⚔ Казнить наводчика (Север оценит суровость)' },
+         { id: 'story:mq2_free', label: '🪙 Отпустить за тайник (Север нахмурится)' },
+         { id: 'close', label: 'Решить позже' }]);
+      return;
+    }
     if (npc.role === 'prisoner') {
       this.sendDialog(p, npc.id, `⛓ ${npc.name}, пленник`,
         ['«Хвала небесам, живая душа! Меня схватили и бросили в клетку.',
@@ -5239,6 +5684,28 @@ export class Game {
         if (s.food < 25) lines.push('⚠ Припасы на исходе — нам нужна еда!');
       }
       const choices = [];
+      // ─── кампания: этапы у старейшин ───
+      const MQ = this.world.mq;
+      if (s && p.story.mq === 1 && p.story.mqS === 1 && s === this.world.settlements[0])
+        choices.push({ id: 'story:mq1_elder', label: '📜 Показать чёрный медальон' });
+      if (s && p.story.mq === 2 && s.id === MQ?.northId) {
+        if (p.story.mqS === 0)
+          choices.push({ id: 'story:mq2_task', label: '📜 (Кампания) Слово для Совета трёх огней' });
+        else if (p.story.mqS === 3 || MQ.prisoner)
+          choices.push({ id: 'story:mq2_done', label: '📜 Дело сделано — Север идёт в Совет?' });
+        else lines.push('«Сначала дело — потом разговоры. Логово ждёт»');
+      }
+      if (s && p.story.mq === 4 && s === this.world.settlements[2]) {
+        if (!MQ?.dispute) {
+          lines.push('«Совет? Мы бы рады… Но Север который год травит наши пастбища.',
+            'Рассуди по чести — или мирись за нас, коли богат»');
+          choices.push({ id: 'story:mq4_steppe', label: '📜 Встать за степь (Север озлобится)' });
+          choices.push({ id: 'story:mq4_north', label: '📜 Встать за Север (степь запомнит)' });
+          choices.push({ id: 'story:mq4_peace', label: '📜 Примирить дарами (100 мон.)' });
+        } else {
+          choices.push({ id: 'story:mq4_after', label: '📜 Спор решён — степь идёт в Совет' });
+        }
+      }
       // портальная сеть: дар героя — и жители возведут портальный камень
       if (s && !s.portal && s.project?.type !== 'portal' && (p.rep[s.faction] || 0) >= 25)
         choices.push({ id: 'portal_fund', label: '⌘ Дар на портальный камень (6 крист., 10 мет., 100 мон.)' });
@@ -5291,7 +5758,7 @@ export class Game {
       if (war && this.world.citadel && !this.world.citadel.dead) {
         const warLabel = [
           '⚔ «Тьма растёт с каждым днём. Пора дать отпор» (начать Войну с Тьмой)',
-          '⚔ Война: заключить союз фракций (репутация 25 у всех трёх)',
+          `⚔ Война: заключить союз фракций (репутация ${this.world.mq?.priest === 'exposed' ? '25/15/25' : '25 у всех трёх'})`,
           '⚔ Война: передать реликвии (10 кристаллов, Сердце Тени, Древний осколок)',
           '⚔ Война: врата пали — штурмуй Цитадель и срази гарнизон!',
         ][war.stage];
@@ -5317,6 +5784,17 @@ export class Game {
       choices.push({ id: 'close', label: STR.bye });
       this.sendDialog(p, npc.id, `Кузнец ${npc.name}`, [this.npcGreeting(p, npc), ...lines.slice(1)], choices);
     } else if (npc.role === 'priest') {
+      // кампания гл.3: жрец Лютобор под подозрением
+      if (npc.mqPriest && p.story.mq === 3 && p.story.mqS === 2 && !this.world.mq?.priest) {
+        this.sendDialog(p, npc.id, `Жрец ${npc.name}`,
+          ['Лютобор встречает тебя слишком широкой улыбкой.',
+           '«Порча? Экая беда… Духи гневаются, не иначе». Его пальцы',
+           'теребят шнурок на поясе — ТОЧНО ТАКОЙ, как на мешочке с гнилью.'],
+          [{ id: 'story:mq3_expose', label: '📜 Разоблачить при всех (изгнание; горькая правда для Совета)' },
+           { id: 'story:mq3_cleanse', label: '✦ Очистить тайно у идола (жрец жив; он отблагодарит)' },
+           { id: 'close', label: 'Отступить и подумать' }]);
+        return;
+      }
       const choices = [
         { id: 'healme', label: 'Исцеление (12 мон.)' },
         { id: 'bless', label: 'Благословение: +15% урона на 3 мин (30 мон.)' },
@@ -5751,7 +6229,16 @@ export class Game {
       this.fx({ t: 'loot', pid: p.id, x: p.x, y: p.y, text: this.itemName(it.item) }, p.mapId, p.x, p.y);
       // Озёрный союз чтит торговлю: сделки с ними греют репутацию вдвое
       if (s) { p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + (s.faction === 'ozerny' ? 2 : 1)); }
-      if (p.hintStage === 4) { p.hintStage = 5; this.toast(p, '🎓 Азы освоены — Пограничье твоё! (M — карта, P — дипломатия)'); }
+      if (p.hintStage === 4) {
+        p.hintStage = 5;
+        this.toast(p, '🎓 Азы освоены — Пограничье твоё! (M — карта, P — дипломатия)');
+        // эстафета: онбординг завершён — начинается кампания
+        if (p.story.mq === 0) {
+          const s0 = this.world.settlements[0];
+          if (s0) this.fx({ t: 'marker', pid: p.id, x: s0.x, y: s0.y, text: 'Ярослава' }, null);
+          this.toast(p, '📜 Капитан Ярослава ищет тебя — с южных дорог тревожные вести');
+        }
+      }
       return;
     }
     if (choice.startsWith('craft:')) {

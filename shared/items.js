@@ -124,6 +124,11 @@ export const ITEMS = {
     id: 'lucky_charm', name: 'Кроличья лапка', slot: 'acc',
     stats: { lck: 2 }, price: 90, icon: 'item_charm',
   },
+  council_seal: {
+    id: 'council_seal', name: 'Печать Совета трёх огней', slot: 'acc',
+    stats: { maxHp: 2, str: 1, int: 1 }, price: 400, icon: 'item_amulet_rune',
+    // награда кампании «Тень над Пограничьем»
+  },
 
   // --- ноги ---
   leather_boots: {

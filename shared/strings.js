@@ -51,4 +51,5 @@ export const ITEM_NAMES = {
   ammo_bolt: 'Болты', ammo_mana: 'Кристаллы маны', ammo_knife: 'Метательные ножи',
   ammo_bomb: 'Бомбы', wood: 'Древесина', hide: 'Шкура', herb: 'Травы',
   metal: 'Металл', wedding_ring: 'Обручальное кольцо',
+  black_medallion: 'Чёрный медальон', first_ember: 'Уголь Первой Тьмы',
 };

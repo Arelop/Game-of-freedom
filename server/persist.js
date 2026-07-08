@@ -60,6 +60,7 @@ export function saveWorld(game) {
         mkey: p.mkey || 0,
       })),
       relations: RELATIONS, // дипломатия народов дрейфует — помним её
+      mq: w.mq || null,     // кампания: мировые последствия выборов
       banditsWeakT: w.banditsWeakT || 0,
       smithBoon: w.smithBoon || false,
       arenaRecord: w.arenaRecord || null,
@@ -139,6 +140,7 @@ export function applyWorldData(game, data) {
       for (const [f, rels] of Object.entries(data.relations))
         if (RELATIONS[f]) Object.assign(RELATIONS[f], rels);
     }
+    if (data.mq) w.mq = { ...w.mq, ...data.mq }; // кампания
     if (data.war) w.war.stage = data.war.stage;
     if (data.stash) w.stash = data.stash;
     if (data.weather) w.weather = data.weather;

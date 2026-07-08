@@ -75,6 +75,20 @@ export function makeWorld(seed) {
     time: 0.3,                  // доля суток (0.3 = утро)
     day: 1,
     war: { stage: 0 },          // «Война с Тьмой»: 0 не начата, 1 союз, 2 реликвии, 3 штурм, 10/11 финалы
+    // кампания «Тень над Пограничьем»: мировые последствия выборов
+    // (главы — личные, p.story.mq; выборы отряда — общие)
+    mq: {
+      prisoner: null,   // выбор 1: 'dead' | 'freed'
+      priest: null,     // выбор 2: 'exposed' | 'cleansed'
+      dispute: null,    // выбор 3: 'steppe' | 'north' | 'peace'
+      dungeon: null,    // целевой данж гл.1 (id POI)
+      lair: null,       // целевое логово гл.2 (id POI)
+      northId: null,    // «дальняя северная» деревня гл.2
+      lairDone: false,  // логово пало — наводчик ждёт суда
+      taint: null,      // улика гл.3 {x,y}
+      cache: null,      // тайник наводчика {x,y}
+      emberDone: false, // Уголь Первой Тьмы добыт
+    },
     stash: {},                  // общий сундук группы (таверна)
     weather: 'clear',           // погода дня: clear | rain | snow
   };
