@@ -157,7 +157,7 @@ export function stampSettlement(world, s, rand) {
         if (baseTile(world.seed, wx, wy) === T.WATER || baseTile(world.seed, wx, wy) === T.DEEP_WATER) {
           for (let k = -3; k <= 4; k++) {
             const px = cx + dx * (d + k), py = cy + dy * (d + k);
-            if (world.edits.get(px + ',' + py) === undefined || k <= 0) set(world, px, py, T.FLOOR_WOOD);
+            if (world.edits.get(px + ',' + py) === undefined || k <= 0) set(world, px, py, T.PIER);
           }
           anchors.works.push({ x: cx + dx * (d + 3), y: cy + dy * (d + 3) }); // рыбацкое место
           break outer;

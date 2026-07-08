@@ -71,6 +71,7 @@ const TILE_SPRITES = {
   [T.WALL_STONE2]: ['tile_wall_stone2'],
   [T.WALL_CLAY]: ['tile_wall_clay'],
   [T.YURT]: ['tile_grass', 'obj_yurt'],
+  [T.PIER]: ['tile_pier'],
 };
 
 // Тайлсеты подземелий: пол/стена по стилю места (шахта, склеп, пещера, форт)

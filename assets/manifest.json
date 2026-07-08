@@ -208,8 +208,7 @@
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/amulet/penta_orange.png"
     },
     "obj_darkheart": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/misc/misc_crystal.png",
-      "down": 2
+      "file": "assets/raw/ai/obj_darkheart.png"
     },
     "enemy_shieldbearer": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/blork_the_orc.png",
@@ -690,9 +689,7 @@
       "proc": "anvil"
     },
     "npc_smith": {
-      "pack": "d",
-      "tx": 4,
-      "ty": 8
+      "file": "assets/raw/ai/npc_smith.png"
     },
     "npc_merc": {
       "pack": "d",
@@ -1111,8 +1108,7 @@
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/ring/gold.png"
     },
     "enemy_ash_lord": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/fire_giant.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_ash_lord.png"
     },
     "wpn_volcano": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/giant_spiked_club.png"
@@ -1295,28 +1291,22 @@
       "down": 2
     },
     "npc_villager_sev": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/elf.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_villager_sev.png"
     },
     "npc_guard_sev": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/dwarf.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_guard_sev.png"
     },
     "npc_merchant_sev": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/wiglaf.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_merchant_sev.png"
     },
     "npc_villager_oz": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/merfolk_plain.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_villager_oz.png"
     },
     "npc_guard_oz": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/merfolk_impaler.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_guard_oz.png"
     },
     "npc_merchant_oz": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/merfolk_aquamancer.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_merchant_oz.png"
     },
     "npc_villager_step": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/human_slave.png",
@@ -1331,9 +1321,7 @@
       "down": 2
     },
     "tile_wall_log": {
-      "pack": "t",
-      "tx": 1,
-      "ty": 6
+      "file": "assets/raw/ai/tile_wall_log.png"
     },
     "tile_wall_stone2": {
       "pack": "t",
@@ -1346,73 +1334,27 @@
       "ty": 15
     },
     "obj_yurt": {
-      "w": 32,
-      "h": 32,
-      "down": 2,
-      "layers": [
-        {
-          "pack": "r",
-          "tx": 48,
-          "ty": 10
-        },
-        {
-          "pack": "r",
-          "tx": 49,
-          "ty": 10,
-          "dx": 16
-        },
-        {
-          "pack": "r",
-          "tx": 48,
-          "ty": 11,
-          "dy": 16
-        },
-        {
-          "pack": "r",
-          "tx": 49,
-          "ty": 11,
-          "dx": 16,
-          "dy": 16
-        }
-      ]
+      "file": "assets/raw/ai/obj_yurt.png"
     },
     "obj_tower": {
-      "w": 16,
-      "h": 32,
-      "layers": [
-        {
-          "pack": "t",
-          "tx": 3,
-          "ty": 8,
-          "dy": 0
-        },
-        {
-          "pack": "t",
-          "tx": 6,
-          "ty": 6,
-          "dy": 16
-        }
-      ]
+      "file": "assets/raw/ai/obj_tower.png"
     },
     "npc_villager_plain": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/human.png",
       "down": 2
     },
     "npc_captain": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/maud.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_captain.png"
     },
     "npc_arena": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/norris.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_arena.png"
     },
     "npc_widow": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/erica.png",
       "down": 2
     },
     "npc_elder2": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/sigmund.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_elder2.png"
     },
     "npc_hunter2": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/harold.png",
@@ -1421,6 +1363,9 @@
     "npc_priest2": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/josephine.png",
       "down": 2
+    },
+    "tile_pier": {
+      "file": "assets/raw/ai/tile_pier.png"
     }
   }
 }
