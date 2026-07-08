@@ -138,9 +138,14 @@ export function generateDungeon(seed, difficulty, withBoss, depth = 1, name = ''
     prev = { x: nx, y: ny };
   }
 
-  // мини-босс с ключом в средней комнате (только если дверь босса заперта)
+  // мини-босс с ключом в средней комнате (только если дверь босса заперта);
+  // комнаты могут сливаться — хранителю нельзя оказаться ЗА решёткой босса
   if (withBoss && rooms.length >= 3) {
-    const midRoom = rooms[Math.floor((rooms.length - 1) / 2)];
+    const bossR = rooms[rooms.length - 1];
+    const apart = r => Math.abs(r.x - bossR.x) > r.w + bossR.w + 1
+      || Math.abs(r.y - bossR.y) > r.h + bossR.h + 1;
+    const cand = rooms.filter(r => !r.isBoss && apart(r));
+    const midRoom = cand[Math.floor((cand.length - 1) / 2)] || rooms[0];
     midRoom.spawns.push({
       kind: difficulty >= 3 ? 'minotaur' : 'orcWarlord',
       x: midRoom.x, y: midRoom.y, keyBearer: true,

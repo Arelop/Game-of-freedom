@@ -3694,8 +3694,12 @@ export class Game {
           const instD = this.dungeons.get(p.mapId);
           const pendingBearer = instD?.dungeon.rooms.some(r =>
             !r.cleared && !r.enemyIds && r.spawns?.some(sp => sp.keyBearer));
+          // хранитель, запертый ЗА решёткой (слитые комнаты старых данжей), недосягаем
+          const bossR = instD?.dungeon.rooms.find(r => r.isBoss);
+          const reachable = e => !bossR
+            || Math.abs(e.x / TILE - bossR.x) > bossR.w || Math.abs(e.y / TILE - bossR.y) > bossR.h;
           const keyExists = pendingBearer || [...this.entities.values()].some(e => e.mapId === p.mapId
-            && ((e.entType === 'enemy' && e.dropKey) || (e.entType === 'drop' && e.item === 'dungeon_key')));
+            && ((e.entType === 'enemy' && e.dropKey && reachable(e)) || (e.entType === 'drop' && e.item === 'dungeon_key' && reachable(e))));
           if (!keyExists) {
             p.inventory.dungeon_key = 1; // «нашёл ключ на теле у решётки»
             this.toast(p, '🗝 У решётки — тело с ключом на поясе. Повезло');
