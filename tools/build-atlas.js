@@ -81,6 +81,39 @@ function extractFile(relPath, down = 1) {
   return out;
 }
 
+// Композиция слоёв из тайлов паков (конструктор персонажей Kenney,
+// многотайловые постройки). Слой: {pack, tx, ty, tw?, th?, dx?, dy?}.
+// Размер холста — spec.w/h или габарит слоёв; spec.down — финальный даунскейл.
+function composeLayers(spec) {
+  const parts = spec.layers.map(l => ({
+    l, img: extract(packs[l.pack], l.tx, l.ty, l.tw || 1, l.th || 1, packMeta[l.pack]?.stride || 16),
+  }));
+  const w = spec.w || Math.max(...parts.map(p => (p.l.dx || 0) + p.img.w));
+  const h = spec.h || Math.max(...parts.map(p => (p.l.dy || 0) + p.img.h));
+  const out = { w, h, data: new Uint8Array(w * h * 4) };
+  for (const { l, img } of parts) {
+    const dx = l.dx || 0, dy = l.dy || 0;
+    for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) {
+      const si = (y * img.w + x) * 4;
+      if (img.data[si + 3] <= 10) continue;
+      const di = ((dy + y) * w + dx + x) * 4;
+      out.data[di] = img.data[si]; out.data[di + 1] = img.data[si + 1];
+      out.data[di + 2] = img.data[si + 2]; out.data[di + 3] = img.data[si + 3];
+    }
+  }
+  if (spec.down > 1) {
+    const dw = Math.floor(w / spec.down), dh = Math.floor(h / spec.down);
+    const d2 = { w: dw, h: dh, data: new Uint8Array(dw * dh * 4) };
+    for (let y = 0; y < dh; y++) for (let x = 0; x < dw; x++) {
+      const si = ((y * spec.down) * w + x * spec.down) * 4, di = (y * dw + x) * 4;
+      d2.data[di] = out.data[si]; d2.data[di + 1] = out.data[si + 1];
+      d2.data[di + 2] = out.data[si + 2]; d2.data[di + 3] = out.data[si + 3];
+    }
+    return d2;
+  }
+  return out;
+}
+
 function placeholder() {
   const s = { w: 16, h: 16, data: new Uint8Array(16 * 16 * 4) };
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
@@ -98,6 +131,9 @@ for (const [name, spec] of Object.entries(manifest.sprites)) {
   try {
     if (spec.proc) {
       img = genSprite(spec.proc, spec.args);
+    } else if (spec.layers) {
+      // композит из тайлов паков: [{pack,tx,ty,tw?,th?,dx?,dy?}], опц. w/h/down
+      img = composeLayers(spec);
     } else if (spec.files) {
       img = extractLayers(spec.files, spec.down || 1);
     } else if (spec.file) {

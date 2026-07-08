@@ -26,6 +26,28 @@ export const WEAPONS = {
     sprite: 'wpn_bow2', projSprite: 'proj_arrow', sound: 'shot_bow',
     projRadius: 2, projLife: 1.8, ammoType: 'arrow', price: 85,
   },
+  // ═══ фракционный эксклюзив: продаётся только «своим» (репутация 40+) ═══
+  sever_axe: { // Северяне: секира со стужей в лезвии
+    id: 'sever_axe', structDmg: 7, name: 'Зов метели', melee: true, school: 'melee', damage: 11, fireRate: 0.95,
+    range: 33, arcDeg: 140, knockback: 170, recoilShake: 0.45, infiniteAmmo: true,
+    sprite: 'wpn_axe', sound: 'swing_heavy', swingColor: '#9fd8e8', price: 240,
+    chill: { time: 2.5 }, slow: { mult: 0.6, time: 2 }, // метка льда для реакций
+  },
+  mist_staff: { // Озёрный союз: туман стелется и студит
+    id: 'mist_staff', name: 'Посох тумана', school: 'magic', damage: 7, projectilesPerShot: 1,
+    spreadDeg: 0, projectileSpeed: 270, fireRate: 1.5, manaCost: 2,
+    knockback: 25, recoilShake: 0.14,
+    sprite: 'wpn_staff_frost', projSprite: 'proj_frost', sound: 'shot_frost',
+    projRadius: 4, projLife: 1.5, price: 240,
+    chill: { time: 2.5 }, slow: { mult: 0.55, time: 2 },
+  },
+  steppe_bow: { // Степняки: составной лук — стрела не знает промаха
+    id: 'steppe_bow', name: 'Ветер травы', school: 'ranged', damage: 8, projectilesPerShot: 1,
+    spreadDeg: 0, projectileSpeed: 540, fireRate: 1.5, magSize: 2,
+    reloadTime: 0.5, knockback: 55, recoilShake: 0.3,
+    sprite: 'wpn_bow2', projSprite: 'proj_arrow', sound: 'shot_bow',
+    projRadius: 2, projLife: 2.1, ammoType: 'arrow', price: 240,
+  },
   crossbow: {
     id: 'crossbow', structDmg: 2, name: 'Арбалет', school: 'ranged', damage: 10, projectilesPerShot: 1,
     spreadDeg: 1, projectileSpeed: 420, fireRate: 0.7, magSize: 1,

@@ -66,6 +66,11 @@ const TILE_SPRITES = {
   [T.CRACKED_WALL]: ['tile_wall_crack'],
   [T.PLAQUE]: ['tile_dungeon_floor', 'obj_plaque'],
   [T.PLATE]: ['tile_dungeon_floor', 'obj_plate'],
+  // фракционная архитектура
+  [T.WALL_LOG]: ['tile_wall_log'],
+  [T.WALL_STONE2]: ['tile_wall_stone2'],
+  [T.WALL_CLAY]: ['tile_wall_clay'],
+  [T.YURT]: ['tile_grass', 'obj_yurt'],
 };
 
 // Тайлсеты подземелий: пол/стена по стилю места (шахта, склеп, пещера, форт)
@@ -115,6 +120,15 @@ export class TileRenderer {
         if (t === T.GRASS) {
           const h = hash2(11, cx * CHUNK + x, cy * CHUNK + y) % 100;
           spec = [h < 2 ? 'tile_grass_flowers' : h < 25 ? 'tile_grass2' : 'tile_grass'];
+        }
+        // дозорная башня: высокий спрайт 16×32 (у старых башен 2×2 —
+        // рисуем один спрайт в правом нижнем углу кластера)
+        if (t === T.TOWER) {
+          this.atlas.blit(ctx, 'tile_grass', x * TILE, y * TILE);
+          const eastTower = x < CHUNK - 1 && tiles[y * CHUNK + x + 1] === T.TOWER;
+          const southTower = y < CHUNK - 1 && tiles[(y + 1) * CHUNK + x] === T.TOWER;
+          if (!eastTower && !southTower) this.atlas.blit(ctx, 'obj_tower', x * TILE, y * TILE - 16);
+          continue;
         }
         if (style) {
           if (t === T.DUNGEON_FLOOR) spec = [styledFloor(x, y)];

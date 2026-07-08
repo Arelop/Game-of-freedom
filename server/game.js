@@ -37,6 +37,16 @@ const NPC_NAMES = [
   'Дарёна', 'Огнеслав', 'Рогнеда', 'Путята', 'Умила', 'Ратибор', 'Злата',
 ];
 
+// лица народов: у каждой фракции свои спрайты жителей, стражи и торговцев
+const FACTION_KINDS = {
+  severane: { villager: 'npc_villager_sev', guard: 'npc_guard_sev', merchant: 'npc_merchant_sev' },
+  ozerny: { villager: 'npc_villager_oz', guard: 'npc_guard_oz', merchant: 'npc_merchant_oz' },
+  stepnyaki: { villager: 'npc_villager_step', guard: 'npc_guard_step', merchant: 'npc_merchant_step' },
+};
+
+// звери степной охоты: за них Степняки уважают (каждый четвёртый — +1 реп)
+const BEAST_KINDS = new Set(['wolf', 'bear', 'boar', 'spider', 'warg', 'slime']);
+
 const HOT_RADIUS = 600;            // px: враги думают только рядом с игроками
 const SETTLEMENT_HYDRATE_R = 400;  // px
 const REVIVE_DIST = 26;
@@ -65,24 +75,46 @@ const CONTRACTS = {
 };
 const CONTRACT_TIME = 480; // сек
 
+// Ядро прилавка — есть у всех народов; остальное зависит от фракции.
 const SHOP = [
   { item: 'bread', price: 8 }, { item: 'bandage', price: 15 }, { item: 'wood', price: 6 },
-  { item: 'heal_potion', price: 30 }, { item: 'swift_potion', price: 35 },
+  { item: 'heal_potion', price: 30 }, { item: 'mana_potion', price: 28 },
   { item: 'ammo_arrow', price: 10, count: 20 }, { item: 'ammo_bolt', price: 15, count: 8 },
-  { item: 'ammo_knife', price: 14, count: 8 }, { item: 'mana_potion', price: 28 },
-  { item: 'leather_armor', price: 40 }, { item: 'wood_shield', price: 25 },
-  { item: 'leather_boots', price: 30 }, { item: 'iron_greaves', price: 70 },
-  { item: 'wizard_hat', price: 90 }, { item: 'ring_str', price: 70 },
-  { item: 'flame_tome', price: 145 }, { item: 'lucky_deck', price: 120 },
-  { item: 'throwing_net', price: 95 }, { item: 'crystal_orb', price: 130 },
-  { item: 'weapon:mace', price: 75 }, { item: 'weapon:greatsword', price: 150 }, { item: 'weapon:halberd', price: 125 },
-  { item: 'iron_helmet', price: 65 }, { item: 'wolf_amulet', price: 55 },
-  { item: 'weapon:huntbow', price: 85 }, { item: 'weapon:firestaff', price: 100 },
-  { item: 'weapon:axe', price: 90 }, { item: 'weapon:bombs', price: 140 },
-  { item: 'weapon:spear', price: 55 }, { item: 'padded_armor', price: 25 }, { item: 'iron_ring', price: 45 },
-  { item: 'ammo_bomb', price: 20, count: 3 }, { item: 'fire_arrows', price: 25 },
+  { item: 'ammo_knife', price: 14, count: 8 }, { item: 'ammo_bomb', price: 20, count: 3 },
+  { item: 'padded_armor', price: 25 }, { item: 'leather_boots', price: 30 },
   { item: 'metal', price: 14 },
 ];
+// Товары народов: у Северян — сталь и мех, у Озёрных — травы и чары,
+// у Степняков — луки и кожа. Цены на «своё» ниже базарных.
+const FACTION_GOODS = {
+  severane: [
+    { item: 'meat', price: 9 }, { item: 'hide', price: 12 },
+    { item: 'weapon:axe', price: 80 }, { item: 'weapon:warhammer', price: 125 },
+    { item: 'weapon:greatsword', price: 140 }, { item: 'weapon:mace', price: 70 },
+    { item: 'iron_helmet', price: 58 }, { item: 'iron_greaves', price: 64 },
+    { item: 'iron_ring', price: 45 }, { item: 'ring_str', price: 65 },
+  ],
+  ozerny: [
+    { item: 'herb', price: 5 }, { item: 'swift_potion', price: 33 },
+    { item: 'weapon:froststaff', price: 105 }, { item: 'weapon:firestaff', price: 100 },
+    { item: 'wizard_hat', price: 82 }, { item: 'crystal_orb', price: 115 },
+    { item: 'flame_tome', price: 135 }, { item: 'lucky_deck', price: 110 },
+    { item: 'wood_shield', price: 25 },
+  ],
+  stepnyaki: [
+    { item: 'meat', price: 8 }, { item: 'ammo_arrow', price: 8, count: 20 },
+    { item: 'weapon:huntbow', price: 75 }, { item: 'weapon:spear', price: 48 },
+    { item: 'weapon:bombs', price: 130 }, { item: 'weapon:halberd', price: 115 },
+    { item: 'leather_armor', price: 34 }, { item: 'wolf_amulet', price: 50 },
+    { item: 'fire_arrows', price: 22 }, { item: 'throwing_net', price: 85 },
+  ],
+};
+// Верность народу (репутация 40+) открывает эксклюзивное оружие
+const FACTION_EXCLUSIVE = {
+  severane: { item: 'weapon:sever_axe', price: 240 },
+  ozerny: { item: 'weapon:mist_staff', price: 240 },
+  stepnyaki: { item: 'weapon:steppe_bow', price: 240 },
+};
 
 const MAX_WEAPON_SLOTS = 4;
 const SCHOOL_NAMES = { melee: 'ближний бой', ranged: 'дальний бой', magic: 'магия' };
@@ -637,7 +669,7 @@ export class Game {
         const n = this.entities.get(id);
         n.name = 'Заезжий купец';
         n.dieAtTick = this.tick + 200 * 30;
-        this.toastAll(`🧳 Странствующий торговец заглянул в ${s.name} (на ~3 мин)`, true);
+        this.toastAll(`🧳 Странствующий торговец заглянул в ${s.name} (на ~3 мин)`); // мирная весть — только летопись
         break;
       }
       case 'hunt': { // странствующий именной зверь — трофей для смельчаков
@@ -1038,7 +1070,8 @@ export class Game {
     const half = arcDeg * Math.PI / 360;
     const r = w.range || 26;
     const atk = this.rollAttack(p, w);
-    const hitFake = { vx: Math.cos(aim), vy: Math.sin(aim), knockback: w.knockback, owner: p.id, school: 'melee', crit: atk.crit };
+    const hitFake = { vx: Math.cos(aim), vy: Math.sin(aim), knockback: w.knockback, owner: p.id, school: 'melee', crit: atk.crit,
+      chill: w.chill, fire: w.fire, poison: w.poison, slow: w.slow }; // стихии клинка («Зов метели»)
     for (const e of [...this.entities.values()]) {
       if (e.entType === 'enemy' && e.mapId === p.mapId) {
         const def = ENEMIES[e.kind];
@@ -1179,9 +1212,10 @@ export class Game {
   }
 
   spawnCaravanNpc(tok, unit) {
+    const fk = FACTION_KINDS[tok.faction] || {};
     return this.spawnNpc(unit === 'guard' ? 'guard' : 'trader', tok.faction, 'over',
       tok.x + (Math.random() - 0.5) * 40, tok.y + (Math.random() - 0.5) * 40,
-      { caravan: tok.id, kind: unit === 'guard' ? 'npc_guard' : 'npc_merchant' });
+      { caravan: tok.id, kind: unit === 'guard' ? (fk.guard || 'npc_guard') : (fk.merchant || 'npc_merchant') });
   }
 
   spawnDrop(item, count, mapId, x, y, ttl = 120) {
@@ -1290,7 +1324,10 @@ export class Game {
           th.hp = th.maxHp = 14;
           ids.push(tid);
         }
-        ids.push(this.spawnNpc('merchant', s.id, 'over', (a.stalls[0]?.x ?? s.x) * TILE + 8, (a.stalls[0]?.y ?? s.y) * TILE + 8));
+        // лица народа: жители, стража и торговцы каждой фракции — свои
+        const fk = FACTION_KINDS[s.faction] || {};
+        ids.push(this.spawnNpc('merchant', s.id, 'over', (a.stalls[0]?.x ?? s.x) * TILE + 8, (a.stalls[0]?.y ?? s.y) * TILE + 8,
+          fk.merchant ? { kind: fk.merchant } : {}));
         // ремесленники и служители — если деревня их «выучила»
         if (a.smithy) ids.push(this.spawnNpc('blacksmith', s.id, 'over', a.smithy.x * TILE + 8, a.smithy.y * TILE + 8));
         if (a.tavern) ids.push(this.spawnNpc('innkeeper', s.id, 'over', a.tavern.x * TILE + 8, a.tavern.y * TILE + 8));
@@ -1298,7 +1335,8 @@ export class Game {
         if (s.forestRich >= 2) ids.push(this.spawnNpc('hunter', s.id, 'over', sx - 40, sy + 30));
         for (let gi = 0; gi < (s.guards || 2); gi++) {
           const ga = gi / Math.max(1, s.guards) * Math.PI * 2;
-          ids.push(this.spawnNpc('guard', s.id, 'over', sx + Math.cos(ga) * 34, sy + Math.sin(ga) * 34));
+          ids.push(this.spawnNpc('guard', s.id, 'over', sx + Math.cos(ga) * 34, sy + Math.sin(ga) * 34,
+            fk.guard ? { kind: fk.guard } : {}));
         }
         // призванный дух-хранитель: парит у святилища, разит врагов
         if (s.spiritT > 0) {
@@ -1311,7 +1349,8 @@ export class Game {
         const villagers = Math.min(9, Math.max(2, s.population - 4));
         for (let i = 0; i < villagers; i++) {
           const bed = a.beds[i % a.beds.length];
-          const npc = this.spawnNpc('villager', s.id, 'over', sx + (this.rand() - 0.5) * 120, sy + (this.rand() - 0.5) * 120);
+          const npc = this.spawnNpc('villager', s.id, 'over', sx + (this.rand() - 0.5) * 120, sy + (this.rand() - 0.5) * 120,
+            fk.villager && this.rand() < 0.65 ? { kind: fk.villager } : {});
           const ent = this.entities.get(npc);
           ent.bed = bed ? { x: bed.x, y: bed.y } : { x: s.x, y: s.y };
           ent.work = pick(this.rand, a.works);
@@ -2640,6 +2679,18 @@ export class Game {
       q.bestiary = q.bestiary || {};
       q.bestiary[e.kind] = (q.bestiary[e.kind] || 0) + 1;
     }
+    // характеры народов: Северяне чтят доблесть, Степняки — охоту
+    // (тихо, без уведомлений — растущую репутацию видно в P)
+    for (const q of gainers) {
+      if (e.elite || (def.tier || 1) >= 5) {
+        q.valorN = (q.valorN || 0) + 1;
+        if (q.valorN % 3 === 0) q.rep.severane = Math.min(100, (q.rep.severane || 0) + 1);
+      }
+      if (BEAST_KINDS.has(e.kind)) {
+        q.huntN = (q.huntN || 0) + 1;
+        if (q.huntN % 4 === 0) q.rep.stepnyaki = Math.min(100, (q.rep.stepnyaki || 0) + 1);
+      }
+    }
     // задание дня: счёт добычи участникам
     const D = this.world.daily;
     if (D?.type === 'hunt' && e.kind === D.kind) {
@@ -2669,14 +2720,16 @@ export class Game {
     for (const [item, range] of Object.entries(def.drops || {})) {
       if (item === 'weapon') { this.dropRandomWeapon(e.mapId, e.x, e.y, luck, 2); continue; }
       let n = Array.isArray(range) ? randInt(this.rand, range[0], range[1]) : range;
+      if (item === 'coin') n = Math.ceil(n * 0.6); // мир прижимист: монет поменьше
+      else if (this.rand() > 0.6 + dropBonus) continue; // припасы падают не с каждого
       if (item === 'coin' && killer) n = Math.round(n * (killer.derived?.coinMult || 1));
       if (item === 'coin' && killer?.contract) n = Math.round(n * 1.75); // кровавый контракт
       if (item === 'coin' && (killer?.goldUltT || 0) > 0) n *= 2; // «Дым и золото»
       if (item === 'coin' && e.goldMult) n *= e.goldMult; // элита «Золотой»
       if (n > 0) this.spawnDrop(item, n, e.mapId, e.x + (this.rand() - 0.5) * 14, e.y + (this.rand() - 0.5) * 14);
     }
-    // элита: щедрый дроп экипировки
-    if (e.elite && this.rand() < 0.45) this.dropRandomGear(e.mapId, e.x, e.y, false, luck + 4);
+    // элита: дроп экипировки (пореже — вещь должна оставаться событием)
+    if (e.elite && this.rand() < 0.28) this.dropRandomGear(e.mapId, e.x, e.y, false, luck + 4);
     // именной зверь из заказа старейшины
     if (e.slayFor) {
       const owner = this.players.get(e.slayFor);
@@ -2696,8 +2749,8 @@ export class Game {
     if (e.arenaChamp) this.dropSetPiece(e.mapId, e.x, e.y, luck);
     // Выжженные земли: элита щеголяет «Пепельным орденом», всякая тварь — оружием огня
     if (e.mapId === 'ash') {
-      if (e.elite && this.rand() < 0.35) this.dropSetPiece('ash', e.x, e.y, luck, 'ashorder');
-      if (this.rand() < 0.04) this.dropRandomWeapon('ash', e.x, e.y, luck, 1, ['obsidianblade', 'ashstaff']);
+      if (e.elite && this.rand() < 0.25) this.dropSetPiece('ash', e.x, e.y, luck, 'ashorder');
+      if (this.rand() < 0.02) this.dropRandomWeapon('ash', e.x, e.y, luck, 1, ['obsidianblade', 'ashstaff']);
       for (const q of gainers) {
         if (q.story?.ash === 1 && e.kind === 'salamander') {
           q.story.ashN = (q.story.ashN || 0) + 1;
@@ -2857,6 +2910,16 @@ export class Game {
             this.toastAll(`🏴 Караван разграблен разбойником ${attacker.name}!`);
             this.events.push(this.world.day, `${attacker.name} разграбил караван ${FACTIONS[tok.faction]?.name || ''}`,
               { x: Math.round(n.x / TILE), y: Math.round(n.y / TILE) });
+            // заказ «перехватить караван»: заказчик доволен, народы ссорятся
+            const rq = attacker.quests?.find(q => q.type === 'raidq' && q.target === tok.faction && !q.done);
+            if (rq) {
+              this.completeQuestObjective(attacker, rq);
+              if (rq.gf && RELATIONS[rq.gf]) {
+                RELATIONS[rq.gf][tok.faction] = Math.max(-100, (RELATIONS[rq.gf][tok.faction] || 0) - 8);
+                RELATIONS[tok.faction][rq.gf] = RELATIONS[rq.gf][tok.faction];
+                this.events.push(this.world.day, `Между ${FACTIONS[rq.gf]?.name} и ${FACTIONS[tok.faction]?.name} растёт вражда`);
+              }
+            }
           }
         }
       }
@@ -4872,15 +4935,44 @@ export class Game {
 
   // ---------- диалоги / магазин / квесты / слухи ----------
   // NPC помнят знакомых: первая встреча — представление, дальше — приветствие
+  // прилавок торговца: ядро + товары народа + эксклюзив за верность (реп 40+)
+  shopFor(faction, p) {
+    const list = [...SHOP, ...(FACTION_GOODS[faction] || [])];
+    if (faction && FACTION_EXCLUSIVE[faction] && (p.rep[faction] || 0) >= 40)
+      list.push(FACTION_EXCLUSIVE[faction]);
+    return list;
+  }
+
   npcGreeting(p, npc) {
     p.met = p.met || new Set();
     const key = npc.home + ':' + npc.role + ':' + npc.name;
+    const faction = this.world.settlements.find(x => x.id === npc.home)?.faction
+      || (FACTIONS[npc.home] ? npc.home : null);
+    // говор народов: север краток, озёрные обходительны, степняки с прибауткой
+    const G = {
+      severane: {
+        first: `«${npc.name}. Слова — ветер, дела — сталь».`,
+        warm: `«${p.name}! Крепка твоя рука — садись к огню».`,
+        cold: `«Снова ты. Говори быстро — дел много».`,
+      },
+      ozerny: {
+        first: `«Добро пожаловать, путник. Я — ${npc.name}, к вашим услугам».`,
+        warm: `«${p.name}, дорогой гость! Вода нынче тихая — к удаче».`,
+        cold: `«А, это вы… Чем можем — поможем».`,
+      },
+      stepnyaki: {
+        first: `«Э-ге-гей! ${npc.name} меня кличут. Конь есть? Нет? Беда!»`,
+        warm: `«${p.name}, брат степи! Ветер донёс — ты снова в сёдлах!»`,
+        cold: `«Опять пеший ходишь, ${p.name}? Ну, говори».`,
+      },
+    }[faction];
     if (p.met.has(key)) {
-      const warm = (p.rep[this.world.settlements.find(x => x.id === npc.home)?.faction] || 0) > 30;
+      const warm = (p.rep[faction] || 0) > 30;
+      if (G) return warm ? G.warm : G.cold;
       return warm ? `«Рад видеть тебя снова, ${p.name}!»` : `«А, это снова ты, ${p.name}».`;
     }
     p.met.add(key);
-    return `«Будем знакомы — ${npc.name}».`;
+    return G ? G.first : `«Будем знакомы — ${npc.name}».`;
   }
 
   openDialog(p, npc) {
@@ -4980,9 +5072,10 @@ export class Game {
       return;
     }
     if (npc.role === 'merchant' || npc.role === 'trader') {
-      // структурированный прилавок: клиент рисует окно-сетку с иконками
+      // структурированный прилавок: ядро + товары народа + эксклюзив за верность
+      const faction = s?.faction || (FACTIONS[npc.home] ? npc.home : null);
       const mult = priceMultiplier(s ? p.rep[s.faction] : 0);
-      const items = SHOP.map((it, i) => {
+      const items = this.shopFor(faction, p).map((it, i) => {
         const sc = scarcityMult(s, it.item, 'buy');
         let need = null;
         if (it.item.startsWith('ammo_')) {
@@ -4998,7 +5091,10 @@ export class Game {
           need,
         };
       });
-      this.fx({ t: 'shop', pid: p.id, id: npc.id, name: npc.name, greet: this.npcGreeting(p, npc), items }, null);
+      let greet = this.npcGreeting(p, npc);
+      if (faction && FACTION_EXCLUSIVE[faction] && (p.rep[faction] || 0) < 40)
+        greet += ' «Есть у нас и особый товар — но только для своих (репутация 40)».';
+      this.fx({ t: 'shop', pid: p.id, id: npc.id, name: npc.name, greet, items }, null);
     } else if (npc.role === 'elder') {
       if (p.hintStage === 0) p.hintStage = 1; // онбординг: познакомились со старейшиной
       this.checkDeliver(p, npc);
@@ -5476,10 +5572,12 @@ export class Game {
     if (choice.startsWith('smithbrk:')) { this.smithBreak(p, choice.slice(9), dialogId); return; }
     if (choice.startsWith('buy:')) {
       const npc = this.entities.get(dialogId);
-      const stock = npc?.role === 'ashtrader' ? ASH_SHOP : npc?.role === 'dgtrader' ? DG_SHOP : SHOP;
+      const s = npc && this.world.settlements.find(x => x.id === npc.home);
+      const faction = s?.faction || (npc && FACTIONS[npc.home] ? npc.home : null);
+      const stock = npc?.role === 'ashtrader' ? ASH_SHOP : npc?.role === 'dgtrader' ? DG_SHOP
+        : this.shopFor(faction, p);
       const it = stock[+choice.split(':')[1]];
       if (!it) return;
-      const s = npc && this.world.settlements.find(x => x.id === npc.home);
       const price = npc?.role === 'ashtrader' || npc?.role === 'dgtrader' ? it.price
         : Math.ceil(it.price * priceMultiplier(s ? p.rep[s.faction] : 0) * scarcityMult(s, it.item, 'buy'));
       if (p.coins < price) { this.toast(p, STR.notEnoughCoins); return; }
@@ -5487,7 +5585,8 @@ export class Game {
       if (it.item.startsWith('ammo_')) p.ammo[it.item.slice(5)] = (p.ammo[it.item.slice(5)] || 0) + (it.count || 1);
       else p.inventory[it.item] = (p.inventory[it.item] || 0) + 1;
       this.fx({ t: 'loot', pid: p.id, x: p.x, y: p.y, text: this.itemName(it.item) }, p.mapId, p.x, p.y);
-      if (s) { p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + 1); }
+      // Озёрный союз чтит торговлю: сделки с ними греют репутацию вдвое
+      if (s) { p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + (s.faction === 'ozerny' ? 2 : 1)); }
       if (p.hintStage === 4) { p.hintStage = 5; this.toast(p, '🎓 Азы освоены — Пограничье твоё! (M — карта, P — дипломатия)'); }
       return;
     }
@@ -5690,6 +5789,34 @@ export class Game {
       }, ' (держись рядом с караваном!)');
       return;
     }
+    // межфракционная политика: самая холодная к нам фракция
+    const coldest = ['severane', 'ozerny', 'stepnyaki'].filter(f => f !== s.faction)
+      .sort((a, b) => (RELATIONS[s.faction][a] || 0) - (RELATIONS[s.faction][b] || 0))[0];
+    const rel = RELATIONS[s.faction][coldest] || 0;
+    // дары примирения: отвези добро — отношения народов теплеют
+    if (rel < 25 && roll >= 0.5 && roll < 0.62 && !p.quests.some(q => q.gift)) {
+      const to = this.world.settlements.find(x => x.faction === coldest && !x.ruined && !x.captured);
+      if (to) {
+        this.addQuest(p, {
+          type: 'deliver', to: to.id, gift: coldest, giver: s.id, done: false,
+          title: `☮ Отвезти дары примирения в ${to.name}`, tx: to.x, ty: to.y,
+          desc: `«Со ${FACTIONS[coldest].name} у нас нелады. Отвези дары их старейшине — пусть знают: мы худого не держим»`,
+          reward: { coins: 30, rep: 12, xp: 40 },
+        });
+        return;
+      }
+    }
+    // тёмное дело: перехват чужого каравана (только при холодных отношениях)
+    if (rel < 10 && roll >= 0.62 && roll < 0.72 && !p.quests.some(q => q.type === 'raidq')
+      && (p.rep[s.faction] || 0) >= 20) {
+      this.addQuest(p, {
+        type: 'raidq', target: coldest, gf: s.faction, giver: s.id, done: false,
+        title: `🏴 Перехватить караван: ${FACTIONS[coldest].name}`,
+        desc: `«Дело тёмное, но платим щедро. Их обозы жиреют на наших дорогах. Перебей охрану — груз твой. ${FACTIONS[coldest].name} этого не простят»`,
+        reward: { coins: 80, rep: 15, xp: 60 },
+      });
+      return;
+    }
     if (roll < 0.4) {
       // ближайший незачищенный данж, на который ЕЩЁ нет задания в журнале
       const poi = this.world.pois
@@ -5820,7 +5947,21 @@ export class Game {
   // доставка: пришёл к старейшине цели
   checkDeliver(p, npc) {
     for (const q of p.quests)
-      if (q.type === 'deliver' && !q.done && npc.home === q.to) this.completeQuestObjective(p, q);
+      if (q.type === 'deliver' && !q.done && npc.home === q.to) {
+        this.completeQuestObjective(p, q);
+        // дары примирения: народы теплеют друг к другу
+        if (q.gift) {
+          const gs = this.world.settlements.find(x => x.id === q.giver);
+          const gf = gs?.faction;
+          if (gf && q.gift !== gf) {
+            RELATIONS[gf][q.gift] = Math.min(100, (RELATIONS[gf][q.gift] || 0) + 8);
+            RELATIONS[q.gift][gf] = RELATIONS[gf][q.gift];
+          }
+          p.rep[q.gift] = Math.min(100, (p.rep[q.gift] || 0) + 8);
+          this.toast(p, `☮ Дары приняты: ${FACTIONS[q.gift]?.name} теплеют к тебе и к ${FACTIONS[gf]?.name || 'соседям'}`);
+          this.events.push(this.world.day, `${p.name} привёз дары примирения — народы сблизились`);
+        }
+      }
   }
 
   useItem(p, item) {

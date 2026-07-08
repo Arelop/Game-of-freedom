@@ -66,6 +66,11 @@ export const T = {
   CRACKED_WALL: 56,  // треснувшая стена — за ней тайник (ломается оружием)
   PLAQUE: 57,        // каменная табличка с летописью подземелья
   PLATE: 58,         // ритуальная плита испытания (E — принять бой)
+  // фракционная архитектура: у каждого народа свой строительный почерк
+  WALL_LOG: 59,      // северный сруб — тёмное дерево
+  WALL_STONE2: 60,   // озёрная кладка — серый камень
+  WALL_CLAY: 61,     // степной саман — глина и солома
+  YURT: 62,          // степная юрта-шатёр
 };
 
 // Реквизит подземелий: бьётся ЛЮБЫМ оружием, не только с structDmg
@@ -98,6 +103,10 @@ export const DESTRUCTIBLE = {
   [T.SACK]: { hp: 2, becomes: T.DUNGEON_FLOOR, drops: { bread: 0.8, herb: 0.3 } },
   [T.BARREL_FIRE]: { hp: 2, becomes: T.DUNGEON_FLOOR, drops: {} }, // взрыв — в damageTile
   [T.CRACKED_WALL]: { hp: 8, becomes: T.DUNGEON_FLOOR, drops: {} },
+  [T.WALL_LOG]: { hp: 12, becomes: T.RUBBLE, drops: { wood: 0.6 } },
+  [T.WALL_STONE2]: { hp: 15, becomes: T.RUBBLE, drops: { metal: 0.3 } },
+  [T.WALL_CLAY]: { hp: 10, becomes: T.RUBBLE, drops: {} },
+  [T.YURT]: { hp: 8, becomes: T.GRASS, drops: { wood: 0.5 } },
 };
 
 // Сезоны: 3 игровых дня каждый. Влияют на урожай и агрессию монстров.
@@ -114,6 +123,7 @@ export const SOLID = new Set([
   T.OBELISK, T.STATUE, T.FOUNTAIN, T.DARK_ALTAR, T.CRYSTAL_WALL, T.PILLAR,
   T.LOCKED_DOOR, T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
   T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL, T.PLAQUE,
+  T.WALL_LOG, T.WALL_STONE2, T.WALL_CLAY, T.YURT,
 ]);
 // Блокирует пули (стены — да, вода — нет)
 export const BULLET_SOLID = new Set([
@@ -121,4 +131,5 @@ export const BULLET_SOLID = new Set([
   T.MINE, T.OBELISK, T.STATUE, T.CRYSTAL_WALL, T.PILLAR, T.LOCKED_DOOR,
   T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
   T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL, T.PLAQUE,
+  T.WALL_LOG, T.WALL_STONE2, T.WALL_CLAY, T.YURT,
 ]);

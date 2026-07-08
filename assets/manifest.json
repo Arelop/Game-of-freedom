@@ -10,6 +10,10 @@
     "c": {
       "path": "assets/raw/roguelike-caves/Spritesheet/roguelikeDungeon_transparent.png",
       "stride": 17
+    },
+    "ch": {
+      "path": "assets/raw/roguelike-chars/Spritesheet/roguelikeChar_transparent.png",
+      "stride": 17
     }
   },
   "sprites": {
@@ -1289,6 +1293,256 @@
     "npc_goblin": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/goblin.png",
       "down": 2
+    },
+    "npc_villager_sev": {
+      "layers": [
+        {
+          "pack": "ch",
+          "tx": 0,
+          "ty": 1
+        },
+        {
+          "pack": "ch",
+          "tx": 13,
+          "ty": 3
+        },
+        {
+          "pack": "ch",
+          "tx": 20,
+          "ty": 1
+        }
+      ]
+    },
+    "npc_guard_sev": {
+      "layers": [
+        {
+          "pack": "ch",
+          "tx": 0,
+          "ty": 1
+        },
+        {
+          "pack": "ch",
+          "tx": 14,
+          "ty": 5
+        },
+        {
+          "pack": "ch",
+          "tx": 29,
+          "ty": 7
+        },
+        {
+          "pack": "ch",
+          "tx": 46,
+          "ty": 1
+        }
+      ]
+    },
+    "npc_merchant_sev": {
+      "layers": [
+        {
+          "pack": "ch",
+          "tx": 0,
+          "ty": 1
+        },
+        {
+          "pack": "ch",
+          "tx": 6,
+          "ty": 4
+        },
+        {
+          "pack": "ch",
+          "tx": 24,
+          "ty": 1
+        }
+      ]
+    },
+    "npc_villager_oz": {
+      "layers": [
+        {
+          "pack": "ch",
+          "tx": 0,
+          "ty": 0
+        },
+        {
+          "pack": "ch",
+          "tx": 13,
+          "ty": 1
+        },
+        {
+          "pack": "ch",
+          "tx": 20,
+          "ty": 4
+        }
+      ]
+    },
+    "npc_guard_oz": {
+      "layers": [
+        {
+          "pack": "ch",
+          "tx": 0,
+          "ty": 0
+        },
+        {
+          "pack": "ch",
+          "tx": 13,
+          "ty": 2
+        },
+        {
+          "pack": "ch",
+          "tx": 28,
+          "ty": 3
+        },
+        {
+          "pack": "ch",
+          "tx": 44,
+          "ty": 1
+        }
+      ]
+    },
+    "npc_merchant_oz": {
+      "layers": [
+        {
+          "pack": "ch",
+          "tx": 0,
+          "ty": 0
+        },
+        {
+          "pack": "ch",
+          "tx": 13,
+          "ty": 0
+        },
+        {
+          "pack": "ch",
+          "tx": 29,
+          "ty": 8
+        }
+      ]
+    },
+    "npc_villager_step": {
+      "layers": [
+        {
+          "pack": "ch",
+          "tx": 0,
+          "ty": 2
+        },
+        {
+          "pack": "ch",
+          "tx": 9,
+          "ty": 0
+        },
+        {
+          "pack": "ch",
+          "tx": 28,
+          "ty": 2
+        }
+      ]
+    },
+    "npc_guard_step": {
+      "layers": [
+        {
+          "pack": "ch",
+          "tx": 0,
+          "ty": 2
+        },
+        {
+          "pack": "ch",
+          "tx": 6,
+          "ty": 2
+        },
+        {
+          "pack": "ch",
+          "tx": 28,
+          "ty": 2
+        },
+        {
+          "pack": "ch",
+          "tx": 52,
+          "ty": 1
+        }
+      ]
+    },
+    "npc_merchant_step": {
+      "layers": [
+        {
+          "pack": "ch",
+          "tx": 0,
+          "ty": 2
+        },
+        {
+          "pack": "ch",
+          "tx": 9,
+          "ty": 5
+        },
+        {
+          "pack": "ch",
+          "tx": 28,
+          "ty": 8
+        }
+      ]
+    },
+    "tile_wall_log": {
+      "pack": "t",
+      "tx": 1,
+      "ty": 6
+    },
+    "tile_wall_stone2": {
+      "pack": "t",
+      "tx": 5,
+      "ty": 6
+    },
+    "tile_wall_clay": {
+      "pack": "r",
+      "tx": 15,
+      "ty": 15
+    },
+    "obj_yurt": {
+      "w": 32,
+      "h": 32,
+      "down": 2,
+      "layers": [
+        {
+          "pack": "r",
+          "tx": 48,
+          "ty": 10
+        },
+        {
+          "pack": "r",
+          "tx": 49,
+          "ty": 10,
+          "dx": 16
+        },
+        {
+          "pack": "r",
+          "tx": 48,
+          "ty": 11,
+          "dy": 16
+        },
+        {
+          "pack": "r",
+          "tx": 49,
+          "ty": 11,
+          "dx": 16,
+          "dy": 16
+        }
+      ]
+    },
+    "obj_tower": {
+      "w": 16,
+      "h": 32,
+      "layers": [
+        {
+          "pack": "t",
+          "tx": 3,
+          "ty": 8,
+          "dy": 0
+        },
+        {
+          "pack": "t",
+          "tx": 6,
+          "ty": 6,
+          "dy": 16
+        }
+      ]
     }
   }
 }

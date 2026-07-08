@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CLASSES } from '../shared/classes.js';
+import { RELATIONS } from './sim/factions.js';
 
 // SAVES_DIR — куда класть сейвы (для тестов и внешних дисков хостинга)
 const SAVES = process.env.SAVES_DIR || join(dirname(fileURLToPath(import.meta.url)), '..', 'saves');
@@ -56,6 +57,7 @@ export function saveWorld(game) {
         repRanks: p.repRanks || {}, daily: p.daily || null,
         abilities: p.abilities || null,
       })),
+      relations: RELATIONS, // дипломатия народов дрейфует — помним её
       banditsWeakT: w.banditsWeakT || 0,
       smithBoon: w.smithBoon || false,
       arenaRecord: w.arenaRecord || null,
@@ -128,6 +130,10 @@ export function applyWorldData(game, data) {
     if (data.wildChests) for (const rec of data.wildChests) {
       const c = w.wildChests?.find(x => x.x === rec.x && x.y === rec.y);
       if (c) c.opened = rec.opened;
+    }
+    if (data.relations) { // дипломатия народов из сейва
+      for (const [f, rels] of Object.entries(data.relations))
+        if (RELATIONS[f]) Object.assign(RELATIONS[f], rels);
     }
     if (data.war) w.war.stage = data.war.stage;
     if (data.stash) w.stash = data.stash;

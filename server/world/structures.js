@@ -7,6 +7,12 @@ import { baseTile } from './worldgen.js';
 
 function set(world, x, y, t) { world.edits.set(x + ',' + y, t); }
 
+// строительный почерк народов: северный сруб, озёрная кладка, степной саман
+export const WALL_OF = {
+  severane: T.WALL_LOG, ozerny: T.WALL_STONE2, stepnyaki: T.WALL_CLAY,
+};
+const wallOf = s => WALL_OF[s?.faction] || T.WALL;
+
 // Свободна ли площадка w x h с углом (x0,y0): нет правок и рельеф проходим
 export function siteFree(world, x0, y0, w, h) {
   for (let y = y0 - 1; y < y0 + h + 1; y++) {
@@ -36,7 +42,7 @@ export function findBuildSite(world, s, w, h, rand) {
 // Рантайм-постройки. Возвращают занятые тайлы (для remap чанков).
 export function buildHouse(world, s, site, rand) {
   const w = randInt(rand, 4, 6), h = randInt(rand, 4, 5);
-  stampHouse(world, site.x, site.y, w, h, s.anchors);
+  stampHouse(world, site.x, site.y, w, h, s.anchors, wallOf(s));
   return { w, h };
 }
 
@@ -48,9 +54,9 @@ export function buildField(world, s, site) {
 }
 
 export function buildTower(world, s, site) {
-  for (let y = site.y; y < site.y + 2; y++)
-    for (let x = site.x; x < site.x + 2; x++) set(world, x, y, T.TOWER);
-  return { w: 2, h: 2 };
+  // одинокая дозорная башня: рисуется высоким спрайтом на клиенте
+  set(world, site.x, site.y, T.TOWER);
+  return { w: 1, h: 1 };
 }
 
 export function buildMine(world, s, site) {
@@ -66,11 +72,11 @@ export function buildShrine(world, s, site) {
 }
 
 // Дом размером w x h с дверью снизу; внутри кровать (+стол в больших)
-export function stampHouse(world, x0, y0, w, h, anchors) {
+export function stampHouse(world, x0, y0, w, h, anchors, wallT = T.WALL) {
   for (let y = y0; y < y0 + h; y++)
     for (let x = x0; x < x0 + w; x++) {
       const border = x === x0 || y === y0 || x === x0 + w - 1 || y === y0 + h - 1;
-      set(world, x, y, border ? T.WALL : T.FLOOR_WOOD);
+      set(world, x, y, border ? wallT : T.FLOOR_WOOD);
     }
   const doorX = x0 + Math.floor(w / 2);
   set(world, doorX, y0 + h - 1, T.DOOR);
@@ -110,8 +116,9 @@ export function stampSettlement(world, s, rand) {
     set(world, cx, cy + d, T.ROAD); set(world, cx, cy - d, T.ROAD);
   }
 
+  const wallT = wallOf(s);
   // таверна — большой дом на севере площади (кровати «для постояльцев»)
-  stampHouse(world, cx - 4, cy - 12, 8, 6, anchors);
+  stampHouse(world, cx - 4, cy - 12, 8, 6, anchors, wallT);
   set(world, cx - 2, cy - 9, T.TABLE);
   set(world, cx + 1, cy - 9, T.TABLE);
   anchors.tavern = { x: cx - 1, y: cy - 8 };
@@ -119,7 +126,7 @@ export function stampSettlement(world, s, rand) {
   set(world, cx + 4, cy - 4, T.BOARD);
 
   // кузница — дом с наковальней на востоке
-  stampHouse(world, cx + 6, cy - 6, 5, 5, anchors);
+  stampHouse(world, cx + 6, cy - 6, 5, 5, anchors, wallT);
   set(world, cx + 7, cy - 5, T.ANVIL);
   anchors.smithy = { x: cx + 8, y: cy - 3 };
 
@@ -131,7 +138,36 @@ export function stampSettlement(world, s, rand) {
   const houses = randInt(rand, 3, homeSlots.length);
   for (let i = 0; i < houses; i++) {
     const [ox, oy, w, h] = homeSlots[i];
-    stampHouse(world, cx + ox, cy + oy, w, h, anchors);
+    stampHouse(world, cx + ox, cy + oy, w, h, anchors, wallT);
+  }
+
+  // фракционный колорит двора
+  if (s.faction === 'stepnyaki') {
+    // юрты кочевников меж домов и загон для скота
+    for (const [ox, oy] of [[9, 8], [13, 6], [-11, -10]]) {
+      if (world.edits.get((cx + ox) + ',' + (cy + oy)) === T.GRASS) set(world, cx + ox, cy + oy, T.YURT);
+    }
+    for (let x = cx + 10; x <= cx + 15; x++) { set(world, x, cy + 11, T.FENCE); set(world, x, cy + 14, T.FENCE); }
+    for (let y = cy + 12; y <= cy + 13; y++) set(world, cx + 15, y, T.FENCE);
+  } else if (s.faction === 'ozerny') {
+    // причал: мостки уходят к ближайшей воде (озёрный народ живёт рыбой)
+    outer: for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (let d = R - 2; d <= R + 16; d++) {
+        const wx = cx + dx * d, wy = cy + dy * d;
+        if (baseTile(world.seed, wx, wy) === T.WATER || baseTile(world.seed, wx, wy) === T.DEEP_WATER) {
+          for (let k = -3; k <= 4; k++) {
+            const px = cx + dx * (d + k), py = cy + dy * (d + k);
+            if (world.edits.get(px + ',' + py) === undefined || k <= 0) set(world, px, py, T.FLOOR_WOOD);
+          }
+          anchors.works.push({ x: cx + dx * (d + 3), y: cy + dy * (d + 3) }); // рыбацкое место
+          break outer;
+        }
+      }
+    }
+  } else if (s.faction === 'severane') {
+    // трофейные тотемы у ворот — север встречает силой
+    if (world.edits.get((cx + 3) + ',' + (cy - R + 2)) === T.GRASS) set(world, cx + 3, cy - R + 2, T.STATUE);
+    if (world.edits.get((cx - 3) + ',' + (cy - R + 2)) === T.GRASS) set(world, cx - 3, cy - R + 2, T.STATUE);
   }
 
   // рынок: ряд прилавков у западного входа площади
