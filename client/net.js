@@ -29,6 +29,7 @@ export class Net {
     this.bullets = [];                    // косметические пули
     this.chunks = new Map();              // "mapId:cx,cy" -> Uint8Array
     this.chunkPending = new Map();        // key -> время запроса
+    this.mapStyle = new Map();            // mapId -> тайлсет данжа (mine/crypt/cave/fort)
     this.ping = 0;
     this.resims = 0;
 
@@ -132,6 +133,7 @@ export class Net {
         break;
       }
       case 'mapChange':
+        if (m.style) this.mapStyle.set(m.mapId, m.style); // тайлсет данжа
         if (m.pid === this.myId) {
           this.mapId = m.mapId;
           this.pred.x = m.x; this.pred.y = m.y;

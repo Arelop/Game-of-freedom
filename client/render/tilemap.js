@@ -57,7 +57,26 @@ const TILE_SPRITES = {
   [T.BURNT_TREE]: ['tile_ash', 'obj_burnt_tree'],
   [T.EMBER]: ['tile_ash', 'obj_ember'],
   [T.PORTAL]: ['tile_ash'],             // пламя портала — оверлей
+  // детализация подземелий
+  [T.BARREL]: ['tile_dungeon_floor', 'obj_barrel'],
+  [T.CRATE]: ['tile_dungeon_floor', 'obj_crate'],
+  [T.SACK]: ['tile_dungeon_floor', 'obj_sack'],
+  [T.BARREL_FIRE]: ['tile_dungeon_floor', 'obj_barrel_fire'], // пламя — оверлей
+  [T.BONES]: ['tile_dungeon_floor', 'obj_bones'],
+  [T.CRACKED_WALL]: ['tile_wall_crack'],
+  [T.PLAQUE]: ['tile_dungeon_floor', 'obj_plaque'],
+  [T.PLATE]: ['tile_dungeon_floor', 'obj_plate'],
 };
+
+// Тайлсеты подземелий: пол/стена по стилю места (шахта, склеп, пещера, форт)
+const DUNGEON_STYLES = {
+  mine: { floor: ['tile_dfloor_mine', 'tile_dfloor_mine2'], wall: 'tile_dwall_mine' },
+  crypt: { floor: ['tile_dfloor_crypt', 'tile_dfloor_crypt2'], wall: 'tile_dwall_crypt' },
+  cave: { floor: ['tile_dfloor_cave', 'tile_dfloor_cave2'], wall: 'tile_dwall_cave' },
+  fort: { floor: ['tile_dfloor_fort', 'tile_dfloor_fort2'], wall: 'tile_dwall_fort' },
+};
+// по этим тайлам «стоит» факел на стене (пол под стеной)
+const TORCH_FLOORS = new Set([T.DUNGEON_FLOOR, T.BLOOD, T.TRAP, T.BONES, T.RUBBLE, T.PLATE]);
 
 export class TileRenderer {
   constructor(atlas, net) {
@@ -80,6 +99,12 @@ export class TileRenderer {
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     const animated = [];
+    // тайлсет данжа: пол и стены по стилю места (шахта/склеп/пещера/форт)
+    const style = DUNGEON_STYLES[this.net.mapStyle?.get(mapId)];
+    const styledFloor = (x, y) => {
+      const h = hash2(7, cx * CHUNK + x, cy * CHUNK + y) % 100;
+      return style.floor[h < 30 ? 1 : 0];
+    };
     for (let y = 0; y < CHUNK; y++) {
       for (let x = 0; x < CHUNK; x++) {
         const t = tiles[y * CHUNK + x];
@@ -91,11 +116,20 @@ export class TileRenderer {
           const h = hash2(11, cx * CHUNK + x, cy * CHUNK + y) % 100;
           spec = [h < 2 ? 'tile_grass_flowers' : h < 25 ? 'tile_grass2' : 'tile_grass'];
         }
+        if (style) {
+          if (t === T.DUNGEON_FLOOR) spec = [styledFloor(x, y)];
+          else if (t === T.DUNGEON_WALL) spec = [style.wall];
+          else if (spec[0] === 'tile_dungeon_floor') spec = [styledFloor(x, y), spec[1]];
+          // факелы на стенах: живой огонь там, где стена смотрит в зал
+          if (t === T.DUNGEON_WALL && y < CHUNK - 1 && TORCH_FLOORS.has(tiles[(y + 1) * CHUNK + x])
+            && hash2(13, cx * CHUNK + x, cy * CHUNK + y) % 100 < 9)
+            animated.push({ x: cx * CHUNK + x, y: cy * CHUNK + y, tile: 'torch' });
+        }
         this.atlas.blit(ctx, spec[0], x * TILE, y * TILE);
         if (spec[1]) this.atlas.blit(ctx, spec[1], x * TILE, y * TILE);
         if (t === T.CAMPFIRE || t === T.DUNGEON_EXIT || t === T.BOARD
           || t === T.CRYSTAL_WALL || t === T.FOUNTAIN // кристаллы и источники светятся в темноте
-          || t === T.LAVA || t === T.PORTAL || t === T.EMBER)
+          || t === T.LAVA || t === T.PORTAL || t === T.EMBER || t === T.BARREL_FIRE)
           animated.push({ x: cx * CHUNK + x, y: cy * CHUNK + y, tile: t });
       }
     }
@@ -143,6 +177,14 @@ export class TileRenderer {
       } else if (a.tile === T.PORTAL) {
         const sc = 1 + Math.sin(timeSec * 5) * 0.1;
         this.atlas.draw(ctx, 'obj_flame_portal', s.x, s.y, { scale: sc });
+      } else if (a.tile === 'torch') {
+        // факел на стене данжа: мерцающий живой огонь
+        const frame = Math.floor(timeSec * 8 + a.x * 1.7 + a.y) % 4;
+        this.atlas.draw(ctx, 'obj_torch_' + frame, s.x, s.y + 3);
+      } else if (a.tile === T.BARREL_FIRE) {
+        // фитиль огненной бочки тлеет — заметно и тревожно
+        const frame = Math.floor(timeSec * 6 + a.x) % 2;
+        this.atlas.draw(ctx, 'obj_campfire_' + frame, s.x, s.y - 6, { scale: 0.55 });
       }
     }
   }

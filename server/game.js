@@ -1,7 +1,7 @@
 // Авторитетная симуляция: игроки, враги, NPC, пули, данжи, квесты, голод.
 import {
   TICK_DT, TILE, SOLID, BULLET_SOLID, T, PLAYER_MAX_HP, PLAYER_HURT_INVULN,
-  HUNGER_MAX, HUNGER_RATE, DAY_LENGTH, PLAYER_RADIUS, DESTRUCTIBLE, seasonOf,
+  HUNGER_MAX, HUNGER_RATE, DAY_LENGTH, PLAYER_RADIUS, DESTRUCTIBLE, PROP_TILES, seasonOf,
   WORLD_TILES,
 } from '../shared/constants.js';
 import { WEAPONS } from '../shared/weapons.js';
@@ -108,6 +108,15 @@ const ASH_SHOP = [
   { item: 'ammo_arrow', price: 16, count: 20 }, { item: 'ammo_bolt', price: 22, count: 8 },
 ];
 
+// прилавок гоблина-барыги в подземельях: втридорога, зато под рукой
+const DG_SHOP = [
+  { item: 'heal_potion', price: 55 }, { item: 'mana_potion', price: 50 },
+  { item: 'bread', price: 16 }, { item: 'bandage', price: 30 },
+  { item: 'swift_potion', price: 60 },
+  { item: 'ammo_arrow', price: 18, count: 20 }, { item: 'ammo_bolt', price: 26, count: 8 },
+  { item: 'ammo_knife', price: 24, count: 8 },
+];
+
 // mode 'buy' — покупка игроком, 'sell' — продажа игроком (дефицит платит больше).
 function scarcityMult(s, item, mode) {
   if (!s) return 1;
@@ -177,6 +186,14 @@ export class Game {
     for (const [item, chance] of Object.entries(def.drops || {})) {
       let n = Math.floor(chance) + (this.rand() < chance % 1 ? 1 : 0);
       if (n > 0) this.spawnDrop(item, n, mapId, tx * TILE + 8, ty * TILE + 8);
+    }
+    // огненная бочка: взрыв жжёт всех вокруг и детонирует соседние бочки
+    if (tile === T.BARREL_FIRE)
+      this.explodeAt(mapId, tx * TILE + 8, ty * TILE + 8, 3, 40, attacker?.id, 6);
+    // треснувшая стена рухнула — тайник открыт
+    if (tile === T.CRACKED_WALL) {
+      const inst = this.dungeons.get(mapId);
+      if (inst?.dungeon.secret) this.toastMap(mapId, '✨ Стена рухнула — за ней тайник!');
     }
     // вандализм в живой деревне портит репутацию
     if (attacker && mapId === 'over' && tile !== T.TREE && tile !== T.BUSH && tile !== T.ROCK_SOLID) {
@@ -1049,16 +1066,18 @@ export class Game {
       da = Math.atan2(Math.sin(da), Math.cos(da));
       if (arcDeg >= 360 || Math.abs(da) <= half) this.damagePlayer(q, atk.dmg, p);
     }
-    // удар по постройкам: дерево рубится, стены крошатся (по structDmg оружия)
-    if (w.structDmg > 0) {
-      for (const dd of [12, 22]) {
-        const tx = Math.floor((p.x + Math.cos(aim) * dd) / TILE);
-        const ty = Math.floor((p.y + Math.sin(aim) * dd) / TILE);
-        if (DESTRUCTIBLE[this.chunks.tileAt(p.mapId, tx, ty)]) {
-          this.damageTile(p.mapId, tx, ty, Math.round(w.structDmg * (p.derived?.dmgMelee || 1)), p);
-          break;
-        }
-      }
+    // удар по постройкам: дерево рубится, стены крошатся (по structDmg оружия);
+    // реквизит данжей (бочки, ящики) бьётся любым оружием
+    for (const dd of [12, 22]) {
+      const tx = Math.floor((p.x + Math.cos(aim) * dd) / TILE);
+      const ty = Math.floor((p.y + Math.sin(aim) * dd) / TILE);
+      const tile = this.chunks.tileAt(p.mapId, tx, ty);
+      if (!DESTRUCTIBLE[tile]) continue;
+      const structDmg = PROP_TILES.has(tile)
+        ? Math.max(w.structDmg || 0, Math.round(atk.dmg))
+        : Math.round((w.structDmg || 0) * (p.derived?.dmgMelee || 1));
+      if (structDmg > 0) this.damageTile(p.mapId, tx, ty, structDmg, p);
+      break;
     }
     this.fx({ t: 'swing', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, range: r, arc: arcDeg }, p.mapId, p.x, p.y);
   }
@@ -2359,11 +2378,15 @@ export class Game {
       if (!stepProjectile(pr, dt, map)) {
         if (pr.explode) {
           this.explodeAt(pr.mapId, pr.x, pr.y, pr.dmg, pr.explode.radius, pr.owner, pr.structDmg || 0);
-        } else if (pr.structDmg > 0 && pr.life > 0) {
+        } else if (pr.life > 0) {
           // пуля упёрлась в стену: бьём тайл по направлению полёта
+          // (реквизит данжей пробивается любым снарядом, стены — только structDmg)
           const tx = Math.floor((pr.x + Math.sign(pr.vx) * 6) / TILE);
           const ty = Math.floor((pr.y + Math.sign(pr.vy) * 6) / TILE);
-          if (!this.damageTile(pr.mapId, tx, ty, pr.structDmg, this.players.get(pr.owner)))
+          const tile = this.chunks.tileAt(pr.mapId, tx, ty);
+          const structDmg = PROP_TILES.has(tile)
+            ? Math.max(pr.structDmg || 0, Math.ceil(pr.dmg)) : (pr.structDmg || 0);
+          if (!(structDmg > 0) || !this.damageTile(pr.mapId, tx, ty, structDmg, this.players.get(pr.owner)))
             this.fx({ t: 'hit', kind: 'wall', x: pr.x, y: pr.y }, pr.mapId, pr.x, pr.y);
         } else {
           this.fx({ t: 'hit', kind: 'wall', x: pr.x, y: pr.y }, pr.mapId, pr.x, pr.y);
@@ -3105,16 +3128,10 @@ export class Game {
   enterDungeon(p, poi) {
     const mapId = 'dg:' + poi.id;
     if (!this.dungeons.has(mapId)) {
-      const d = generateDungeon(hash2(this.world.seed, poi.x, poi.y), poi.difficulty, poi.boss);
+      const d = generateDungeon(hash2(this.world.seed, poi.x, poi.y), poi.difficulty, poi.boss, 1, poi.name);
       this.dungeons.set(mapId, { dungeon: d, poi });
       this.chunks.dungeons.set(mapId, d);
-      // пленники в тюремных клетках ждут спасителя
-      for (const room of d.rooms) {
-        if (!room.prisoner) continue;
-        const id = this.spawnNpc('prisoner', null, mapId, room.prisoner.x * TILE + 8, room.prisoner.y * TILE + 8);
-        const n = this.entities.get(id);
-        if (n) { n.name = pick(this.rand, NPC_NAMES); n.hp = n.maxHp = 8; }
-      }
+      this.populateDungeon(mapId, d);
     }
     const { dungeon } = this.dungeons.get(mapId);
     p.mapId = mapId;
@@ -3124,6 +3141,35 @@ export class Game {
     if (dungeon.cursed) this.toast(p, '⚠ Проклятое подземелье: все враги — элита, но добыча щедрее');
   }
 
+  // обитатели свежего этажа: пленники, гоблин-барыга, дозор в коридорах
+  populateDungeon(mapId, d) {
+    for (const room of d.rooms) {
+      if (room.prisoner) { // пленники в тюремных клетках ждут спасителя
+        const id = this.spawnNpc('prisoner', null, mapId, room.prisoner.x * TILE + 8, room.prisoner.y * TILE + 8);
+        const n = this.entities.get(id);
+        if (n) { n.name = pick(this.rand, NPC_NAMES); n.hp = n.maxHp = 8; }
+      }
+      if (room.goblin) { // трусливый барыга: торгует втридорога там, куда лавки не доедут
+        const id = this.spawnNpc('dgtrader', null, mapId, room.goblin.x * TILE + 8, room.goblin.y * TILE + 8, { kind: 'npc_goblin' });
+        const n = this.entities.get(id);
+        if (n) { n.name = 'Сквиз'; n.hp = n.maxHp = 10; }
+      }
+    }
+    if (d.patrol) { // дозор ходит меж комнат — засада или встречный бой
+      const [w0, w1] = d.patrol.route;
+      const dx = Math.sign(w1.x - w0.x), dy = Math.sign(w1.y - w0.y);
+      for (let i = 0; i < d.patrol.kinds.length; i++) {
+        // растягиваем группу вдоль маршрута; в стену не ставим
+        let ex = w0.x * TILE + 8 + dx * i * 12, ey = w0.y * TILE + 8 + dy * i * 12;
+        if (SOLID.has(this.chunks.tileAt(mapId, Math.floor(ex / TILE), Math.floor(ey / TILE)))) {
+          ex = w0.x * TILE + 8; ey = w0.y * TILE + 8;
+        }
+        this.spawnEnemy(d.patrol.kinds[i], mapId, ex, ey,
+          { patrol: d.patrol.route, patrolI: 1, forceElite: d.cursed });
+      }
+    }
+  }
+
   // лестница вниз: второй этаж — сложнее, мрачнее, богаче
   descendDungeon(p) {
     const inst = this.dungeons.get(p.mapId);
@@ -3131,9 +3177,10 @@ export class Game {
     const poi = inst.poi;
     const mapId = 'dg:' + poi.id + ':d2';
     if (!this.dungeons.has(mapId)) {
-      const d = generateDungeon(hash2(this.world.seed, poi.x, poi.y) + 7, poi.difficulty + 1, true, 2);
+      const d = generateDungeon(hash2(this.world.seed, poi.x, poi.y) + 7, poi.difficulty + 1, true, 2, poi.name);
       this.dungeons.set(mapId, { dungeon: d, poi });
       this.chunks.dungeons.set(mapId, d);
+      this.populateDungeon(mapId, d);
     }
     const { dungeon } = this.dungeons.get(mapId);
     p.mapId = mapId;
@@ -3154,7 +3201,8 @@ export class Game {
   }
 
   sendMapChange(p, title) {
-    this.fx({ t: 'mapChange', pid: p.id, mapId: p.mapId, x: p.x, y: p.y, title }, null);
+    const style = this.dungeons.get(p.mapId)?.dungeon.style || null;
+    this.fx({ t: 'mapChange', pid: p.id, mapId: p.mapId, x: p.x, y: p.y, title, style }, null);
   }
 
   checkDungeonRooms() {
@@ -3163,6 +3211,25 @@ export class Game {
       const playersHere = [...this.players.values()].filter(p => p.mapId === mapId && !p.dead);
       if (!playersHere.length) continue;
       for (const room of dungeon.rooms) {
+        // испытание древних: волна на время, успех — щедрая плата
+        if (room.trialIds) {
+          const alive = room.trialIds.filter(id => this.entities.has(id));
+          if (!alive.length) {
+            room.trialIds = null; room.trial.done = true; room.sealedByTrial = false;
+            for (const dd of room.doors) this.setDungeonDoor(mapId, dd, false);
+            const cx = room.trial.x * TILE + 8, cy = room.trial.y * TILE + 8;
+            this.dropRandomGear(mapId, cx + 12, cy + 12, true, 3);
+            this.spawnDrop('coin', randInt(this.rand, 18, 35), mapId, cx - 8, cy + 12);
+            for (const q of playersHere) this.addXp(q, 30);
+            this.fx({ t: 'chest', x: cx, y: cy }, mapId, cx, cy);
+            this.toastMap(mapId, '🏆 Испытание пройдено! Древние платят щедро');
+            this.events.push(this.world.day, `Испытание древних в ${poi.name} пройдено`);
+          } else if (this.tick >= room.trialEnd) {
+            room.trialIds = null; room.trial.done = true; room.sealedByTrial = false;
+            for (const dd of room.doors) this.setDungeonDoor(mapId, dd, false);
+            this.toastMap(mapId, '⌛ Время вышло — плита остыла. Недобитки разбрелись по залам…');
+          }
+        }
         if (room.cleared) continue;
         const inside = playersHere.some(p => {
           const tx = Math.floor(p.x / TILE), ty = Math.floor(p.y / TILE);
@@ -3232,6 +3299,7 @@ export class Game {
     const ROLE_PRIO = {
       elder: 3, merchant: 2, trader: 2, blacksmith: 2, priest: 2, innkeeper: 2, hunter: 2,
       hermit: 4, wanderer: 4, captain: 4, mastersmith: 4, widow: 4, arenamaster: 4, darkheart: 5,
+      dgtrader: 3, prisoner: 3,
     };
     let npc = null, bestScore = -Infinity;
     const R2 = 26 * 26; // ближе — иначе NPC перехватывают колодцы и доски
@@ -3267,6 +3335,11 @@ export class Game {
       if (t === T.PORTAL) { this.usePortal(p); return; }
       // трон Владыки Пепла: статуи у трона в логове големов
       if ((t === T.STATUE || t === T.PILLAR) && p.mapId === 'ash') { this.tryWakeAshLord(p, tx + dx, ty + dy); return; }
+      // события подземелий: плита испытания, табличка, проклятая статуя, павший искатель
+      if (t === T.PLATE && this.dungeons.has(p.mapId)) { this.startTrial(p, tx + dx, ty + dy); return; }
+      if (t === T.PLAQUE && this.dungeons.has(p.mapId)) { this.readPlaque(p, tx + dx, ty + dy); return; }
+      if (t === T.STATUE && this.dungeons.has(p.mapId) && this.tryCursedStatue(p, tx + dx, ty + dy)) return;
+      if (t === T.BONES && this.dungeons.has(p.mapId) && this.trySeekerLoot(p, tx + dx, ty + dy)) return;
       if (t === T.STATUE && this.tryBarrowStatue(p, tx + dx, ty + dy)) return;
       if (t === T.DUNGEON_EXIT && p.mapId !== 'over') { this.exitDungeon(p); return; }
       if (t === T.LOCKED_DOOR && p.mapId !== 'over') {
@@ -3449,7 +3522,96 @@ export class Game {
     this.dropRandomWeapon(p.mapId, tx * TILE + 8, ty * TILE + 20, luck, 1);
     this.spawnDrop('coin', randInt(this.rand, 10, 25), p.mapId, tx * TILE - 4, ty * TILE + 20);
     if (this.rand() < 0.6 + (p.derived?.dropBonus || 0)) this.dropRandomGear(p.mapId, tx * TILE + 20, ty * TILE + 20, false, luck);
+    // тайник за треснувшей стеной: каменщики прятали лучшее
+    const secret = this.dungeons.get(p.mapId)?.dungeon.secret;
+    if (secret && secret.x === tx && secret.y === ty && !secret.opened) {
+      secret.opened = true;
+      this.dropRandomGear(p.mapId, tx * TILE + 8, ty * TILE + 24, true, luck + 3);
+      this.spawnDrop('crystal', 2, p.mapId, tx * TILE + 20, ty * TILE + 8);
+      this.addXp(p, 30);
+      this.toastMap(p.mapId, `✨ ${p.name} нашёл тайник каменщиков!`);
+      this.events.push(this.world.day, `${p.name} отыскал тайник за треснувшей стеной`);
+    }
     this.fx({ t: 'chest', x: tx * TILE, y: ty * TILE }, p.mapId, tx * TILE, ty * TILE);
+  }
+
+  // ---------- события подземелий ----------
+  // Испытание древних: наступил на плиту — двери на замок, волна на время
+  startTrial(p, tx, ty) {
+    const inst = this.dungeons.get(p.mapId);
+    const room = inst?.dungeon.rooms.find(r => r.trial && r.trial.x === tx && r.trial.y === ty);
+    if (!room) return;
+    if (room.trial.done || room.trialIds) { this.toast(p, 'Плита остыла и молчит'); return; }
+    const d = inst.dungeon;
+    const kinds = enemiesOfTier(1, Math.min(4, d.difficulty + 1));
+    const n = 4 + d.difficulty;
+    const ids = [];
+    for (let i = 0; i < n; i++) {
+      // случайная свободная клетка комнаты
+      let ex = room.x, ey = room.y;
+      for (let tries = 0; tries < 12; tries++) {
+        const cx = room.x + randInt(this.rand, -room.w + 1, room.w - 1);
+        const cy = room.y + randInt(this.rand, -room.h + 1, room.h - 1);
+        if (!SOLID.has(this.chunks.tileAt(p.mapId, cx, cy))) { ex = cx; ey = cy; break; }
+      }
+      ids.push(this.spawnEnemy(pick(this.rand, kinds), p.mapId, ex * TILE + 8, ey * TILE + 8,
+        { aggro: true, forceElite: d.cursed || i === 0 }));
+    }
+    room.trialIds = ids.filter(Boolean);
+    room.trialEnd = this.tick + 35 * 30;
+    room.sealedByTrial = true;
+    for (const dd of room.doors) this.setDungeonDoor(p.mapId, dd, true);
+    this.fx({ t: 'bloodcast', pid: p.id, x: tx * TILE + 8, y: ty * TILE + 8 }, p.mapId, tx * TILE, ty * TILE);
+    this.toastMap(p.mapId, '⚔ ИСПЫТАНИЕ ДРЕВНИХ: перебей волну за 35 секунд — и плита заплатит!');
+    this.events.push(this.world.day, `${p.name} принял испытание древних`);
+  }
+
+  // Каменная табличка: обрывок летописи подземелья
+  readPlaque(p, tx, ty) {
+    const inst = this.dungeons.get(p.mapId);
+    const pl = inst?.dungeon.plaques?.find(q => q.x === tx && q.y === ty);
+    if (!pl) return;
+    this.sendDialog(p, 'plaque', '📜 Каменная табличка', pl.lines,
+      [{ id: 'close', label: 'Отойти' }]);
+  }
+
+  // Проклятая статуя: молитва — благословение или гнев, 50/50
+  tryCursedStatue(p, tx, ty) {
+    const inst = this.dungeons.get(p.mapId);
+    const room = inst?.dungeon.rooms.find(r => r.eventStatue && r.eventStatue.x === tx && r.eventStatue.y === ty);
+    if (!room) return false;
+    if (room.eventStatue.used) { this.toast(p, '🗿 Статуя молчит. Взгляд её потух'); return true; }
+    this.sendDialog(p, 'dstatue:' + tx + ',' + ty, '🗿 Проклятая статуя',
+      ['Каменные глаза будто следят за тобой. На постаменте выбито:',
+       '«Попроси — и получишь. Но не жалуйся на ответ»'],
+      [{ id: 'statue_pray', label: '🙏 Помолиться (как повезёт…)' },
+       { id: 'close', label: 'Отойти от греха' }]);
+    return true;
+  }
+
+  // Павший искатель: кости, записка и добыча предшественника
+  trySeekerLoot(p, tx, ty) {
+    const inst = this.dungeons.get(p.mapId);
+    const room = inst?.dungeon.rooms.find(r => r.seeker && r.seeker.x === tx && r.seeker.y === ty);
+    if (!room) return false;
+    if (room.seeker.looted) { this.toast(p, 'Прах упокоен. Пусть спит'); return true; }
+    room.seeker.looted = true;
+    const luck = p.effStats?.lck ?? 0;
+    this.spawnDrop('coin', randInt(this.rand, 8, 18), p.mapId, tx * TILE + 8, ty * TILE + 20);
+    this.dropRandomGear(p.mapId, tx * TILE + 20, ty * TILE + 8, false, luck + 1);
+    if (this.rand() < 0.3) this.dropRandomWeapon(p.mapId, tx * TILE - 4, ty * TILE + 8, luck, 1);
+    this.addXp(p, 20);
+    const notes = [
+      '«Шёл за сокровищем. Нашёл. Не унёс…»',
+      '«Если найдёшь меня — передай Милице из деревни, что я пытался»',
+      '«Они ходят дозором. Я сосчитал шаги. Ошибся на один»',
+      '«Треснувшая стена. За ней. Я слышал звон, но сил уже нет»',
+    ];
+    this.sendDialog(p, 'seeker', '🕯 Павший искатель',
+      ['Среди костей — истлевшая сумка и записка:', pick(this.rand, notes)],
+      [{ id: 'close', label: 'Забрать его ношу и идти дальше' }]);
+    this.events.push(this.world.day, `${p.name} нашёл останки искателя в подземелье`);
+    return true;
   }
 
   // ---------- Война с Тьмой: эндгейм-кампания ----------
@@ -4729,6 +4891,12 @@ export class Game {
       this.fx({ t: 'shop', pid: p.id, id: npc.id, name: `${npc.name}, торговец огнеходцев`, greet: '«Огонь всё дорожает, путник. Но и товар — жаркий»', items }, null);
       return;
     }
+    if (npc.role === 'dgtrader') {
+      const items = DG_SHOP.map((it, i) => ({ i, item: it.item, count: it.count || 0, price: it.price, trend: 1, need: null }));
+      this.fx({ t: 'shop', pid: p.id, id: npc.id, name: `${npc.name}, гоблин-барыга`,
+        greet: '«Хи-хи! Наверху дешевле, да до верха дожить надо. Плати!»', items }, null);
+      return;
+    }
     if (npc.role === 'enchanter') {
       const lines = ['Искра, зачарователь огнеходцев',
         '«Неси ЭПИЧЕСКУЮ вещь из сумки, 6 кристаллов и 120 монет —',
@@ -5189,6 +5357,32 @@ export class Game {
       this.events.push(this.world.day, `${p.name} вызволил пленника ${npc.name} из подземелья`);
       return;
     }
+    if (choice === 'statue_pray') {
+      // проклятая статуя: дар или гнев — как повезёт
+      const m = /^dstatue:(-?\d+),(-?\d+)$/.exec(dialogId);
+      const inst = this.dungeons.get(p.mapId);
+      if (!m || !inst) return;
+      const sx = +m[1], sy = +m[2];
+      const room = inst.dungeon.rooms.find(r => r.eventStatue && r.eventStatue.x === sx && r.eventStatue.y === sy);
+      if (!room || room.eventStatue.used) return;
+      room.eventStatue.used = true;
+      if (this.rand() < 0.5) {
+        p.buffs.blessed = { mult: 0.25, t: 240 };
+        p.hp = Math.min(p.maxHp, p.hp + 2);
+        this.recomputeStats(p);
+        this.fx({ t: 'levelup', pid: -1, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        this.toast(p, '🗿 Статуя благоволит: +25% урона на 4 мин и +1 сердце');
+      } else {
+        this.damagePlayer(p, 1, { x: sx * TILE + 8, y: sy * TILE + 8 });
+        for (let i = 0; i < 2; i++)
+          this.spawnEnemy(inst.dungeon.difficulty >= 3 ? 'ghoul' : 'skeleton', p.mapId,
+            sx * TILE + 8 + (i * 2 - 1) * 20, sy * TILE + 20, { aggro: true });
+        this.fx({ t: 'bloodcast', pid: p.id, x: sx * TILE + 8, y: sy * TILE + 8 }, p.mapId, p.x, p.y);
+        this.toast(p, '🗿 Статуя скалится: из-под плит встают её слуги!');
+      }
+      this.events.push(this.world.day, `${p.name} помолился проклятой статуе`);
+      return;
+    }
     if (choice === 'altar_power' || choice === 'altar_gift') {
       const inst = this.dungeons.get(p.mapId);
       if (!inst || inst.dungeon.altarUsed) return;
@@ -5282,11 +5476,11 @@ export class Game {
     if (choice.startsWith('smithbrk:')) { this.smithBreak(p, choice.slice(9), dialogId); return; }
     if (choice.startsWith('buy:')) {
       const npc = this.entities.get(dialogId);
-      const stock = npc?.role === 'ashtrader' ? ASH_SHOP : SHOP;
+      const stock = npc?.role === 'ashtrader' ? ASH_SHOP : npc?.role === 'dgtrader' ? DG_SHOP : SHOP;
       const it = stock[+choice.split(':')[1]];
       if (!it) return;
       const s = npc && this.world.settlements.find(x => x.id === npc.home);
-      const price = npc?.role === 'ashtrader' ? it.price
+      const price = npc?.role === 'ashtrader' || npc?.role === 'dgtrader' ? it.price
         : Math.ceil(it.price * priceMultiplier(s ? p.rep[s.faction] : 0) * scarcityMult(s, it.item, 'buy'));
       if (p.coins < price) { this.toast(p, STR.notEnoughCoins); return; }
       p.coins -= price;

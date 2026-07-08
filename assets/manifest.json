@@ -2,7 +2,15 @@
   "packs": {
     "d": "assets/raw/tiny-dungeon/Tilemap/tilemap_packed.png",
     "t": "assets/raw/tiny-town/Tilemap/tilemap_packed.png",
-    "s": "assets/raw/pixel-shmup/Tilemap/tiles_packed.png"
+    "s": "assets/raw/pixel-shmup/Tilemap/tiles_packed.png",
+    "r": {
+      "path": "assets/raw/roguelike-rpg/Spritesheet/roguelikeSheet_transparent.png",
+      "stride": 17
+    },
+    "c": {
+      "path": "assets/raw/roguelike-caves/Spritesheet/roguelikeDungeon_transparent.png",
+      "stride": 17
+    }
   },
   "sprites": {
     "tile_grass": {
@@ -1176,6 +1184,111 @@
     },
     "ult_martyr": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/air/deflect_missiles.png"
+    },
+    "obj_barrel": {
+      "pack": "r",
+      "tx": 23,
+      "ty": 0
+    },
+    "obj_barrel_fire": {
+      "pack": "r",
+      "tx": 25,
+      "ty": 0
+    },
+    "obj_sack": {
+      "pack": "r",
+      "tx": 26,
+      "ty": 2
+    },
+    "obj_crate": {
+      "pack": "c",
+      "tx": 6,
+      "ty": 5
+    },
+    "obj_bones": {
+      "pack": "c",
+      "tx": 2,
+      "ty": 2
+    },
+    "tile_dfloor_mine": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/dirt0.png",
+      "down": 2
+    },
+    "tile_dfloor_mine2": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/dirt1.png",
+      "down": 2
+    },
+    "tile_dwall_mine": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/wall/brick_brown2.png",
+      "down": 2
+    },
+    "tile_dfloor_crypt": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/tomb2.png",
+      "down": 2
+    },
+    "tile_dfloor_crypt2": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/tomb3.png",
+      "down": 2
+    },
+    "tile_dwall_crypt": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/wall/tomb1.png",
+      "down": 2
+    },
+    "tile_dfloor_cave": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/pebble_brown2.png",
+      "down": 2
+    },
+    "tile_dfloor_cave2": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/pebble_brown4.png",
+      "down": 2
+    },
+    "tile_dwall_cave": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/wall/lair0.png",
+      "down": 2
+    },
+    "tile_dfloor_fort": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/rect_gray1.png",
+      "down": 2
+    },
+    "tile_dfloor_fort2": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/rect_gray2.png",
+      "down": 2
+    },
+    "tile_dwall_fort": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/wall/stone_brick1.png",
+      "down": 2
+    },
+    "tile_wall_crack": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/dngn_detected_secret_door.png",
+      "down": 2
+    },
+    "obj_plaque": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/granite_stump.png",
+      "down": 2
+    },
+    "obj_plate": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/dngn_trap_teleport.png",
+      "down": 2
+    },
+    "obj_torch_0": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/wall/torches/torch1.png",
+      "down": 2
+    },
+    "obj_torch_1": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/wall/torches/torch2.png",
+      "down": 2
+    },
+    "obj_torch_2": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/wall/torches/torch3.png",
+      "down": 2
+    },
+    "obj_torch_3": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/wall/torches/torch4.png",
+      "down": 2
+    },
+    "npc_goblin": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/goblin.png",
+      "down": 2
     }
   }
 }

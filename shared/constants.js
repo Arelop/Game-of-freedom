@@ -57,7 +57,19 @@ export const T = {
   BURNT_TREE: 48,    // обугленное дерево
   EMBER: 49,         // тлеющая кристальная жила — богатая добыча кристаллов
   PORTAL: 50,        // обсидиановый портал между мирами
+  // детализация подземелий: разрушаемый реквизит и события
+  BARREL: 51,        // бочка — ломается, роняет мелочь
+  CRATE: 52,         // ящик с припасами
+  SACK: 53,          // мешок зерна
+  BARREL_FIRE: 54,   // огненная бочка: взрывается от удара, цепная детонация
+  BONES: 55,         // старые кости — декор склепов и павшие искатели
+  CRACKED_WALL: 56,  // треснувшая стена — за ней тайник (ломается оружием)
+  PLAQUE: 57,        // каменная табличка с летописью подземелья
+  PLATE: 58,         // ритуальная плита испытания (E — принять бой)
 };
+
+// Реквизит подземелий: бьётся ЛЮБЫМ оружием, не только с structDmg
+export const PROP_TILES = new Set([T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL]);
 
 // Разрушаемые тайлы: прочность, во что превращаются, дроп.
 export const DESTRUCTIBLE = {
@@ -80,6 +92,12 @@ export const DESTRUCTIBLE = {
   [T.BURNT_TREE]: { hp: 2, becomes: T.ASH, drops: { wood: 0.6 } },
   [T.OBSIDIAN]: { hp: 18, becomes: T.ASH, drops: { metal: 0.5 } },
   [T.EMBER]: { hp: 14, becomes: T.ASH, drops: { crystal: 1.6 } },
+  // реквизит подземелий (лёгкий — бьётся с одного-двух ударов)
+  [T.BARREL]: { hp: 3, becomes: T.DUNGEON_FLOOR, drops: { coin: 0.9, wood: 0.4 } },
+  [T.CRATE]: { hp: 3, becomes: T.DUNGEON_FLOOR, drops: { coin: 0.7, bread: 0.3 } },
+  [T.SACK]: { hp: 2, becomes: T.DUNGEON_FLOOR, drops: { bread: 0.8, herb: 0.3 } },
+  [T.BARREL_FIRE]: { hp: 2, becomes: T.DUNGEON_FLOOR, drops: {} }, // взрыв — в damageTile
+  [T.CRACKED_WALL]: { hp: 8, becomes: T.DUNGEON_FLOOR, drops: {} },
 };
 
 // Сезоны: 3 игровых дня каждый. Влияют на урожай и агрессию монстров.
@@ -95,10 +113,12 @@ export const SOLID = new Set([
   T.MINE, T.SHRINE, T.FENCE, T.ANVIL,
   T.OBELISK, T.STATUE, T.FOUNTAIN, T.DARK_ALTAR, T.CRYSTAL_WALL, T.PILLAR,
   T.LOCKED_DOOR, T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
+  T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL, T.PLAQUE,
 ]);
 // Блокирует пули (стены — да, вода — нет)
 export const BULLET_SOLID = new Set([
   T.WALL, T.TREE, T.ROCK_SOLID, T.DUNGEON_WALL, T.STALL, T.WELL, T.TOWER,
   T.MINE, T.OBELISK, T.STATUE, T.CRYSTAL_WALL, T.PILLAR, T.LOCKED_DOOR,
   T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
+  T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL, T.PLAQUE,
 ]);

@@ -235,6 +235,33 @@ function chaseTarget(e, def, target, ang, dist, dt, map, slowF, shots, rand) {
 
 function wander(e, def, dt, map, rand) {
   if (def.speed === 0) return;
+  // дозор: вне боя группа мерно ходит маршрутом по коридорам (тайловые точки)
+  if (e.patrol) {
+    const wp = e.patrol[e.patrolI ?? 0];
+    const tx = wp.x * 16 + 8, ty = wp.y * 16 + 8;
+    const d2 = (tx - e.x) ** 2 + (ty - e.y) ** 2;
+    if (d2 < 14 * 14) {
+      e.patrolDir = e.patrolDir || 1;
+      let ni = (e.patrolI ?? 0) + e.patrolDir;
+      if (ni < 0 || ni >= e.patrol.length) { e.patrolDir = -e.patrolDir; ni = (e.patrolI ?? 0) + e.patrolDir; }
+      e.patrolI = ni;
+    } else {
+      const a = Math.atan2(ty - e.y, tx - e.x);
+      e.aim = a;
+      const px = e.x, py = e.y;
+      moveWithCollision(e, Math.cos(a) * def.speed * 0.55 * dt, Math.sin(a) * def.speed * 0.55 * dt, def.radius, map);
+      // упёрся в бочку или колонну — потоптался и разворачивается
+      if ((e.x - px) ** 2 + (e.y - py) ** 2 < 0.01) {
+        e.patrolStuckT = (e.patrolStuckT || 0) + dt;
+        if (e.patrolStuckT > 1.5) {
+          e.patrolStuckT = 0;
+          e.patrolDir = -(e.patrolDir || 1);
+          e.patrolI = Math.max(0, Math.min(e.patrol.length - 1, (e.patrolI ?? 0) + e.patrolDir));
+        }
+      } else e.patrolStuckT = 0;
+    }
+    return;
+  }
   e.wanderT = (e.wanderT ?? 0) - dt;
   if (e.wanderT <= 0) {
     e.wanderT = 1.5 + rand() * 2.5;
