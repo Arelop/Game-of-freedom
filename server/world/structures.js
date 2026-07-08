@@ -71,6 +71,13 @@ export function buildShrine(world, s, site) {
   return { w: 1, h: 1 };
 }
 
+// Портальный камень: жители возводят его после дара героя (квест старейшины)
+export function buildPortal(world, s, site) {
+  set(world, site.x, site.y, T.TOWN_PORTAL);
+  s.portal = { x: site.x, y: site.y };
+  return { w: 1, h: 1 };
+}
+
 // Дом размером w x h с дверью снизу; внутри кровать (+стол в больших)
 export function stampHouse(world, x0, y0, w, h, anchors, wallT = T.WALL) {
   for (let y = y0; y < y0 + h; y++)

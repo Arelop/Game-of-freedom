@@ -72,6 +72,7 @@ const TILE_SPRITES = {
   [T.WALL_CLAY]: ['tile_wall_clay'],
   [T.YURT]: ['tile_grass', 'obj_yurt'],
   [T.PIER]: ['tile_pier'],
+  [T.TOWN_PORTAL]: ['tile_road'],   // сияние портала — анимированный оверлей
 };
 
 // Тайлсеты подземелий: пол/стена по стилю места (шахта, склеп, пещера, форт)
@@ -144,7 +145,8 @@ export class TileRenderer {
         if (spec[1]) this.atlas.blit(ctx, spec[1], x * TILE, y * TILE);
         if (t === T.CAMPFIRE || t === T.DUNGEON_EXIT || t === T.BOARD
           || t === T.CRYSTAL_WALL || t === T.FOUNTAIN // кристаллы и источники светятся в темноте
-          || t === T.LAVA || t === T.PORTAL || t === T.EMBER || t === T.BARREL_FIRE)
+          || t === T.LAVA || t === T.PORTAL || t === T.EMBER || t === T.BARREL_FIRE
+          || t === T.TOWN_PORTAL)
           animated.push({ x: cx * CHUNK + x, y: cy * CHUNK + y, tile: t });
       }
     }
@@ -178,7 +180,7 @@ export class TileRenderer {
       if (a.tile === T.CAMPFIRE) {
         const frame = Math.floor(timeSec * 6) % 2;
         this.atlas.draw(ctx, 'obj_campfire_' + frame, s.x, s.y);
-      } else if (a.tile === T.DUNGEON_EXIT) {
+      } else if (a.tile === T.DUNGEON_EXIT || a.tile === T.TOWN_PORTAL) {
         const sc = 1 + Math.sin(timeSec * 4) * 0.08;
         this.atlas.draw(ctx, 'obj_exit_portal', s.x, s.y, { scale: sc });
       } else if (a.tile === T.BOARD) {

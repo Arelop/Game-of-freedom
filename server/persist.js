@@ -30,6 +30,7 @@ export function saveWorld(game) {
         mines: s.mines, shrines: s.shrines, wardT: s.wardT,
         housingCap: s.housingCap, project: s.project,
         captured: s.captured, ruined: s.ruined, faction: s.faction,
+        portal: s.portal || null,
       })),
       pois: w.pois.map(o => ({ id: o.id, cleared: o.cleared, pressed: o.pressed, looted: o.looted })),
       wildChests: w.wildChests || [],

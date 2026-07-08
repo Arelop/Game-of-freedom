@@ -13,6 +13,7 @@ import {
 } from '../shared/simCore.js';
 import { mulberry32, hash2, randInt, pick } from '../shared/rng.js';
 import { makeWorld, baseTile } from './world/worldgen.js';
+import { findBuildSite } from './world/structures.js';
 import { ChunkStore } from './world/chunks.js';
 import { generateDungeon, roomAt, generateArena } from './world/dungeon.js';
 import { generateAshlands } from './world/ashlands.js';
@@ -3404,6 +3405,7 @@ export class Game {
       if (t === T.CHEST && p.mapId === 'ash') { this.openAshChest(p, tx + dx, ty + dy); return; }
       if (t === T.CHEST) { this.openChest(p, tx + dx, ty + dy); return; }
       if (t === T.PORTAL) { this.usePortal(p); return; }
+      if (t === T.TOWN_PORTAL) { this.openTownPortal(p, tx + dx, ty + dy); return; }
       // трон Владыки Пепла: статуи у трона в логове големов
       if ((t === T.STATUE || t === T.PILLAR) && p.mapId === 'ash') { this.tryWakeAshLord(p, tx + dx, ty + dy); return; }
       // события подземелий: плита испытания, табличка, проклятая статуя, павший искатель
@@ -3818,6 +3820,26 @@ export class Game {
     p.y = (d.entrance.y - 2) * TILE + 8;
     this.sendMapChange(p, '⚔ АРЕНА');
     this.toast(p, '⚔ Волны начнутся через мгновение. Выход — через портал');
+  }
+
+  // ---------- портальная сеть деревень ----------
+  // E у портального камня: выбор деревни, чей камень уже построен
+  openTownPortal(p, tx, ty) {
+    const here = this.world.settlements.find(s =>
+      s.portal && Math.abs(s.portal.x - tx) <= 1 && Math.abs(s.portal.y - ty) <= 1);
+    const targets = this.world.settlements.filter(s =>
+      s.portal && s !== here && !s.ruined && !s.captured);
+    if (!targets.length) {
+      this.sendDialog(p, 'tportal', '⌘ Портальный камень',
+        ['Камень гудит, но отвечать ему некому:', 'во всех прочих деревнях порталов ещё нет.',
+         'Одари их старейшин — и сеть оживёт.'],
+        [{ id: 'close', label: 'Отойти' }]);
+      return;
+    }
+    this.sendDialog(p, 'tportal', '⌘ Портальный камень',
+      ['Камень гудит, готовый свернуть пространство.', 'Куда перенести тебя?'],
+      [...targets.map(s => ({ id: 'tport:' + s.id, label: `⌘ ${s.name} (${FACTIONS[s.faction]?.name || ''})` })),
+       { id: 'close', label: 'Остаться' }]);
   }
 
   // ---------- Испытания данжей (M+): ключ, таймер, модификаторы, рекорд ----------
@@ -5217,6 +5239,9 @@ export class Game {
         if (s.food < 25) lines.push('⚠ Припасы на исходе — нам нужна еда!');
       }
       const choices = [];
+      // портальная сеть: дар героя — и жители возведут портальный камень
+      if (s && !s.portal && s.project?.type !== 'portal' && (p.rep[s.faction] || 0) >= 25)
+        choices.push({ id: 'portal_fund', label: '⌘ Дар на портальный камень (6 крист., 10 мет., 100 мон.)' });
       // дипломатия: посредничество между враждующими фракциями
       if (s && (p.rep[s.faction] || 0) >= 30) {
         for (const [f, v] of Object.entries(RELATIONS[s.faction] || {})) {
@@ -5547,6 +5572,36 @@ export class Game {
     if (choice === 'nohouse') { this.toast(p, '«Чужакам домов не продаём. Заслужи доверие деревни (репутация 20)»'); return; }
     if (choice === 'arena_enter') { this.enterArena(p); return; }
     if (choice === 'mplus_start') { this.startMplus(p); return; }
+    if (choice === 'portal_fund') {
+      // дар на портальный камень: жители строят сами (цив-проект)
+      const npc = this.entities.get(dialogId);
+      const s = npc && this.world.settlements.find(x => x.id === npc.home);
+      if (!s || s.portal || s.project?.type === 'portal') return;
+      if ((p.rep[s.faction] || 0) < 25) { this.toast(p, 'Тебе не доверяют настолько'); return; }
+      if ((p.inventory.crystal || 0) < 6 || (p.inventory.metal || 0) < 10 || p.coins < 100) {
+        this.toast(p, 'Нужно: 6 кристаллов, 10 металла и 100 монет'); return;
+      }
+      const site = findBuildSite(this.world, s, 1, 1, this.rand);
+      if (!site) { this.toast(p, '«Негде ставить камень — всё застроено»'); return; }
+      p.inventory.crystal -= 6;
+      p.inventory.metal -= 10;
+      p.coins -= 100;
+      s.project = { type: 'portal', progress: 0, ticks: 4, site }; // мастера бросают всё
+      this.addXp(p, 40);
+      p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + 10);
+      this.toast(p, '⌘ Дар принят! Мастера взялись за портальный камень — загляни чуть позже');
+      this.events.push(this.world.day, `${p.name} одарил ${s.name} — там возводят портальный камень`);
+      return;
+    }
+    if (choice.startsWith('tport:')) {
+      const to = this.world.settlements.find(x => x.id === choice.slice(6));
+      if (!to?.portal || to.ruined || to.captured) { this.toast(p, 'Портал на той стороне молчит'); return; }
+      p.x = to.portal.x * TILE + 8;
+      p.y = (to.portal.y + 1) * TILE + 8;
+      this.fx({ t: 'poof', x: p.x, y: p.y }, 'over', p.x, p.y);
+      this.toast(p, `⌘ Портал перенёс тебя в ${to.name}`);
+      return;
+    }
     if (choice === 'free_prisoner') {
       const npc = this.entities.get(dialogId);
       if (!npc || npc.role !== 'prisoner' || npc.mapId !== p.mapId) return;

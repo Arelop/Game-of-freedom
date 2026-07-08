@@ -3,7 +3,7 @@
 // стражу за металл, проводят магические ритуалы, голодают и вымирают.
 // Все значимые исходы идут в журнал событий и тостами игрокам поблизости.
 import { TILE, CHUNK, SEASONS, seasonOf, SEASON_HARVEST } from '../../shared/constants.js';
-import { findBuildSite, buildHouse, buildField, buildTower, buildMine, buildShrine } from '../world/structures.js';
+import { findBuildSite, buildHouse, buildField, buildTower, buildMine, buildShrine, buildPortal } from '../world/structures.js';
 import { RELATIONS, FACTIONS } from './factions.js';
 import { DARK_KINDS } from '../../shared/enemies.js';
 import { pick } from '../../shared/rng.js';
@@ -17,6 +17,8 @@ const PROJECTS = {
   tower: { name: 'сторожевая башня', wood: 12, metal: 4, ticks: 6, size: [2, 2] },
   mine: { name: 'шахта', wood: 10, ticks: 5, size: [2, 2] },
   shrine: { name: 'святилище', wood: 10, ticks: 4, size: [1, 1] },
+  // портал не выбирается жителями сам — только после дара героя (квест)
+  portal: { name: 'портальный камень', ticks: 4, size: [1, 1] },
 };
 
 export class CivSim {
@@ -124,10 +126,12 @@ export class CivSim {
     g.events.push(g.world.day, `Поселенцы из ${donor.name} отправились возрождать ${ruin.name}`);
   }
 
+  // городская жизнь (рост, стройки, ритуалы) — ТОЛЬКО в летопись (w:1),
+  // без всплывающих окон: игрока это отвлекало
   say(s, text, data = {}) {
     const g = this.game;
     g.events.push(g.world.day, text, { x: s.x, y: s.y, ...data });
-    g.fx({ t: 'toast', text: `[${s.name}] ${text}` }, 'over', s.x * TILE, s.y * TILE);
+    g.fx({ t: 'toast', text: `[${s.name}] ${text}`, w: 1 }, 'over', s.x * TILE, s.y * TILE);
   }
 
   tickSettlement(s) {
@@ -273,6 +277,11 @@ export class CivSim {
     else if (type === 'field') { rect = buildField(g.world, s, site); s.fields++; }
     else if (type === 'mine') { rect = buildMine(g.world, s, site); s.mines++; }
     else if (type === 'shrine') { rect = buildShrine(g.world, s, site); s.shrines++; }
+    else if (type === 'portal') {
+      rect = buildPortal(g.world, s, site);
+      // сеть растёт — об этом стоит сказать вслух дарителю через летопись
+      g.events.push(g.world.day, `⌘ В ${s.name} открылся портальный камень!`, { x: s.x, y: s.y });
+    }
     else { rect = buildTower(g.world, s, site); s.towers++; }
     s.project = null;
     this.say(s, `Стройка завершена: ${def.name}!`);
