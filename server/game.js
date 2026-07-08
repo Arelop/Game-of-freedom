@@ -3526,6 +3526,15 @@ export class Game {
   }
 
   onPoiCleared(poi) {
+    // кампания гл.1: гнездо зачищено — медальон находится и без хранителя
+    // (страховка для данжей, где хранитель ключа не завёлся)
+    if (poi.id === this.world.mq?.dungeon) {
+      for (const q of this.players.values())
+        if (q.story.mq === 1 && q.story.mqS === 0) {
+          q.story.mqS = 1;
+          this.toast(q, '📜 Средь трофеев гнезда — ЧЁРНЫЙ МЕДАЛЬОН с чужой печатью. Покажи старейшине');
+        }
+    }
     // кампания гл.2: логово пало — средь тел связанный Наводчик Тьмы
     const MQ = this.world.mq;
     if (MQ && poi.id === MQ.lair && !MQ.lairDone && !MQ.prisoner) {
@@ -4484,7 +4493,9 @@ export class Game {
     const cur = this.world.pois.find(o => o.id === MQ.dungeon);
     if (cur && !cur.cleared) return cur;
     const s0 = this.world.settlements[0];
-    const pool = this.world.pois.filter(o => o.type === 'dungeon' && !o.cleared);
+    // хранитель ключа живёт только в данжах С БОССОМ — их и выбираем
+    let pool = this.world.pois.filter(o => o.type === 'dungeon' && !o.cleared && o.boss);
+    if (!pool.length) pool = this.world.pois.filter(o => o.type === 'dungeon' && !o.cleared);
     pool.sort((a, b) => dist2(a.x, a.y, s0.x, s0.y) - dist2(b.x, b.y, s0.x, s0.y));
     MQ.dungeon = pool[0]?.id || null;
     return pool[0] || null;
@@ -4706,7 +4717,12 @@ export class Game {
       ch.unshift({ id: 'story:mq1_accept', label: '📜 (Кампания) Взяться за тревожные вести' });
     } else if (p.story.mq === 1) {
       const d = this.world.pois.find(o => o.id === this.world.mq.dungeon);
-      if (p.story.mqS === 0 && d) {
+      if (p.story.mqS === 0 && d?.cleared) {
+        // гнездо уже разорено (в т.ч. до фикса) — Ярослава зачитывает трофеи
+        p.story.mqS = 1;
+        lines.push('', '«Гнездо уже разорено? Хвалю. Стража перебрала трофеи —',
+          'и нашла ЧЁРНЫЙ МЕДАЛЬОН с чужой печатью. Покажи его старейшине»');
+      } else if (p.story.mqS === 0 && d) {
         lines.push('', `«Гнездо — ${d.name}. Отметила на карте. Хранитель там носит что-то на шее…»`);
         this.fx({ t: 'marker', pid: p.id, x: d.x, y: d.y }, null);
       } else if (p.story.mqS >= 1) {
