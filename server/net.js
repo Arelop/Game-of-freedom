@@ -222,6 +222,9 @@ export class Net {
         ctr: p.contract ? { tp: p.contract.type, t: Math.round(p.contract.t) } : undefined,
         hnt: p.hintStage < 5 ? p.hintStage : undefined,
         asc: p.ascended ? 1 : 0,
+        mpl: game.mplus && p.mapId === game.mplus.mapId
+          ? { l: game.mplus.lvl, t: Math.max(0, Math.round((game.mplus.endTick - game.tick) / 30)) }
+          : undefined,
       },
       ents,
     };

@@ -117,6 +117,13 @@ export class Hud {
     ctx.fillStyle = '#eee';
     ctx.fillText(`${icon} День ${net.day} · ${SEASONS[seasonOf(net.day)]}`, VIEW_W / 2 - 36, 4);
 
+    // испытание данжей: таймер и ключ по центру сверху
+    if (you.mpl) {
+      const mm = Math.floor(you.mpl.t / 60), ss = String(you.mpl.t % 60).padStart(2, '0');
+      ctx.fillStyle = you.mpl.t < 60 ? '#d9574a' : '#fbf236';
+      ctx.fillText(`⏳ ${mm}:${ss} · Испытание +${you.mpl.l}`, VIEW_W / 2 - 44, 14);
+    }
+
     // розыск и кровавый контракт
     if ((you.bnt || 0) > 0) {
       ctx.fillStyle = '#d9574a';

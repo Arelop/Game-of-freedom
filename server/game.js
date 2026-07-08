@@ -604,6 +604,7 @@ export class Game {
     this.abstract.update(dt);
     this.civ.update(dt);
     this.checkDungeonRooms();
+    this.stepMplus();
     this.checkAscensions();
     // метеоры мага: телеграф догорел — удар с неба
     if (this.meteors?.length) {
@@ -1190,6 +1191,8 @@ export class Game {
       if (affix === 'Стремительный') e.hasteF = 1.35;
       if (affix === 'Золотой') e.goldMult = 3;
     }
+    // испытание данжей: обитатели усилены ключом и модификаторами
+    if (this.mplus && mapId === this.mplus.mapId) this.applyMplusMods(e);
     this.entities.set(id, e);
     return id;
   }
@@ -2708,6 +2711,10 @@ export class Game {
         this.toast(q, '✅ Три победы! Открой лист персонажа (C)');
       }
     }
+    // испытание данжей: «Взрывные» рвутся при смерти, владыка — победа
+    if (e.volatileM) this.explodeAt(e.mapId, e.x, e.y, 3, 34, null, 0);
+    if (this.mplus && e.mapId === this.mplus.mapId && def.archetype === 'boss')
+      this.finishMplus(true);
     // Тень отшельника повержена: сила достаётся победителям
     if (e.hermitShade) {
       this.spawnDrop('crystal_orb@e', 1, e.mapId, e.x, e.y);
@@ -3811,6 +3818,102 @@ export class Game {
     p.y = (d.entrance.y - 2) * TILE + 8;
     this.sendMapChange(p, '⚔ АРЕНА');
     this.toast(p, '⚔ Волны начнутся через мгновение. Выход — через портал');
+  }
+
+  // ---------- Испытания данжей (M+): ключ, таймер, модификаторы, рекорд ----------
+  // Ключ игрока p.mkey растёт за победу и слабеет за провал. Боривой заводит
+  // испытание для всей группы рядом; 8 минут на владыку подземелья.
+  startMplus(p) {
+    if (this.mplus) { this.toast(p, '⏳ Испытание уже идёт — дождись, пока храбрецы вернутся'); return; }
+    const lvl = p.mkey = p.mkey || 1;
+    const n = this.mplusN = (this.mplusN || 0) + 1;
+    const mapId = 'mp:' + n;
+    const name = pick(this.rand, ['Старая шахта', 'Проклятый склеп', 'Тёмная пещера', 'Забытый форт']);
+    const d = generateDungeon(hash2(this.world.seed, 7777 + n * 13, lvl),
+      Math.min(4, 1 + Math.ceil(lvl / 2)), true, 1, name);
+    // модификаторы по уровню ключа: +2 — один, +4 — два, +7 — три
+    const MODS = ['frenzy', 'volatile', 'elite', 'horde'];
+    const nMods = lvl >= 7 ? 3 : lvl >= 4 ? 2 : lvl >= 2 ? 1 : 0;
+    const mods = [];
+    for (let i = 0; i < nMods; i++) mods.push(MODS[(lvl + n + i) % MODS.length]);
+    if (mods.includes('elite')) d.cursed = true; // все враги — элита (и лут щедрее)
+    if (mods.includes('horde')) { // орда: население комнат в полтора раза гуще
+      for (const room of d.rooms) {
+        const extra = Math.ceil(room.spawns.length / 2);
+        for (let i = 0; i < extra; i++) room.spawns.push({ ...room.spawns[i % room.spawns.length] });
+      }
+    }
+    // точка возврата — где стоит группа (у Боривоя)
+    this.dungeons.set(mapId, {
+      dungeon: d,
+      poi: { entrance: { x: Math.floor(p.x / TILE), y: Math.floor(p.y / TILE) }, name: `Испытание +${lvl}` },
+    });
+    this.chunks.dungeons.set(mapId, d);
+    this.mplus = { mapId, lvl, mods, party: [], startTick: this.tick, endTick: this.tick + 8 * 60 * 30 };
+    this.populateDungeon(mapId, d);
+    const MOD_NAMES = { frenzy: 'Бешенство', volatile: 'Взрывные', elite: 'Элита', horde: 'Орда' };
+    const modLine = mods.length ? mods.map(m => MOD_NAMES[m]).join(' · ') : 'без модификаторов';
+    const fromMap = p.mapId, fx = p.x, fy = p.y; // точка сбора ДО телепортов
+    for (const q of [...this.players.values()]) {
+      if (q.dead || q.mapId !== fromMap || dist2(q.x, q.y, fx, fy) > 160 * 160) continue;
+      this.mplus.party.push(q.id);
+      q.mapId = mapId;
+      q.x = d.entrance.x * TILE + 8;
+      q.y = (d.entrance.y - 1) * TILE + 8;
+      this.sendMapChange(q, `⏳ ${name} +${lvl}`);
+      this.toast(q, `⏳ 8 минут на владыку подземелья! Модификаторы: ${modLine}`);
+    }
+    this.events.push(this.world.day, `${p.name} и спутники приняли испытание данжей (+${lvl})`);
+  }
+
+  // усиление обитателей испытания: здоровье и урон растут с ключом
+  applyMplusMods(e) {
+    const { lvl, mods } = this.mplus;
+    e.hp = e.maxHp = Math.round(e.maxHp * (1 + 0.12 * (lvl - 1)));
+    e.dmgBonus = (e.dmgBonus || 0) + Math.floor(lvl / 3);
+    if (mods.includes('frenzy')) e.hasteF = Math.max(e.hasteF || 1, 1.25);
+    if (mods.includes('volatile') && ENEMIES[e.kind].archetype !== 'boss') e.volatileM = true;
+  }
+
+  finishMplus(win) {
+    const M = this.mplus;
+    if (!M) return;
+    this.mplus = null;
+    if (win) {
+      const secLeft = Math.max(0, Math.round((M.endTick - this.tick) / 30));
+      const inMap = [...this.players.values()].filter(q => q.mapId === M.mapId);
+      for (const q of inMap) {
+        q.mkey = Math.max(q.mkey || 1, M.lvl + 1);
+        q.coins += 50 + M.lvl * 20;
+        this.addXp(q, 60 + M.lvl * 25);
+        this.dropRandomGear(M.mapId, q.x + 12, q.y + 8, true, (q.effStats?.lck || 0) + M.lvl);
+        this.toast(q, `🏆 ИСПЫТАНИЕ +${M.lvl} ПРОЙДЕНО (${Math.floor(secLeft / 60)}:${String(secLeft % 60).padStart(2, '0')} в запасе)! Ключ вырос: +${q.mkey}`);
+      }
+      if (inMap[0]) this.spawnDrop('crystal', 1 + Math.ceil(M.lvl / 2), M.mapId, inMap[0].x - 10, inMap[0].y + 8, 300);
+      const rec = this.world.mplusRecord;
+      if (!rec || M.lvl > rec.lvl) {
+        this.world.mplusRecord = { lvl: M.lvl, name: inMap.map(q => q.name).join(' + ') || '…', day: this.world.day };
+        this.events.push(this.world.day, `Рекорд испытаний данжей: +${M.lvl} — ${this.world.mplusRecord.name}`);
+      }
+    } else {
+      for (const id of M.party) {
+        const q = this.players.get(id);
+        if (!q) continue;
+        q.mkey = Math.max(1, (q.mkey || 1) - 1);
+        this.toast(q, `⌛ Испытание провалено. Ключ ослаб: +${q.mkey}`);
+        if (q.mapId === M.mapId) this.exitDungeon(q);
+      }
+      this.events.push(this.world.day, 'Испытание данжей провалено — подземелье поглотило дерзость');
+    }
+  }
+
+  stepMplus() {
+    const M = this.mplus;
+    if (!M) return;
+    if (this.tick >= M.endTick) { this.finishMplus(false); return; }
+    // все покинули испытание (смерть/выход) — засчитываем провал
+    if (this.tick > M.startTick + 90 && ![...this.players.values()].some(q => q.mapId === M.mapId && !q.dead))
+      this.finishMplus(false);
   }
 
   // ---------- Выжженные земли: регион за обсидиановым порталом ----------
@@ -5052,12 +5155,16 @@ export class Game {
     if (npc.role === 'widow') { this.storyDialogWidow(p, npc); return; }
     if (npc.role === 'arenamaster') {
       const rec = this.world.arenaRecord;
+      const mrec = this.world.mplusRecord;
+      const mk = p.mkey || 1;
       this.sendDialog(p, npc.id, '🏛 Распорядитель Боривой',
-        ['«Арена ждёт храбрецов! Волны врагов — одна другой злее.',
-         'Каждая выстоянная волна — звонкая монета. Пятая, десятая,',
-         'пятнадцатая — чемпионы. Сколько выстоишь ты?»',
-         rec ? `Рекорд Пограничья: волна ${rec.wave} — ${rec.name}` : 'Рекорд пока не установлен. Стань первым!'],
+        ['«Арена ждёт храбрецов! А для бывалых — ИСПЫТАНИЯ ДАНЖЕЙ:',
+         'подземелье злее обычного, 8 минут на его владыку.',
+         'Одолел — ключ растёт, провалил — слабеет. Зови друзей!»',
+         rec ? `Рекорд арены: волна ${rec.wave} — ${rec.name}` : 'Рекорд арены не установлен.',
+         mrec ? `Рекорд испытаний: ключ +${mrec.lvl} — ${mrec.name}` : 'Испытания ещё никто не прошёл. Стань первым!'],
         [{ id: 'arena_enter', label: '⚔ Выйти на арену (взнос 25 мон.)' },
+         { id: 'mplus_start', label: `⏳ Испытание данжей: ключ +${mk} (группа рядом идёт с тобой)` },
          { id: 'close', label: STR.bye }]);
       return;
     }
@@ -5439,6 +5546,7 @@ export class Game {
     if (choice === 'stash') { this.openStash(p); return; }
     if (choice === 'nohouse') { this.toast(p, '«Чужакам домов не продаём. Заслужи доверие деревни (репутация 20)»'); return; }
     if (choice === 'arena_enter') { this.enterArena(p); return; }
+    if (choice === 'mplus_start') { this.startMplus(p); return; }
     if (choice === 'free_prisoner') {
       const npc = this.entities.get(dialogId);
       if (!npc || npc.role !== 'prisoner' || npc.mapId !== p.mapId) return;

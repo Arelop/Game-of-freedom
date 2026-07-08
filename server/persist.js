@@ -56,6 +56,7 @@ export function saveWorld(game) {
         bounty: p.bounty || 0, contract: p.contract || null,
         repRanks: p.repRanks || {}, daily: p.daily || null,
         abilities: p.abilities || null,
+        mkey: p.mkey || 0,
       })),
       relations: RELATIONS, // дипломатия народов дрейфует — помним её
       banditsWeakT: w.banditsWeakT || 0,
@@ -65,6 +66,7 @@ export function saveWorld(game) {
       ashLooted: w.ashLooted || false,
       plagueExposed: w.plagueExposed || false,
       ashLordDead: w.ashLordDead || false, ashLordFirst: w.ashLordFirst || null,
+      mplusRecord: w.mplusRecord || null,
     };
     writeFileSync(FILE, JSON.stringify(data));
   } catch (e) { console.warn('[save] не удалось сохранить:', e.message); }
@@ -127,6 +129,7 @@ export function applyWorldData(game, data) {
     if (data.plagueExposed) w.plagueExposed = true;
     if (data.ashLordDead) w.ashLordDead = true;
     if (data.ashLordFirst) w.ashLordFirst = data.ashLordFirst;
+    if (data.mplusRecord) w.mplusRecord = data.mplusRecord;
     if (data.wildChests) for (const rec of data.wildChests) {
       const c = w.wildChests?.find(x => x.x === rec.x && x.y === rec.y);
       if (c) c.opened = rec.opened;
@@ -188,6 +191,7 @@ export function applySavedPlayer(game, p) {
     if (rec.repRanks) p.repRanks = rec.repRanks;
     if (rec.daily) p.daily = rec.daily;
     if (rec.abilities) p.abilities = rec.abilities;
+    if (rec.mkey) p.mkey = rec.mkey;
   }
   for (const wid of p.weapons) if (p.mags[wid] === undefined) p.mags[wid] = 0;
   game.recomputeStats(p);
