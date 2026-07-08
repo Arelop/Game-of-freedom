@@ -1386,6 +1386,174 @@
     },
     "ui_mm_book": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/book/gold.png"
+    },
+    "fx_blood_0": {
+      "file": "assets/raw/vfx/out/fx_blood_0.png"
+    },
+    "fx_blood_1": {
+      "file": "assets/raw/vfx/out/fx_blood_1.png"
+    },
+    "fx_blood_2": {
+      "file": "assets/raw/vfx/out/fx_blood_2.png"
+    },
+    "fx_blood_3": {
+      "file": "assets/raw/vfx/out/fx_blood_3.png"
+    },
+    "fx_blood_4": {
+      "file": "assets/raw/vfx/out/fx_blood_4.png"
+    },
+    "fx_blood_5": {
+      "file": "assets/raw/vfx/out/fx_blood_5.png"
+    },
+    "fx_blood_6": {
+      "file": "assets/raw/vfx/out/fx_blood_6.png"
+    },
+    "fx_blood_7": {
+      "file": "assets/raw/vfx/out/fx_blood_7.png"
+    },
+    "fx_boom_0": {
+      "file": "assets/raw/vfx/out/fx_boom_0.png"
+    },
+    "fx_boom_1": {
+      "file": "assets/raw/vfx/out/fx_boom_1.png"
+    },
+    "fx_boom_2": {
+      "file": "assets/raw/vfx/out/fx_boom_2.png"
+    },
+    "fx_boom_3": {
+      "file": "assets/raw/vfx/out/fx_boom_3.png"
+    },
+    "fx_boom_4": {
+      "file": "assets/raw/vfx/out/fx_boom_4.png"
+    },
+    "fx_boom_5": {
+      "file": "assets/raw/vfx/out/fx_boom_5.png"
+    },
+    "fx_boom_6": {
+      "file": "assets/raw/vfx/out/fx_boom_6.png"
+    },
+    "fx_boom_7": {
+      "file": "assets/raw/vfx/out/fx_boom_7.png"
+    },
+    "fx_dark_0": {
+      "file": "assets/raw/vfx/out/fx_dark_0.png"
+    },
+    "fx_dark_1": {
+      "file": "assets/raw/vfx/out/fx_dark_1.png"
+    },
+    "fx_dark_2": {
+      "file": "assets/raw/vfx/out/fx_dark_2.png"
+    },
+    "fx_dark_3": {
+      "file": "assets/raw/vfx/out/fx_dark_3.png"
+    },
+    "fx_dark_4": {
+      "file": "assets/raw/vfx/out/fx_dark_4.png"
+    },
+    "fx_dark_5": {
+      "file": "assets/raw/vfx/out/fx_dark_5.png"
+    },
+    "fx_dark_6": {
+      "file": "assets/raw/vfx/out/fx_dark_6.png"
+    },
+    "fx_dark_7": {
+      "file": "assets/raw/vfx/out/fx_dark_7.png"
+    },
+    "fx_fire_0": {
+      "file": "assets/raw/vfx/out/fx_fire_0.png"
+    },
+    "fx_fire_1": {
+      "file": "assets/raw/vfx/out/fx_fire_1.png"
+    },
+    "fx_fire_2": {
+      "file": "assets/raw/vfx/out/fx_fire_2.png"
+    },
+    "fx_fire_3": {
+      "file": "assets/raw/vfx/out/fx_fire_3.png"
+    },
+    "fx_fire_4": {
+      "file": "assets/raw/vfx/out/fx_fire_4.png"
+    },
+    "fx_fire_5": {
+      "file": "assets/raw/vfx/out/fx_fire_5.png"
+    },
+    "fx_poison_0": {
+      "file": "assets/raw/vfx/out/fx_poison_0.png"
+    },
+    "fx_poison_1": {
+      "file": "assets/raw/vfx/out/fx_poison_1.png"
+    },
+    "fx_poison_2": {
+      "file": "assets/raw/vfx/out/fx_poison_2.png"
+    },
+    "fx_poison_3": {
+      "file": "assets/raw/vfx/out/fx_poison_3.png"
+    },
+    "fx_poison_4": {
+      "file": "assets/raw/vfx/out/fx_poison_4.png"
+    },
+    "fx_poison_5": {
+      "file": "assets/raw/vfx/out/fx_poison_5.png"
+    },
+    "fx_poison_6": {
+      "file": "assets/raw/vfx/out/fx_poison_6.png"
+    },
+    "fx_poison_7": {
+      "file": "assets/raw/vfx/out/fx_poison_7.png"
+    },
+    "fx_slash_0": {
+      "file": "assets/raw/vfx/out/fx_slash_0.png"
+    },
+    "fx_slash_1": {
+      "file": "assets/raw/vfx/out/fx_slash_1.png"
+    },
+    "fx_slash_2": {
+      "file": "assets/raw/vfx/out/fx_slash_2.png"
+    },
+    "fx_slash_3": {
+      "file": "assets/raw/vfx/out/fx_slash_3.png"
+    },
+    "fx_slash_4": {
+      "file": "assets/raw/vfx/out/fx_slash_4.png"
+    },
+    "fx_slash_5": {
+      "file": "assets/raw/vfx/out/fx_slash_5.png"
+    },
+    "fx_spark_0": {
+      "file": "assets/raw/vfx/out/fx_spark_0.png"
+    },
+    "fx_spark_1": {
+      "file": "assets/raw/vfx/out/fx_spark_1.png"
+    },
+    "fx_spark_2": {
+      "file": "assets/raw/vfx/out/fx_spark_2.png"
+    },
+    "fx_spark_3": {
+      "file": "assets/raw/vfx/out/fx_spark_3.png"
+    },
+    "fx_spark_4": {
+      "file": "assets/raw/vfx/out/fx_spark_4.png"
+    },
+    "fx_spark_5": {
+      "file": "assets/raw/vfx/out/fx_spark_5.png"
+    },
+    "fx_splash_0": {
+      "file": "assets/raw/vfx/out/fx_splash_0.png"
+    },
+    "fx_splash_1": {
+      "file": "assets/raw/vfx/out/fx_splash_1.png"
+    },
+    "fx_splash_2": {
+      "file": "assets/raw/vfx/out/fx_splash_2.png"
+    },
+    "fx_splash_3": {
+      "file": "assets/raw/vfx/out/fx_splash_3.png"
+    },
+    "fx_splash_4": {
+      "file": "assets/raw/vfx/out/fx_splash_4.png"
+    },
+    "fx_splash_5": {
+      "file": "assets/raw/vfx/out/fx_splash_5.png"
     }
   }
 }

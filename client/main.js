@@ -74,6 +74,10 @@ const floatTexts = [];   // летящие цифры урона {x,y,text,color
 const chainFx = [];      // молнии {pts:[[x,y]..], t}
 const ringFx = [];       // кольца/конусы способностей {x,y,r0,r1,t,dur,color,arc?,aim?,fill?}
 const activeZones = [];  // живые зоны: дым/огненный смерч {kind,x,y,vx,vy,t}
+const animFx = [];       // покадровые VFX (CC0-паки): {base,n,x,y,t,dur,scale,rot}
+function playFx(base, n, x, y, opts = {}) {
+  animFx.push({ base, n, x, y, t: 0, dur: opts.dur || 0.45, scale: opts.scale || 1, rot: opts.rot || 0 });
+}
 
 // crawl-спрайты хранятся 32px (красивые иконки) — в мире рисуем 0.5
 function worldScale(name) {
@@ -236,6 +240,8 @@ net.handlers.onFx = (kind, m) => {
       break;
     case 'swing':
       remoteAtk.set(m.pid, performance.now() + 350);
+      playFx('fx_slash', 6, m.x + Math.cos(m.aim) * (m.range - 10), m.y + Math.sin(m.aim) * (m.range - 10),
+        { dur: 0.22, rot: m.aim + Math.PI / 2, scale: Math.max(0.7, (m.range || 26) / 34) });
       if (m.pid !== net.myId) { spawnSwing(m.x, m.y, m.aim, m.range, m.arc, getWeapon(m.weapon)); playWeaponSound(getWeapon(m.weapon)?.sound); }
       break;
     case 'eshot': SFX.enemy_shot(); break;
@@ -267,8 +273,8 @@ net.handlers.onFx = (kind, m) => {
     case 'pickup': particles.sparkle(m.x, m.y); SFX.pickup(); break;
     case 'chest': particles.sparkle(m.x, m.y); SFX.pickup(); break;
     case 'boom':
-      particles.burst(m.x, m.y, '#df7126', 18, 110, 0.5, 2);
-      particles.burst(m.x, m.y, '#fbf236', 10, 70, 0.35);
+      playFx('fx_boom', 8, m.x, m.y, { dur: 0.5, scale: Math.max(1, (m.r || 30) / 16) });
+      particles.burst(m.x, m.y, '#df7126', 12, 110, 0.5, 2);
       cam.addTrauma(0.45);
       SFX.boom();
       break;
@@ -299,9 +305,9 @@ net.handlers.onFx = (kind, m) => {
       if (m.pid === net.myId) { addFloatText(m.x, m.y - 8, 'БЛОК', '#9badb7'); SFX.hit(); }
       break;
     case 'summon':
-      particles.burst(m.x, m.y, '#df7126', 16, 80, 0.5, 2);
+      playFx('fx_dark', 8, m.x, m.y, { dur: 0.45 });
+      playFx('fx_spark', 6, m.x, m.y - 6, { dur: 0.5, scale: 1.4 });
       particles.sparkle(m.x, m.y);
-      ringFx.push({ x: m.x, y: m.y, r0: 20, r1: 6, t: 0, dur: 0.35, color: '#df7126' });
       SFX.boom();
       break;
     case 'poof':
@@ -324,14 +330,18 @@ net.handlers.onFx = (kind, m) => {
       addFloatText(m.x, m.y - 12, '+ ' + m.text, '#fbf236');
       if (m.pid === net.myId) SFX.ui();
       break;
-    case 'react': // реакции стихий и всплески ресурсов: крупный текст
+    case 'react': // реакции стихий и всплески ресурсов: крупный текст + вспышка
       addFloatText(m.x, m.y - 10, m.name, '#df7126', true);
-      particles.burst(m.x, m.y, '#df7126', 10, 70, 0.3);
+      playFx('fx_boom', 8, m.x, m.y, { dur: 0.35, scale: 0.8 });
       break;
     case 'nova': // ледяная/огненная нова реликвий и сетов
       ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 46, t: 0, dur: 0.4, color: '#df7126' });
-      particles.burst(m.x, m.y, '#df7126', 14, 90, 0.35);
+      playFx('fx_splash', 6, m.x, m.y, { dur: 0.4, scale: 1.5 });
       SFX.hit();
+      break;
+    case 'frostnova': // ледяная стена/нова: всплеск льда
+      playFx('fx_splash', 6, m.x, m.y, { dur: 0.45, scale: Math.max(1, (m.r || 30) / 20) });
+      SFX.zap();
       break;
     case 'ability': spawnAbilityFx(m); break;
     case 'zone':
@@ -357,8 +367,8 @@ net.handlers.onFx = (kind, m) => {
       SFX.boom();
       break;
     case 'bloodcast':
+      playFx('fx_dark', 8, m.x, m.y, { dur: 0.5, scale: 1.1 });
       particles.blood(m.x, m.y, 8);
-      ringFx.push({ x: m.x, y: m.y, r0: 4, r1: 16, t: 0, dur: 0.3, color: '#d9574a' });
       if (m.pid === net.myId) { addFloatText(m.x, m.y - 10, '🩸 КРОВАВЫЙ КАСТ', '#d9574a'); SFX.hurt(); }
       break;
     case 'ascend':
@@ -571,6 +581,8 @@ function simStep() {
   for (let i = chainFx.length - 1; i >= 0; i--) if (chainFx[i].t <= 0) chainFx.splice(i, 1);
   for (const r of ringFx) r.t += SIM_DT;
   for (let i = ringFx.length - 1; i >= 0; i--) if (ringFx[i].t >= ringFx[i].dur) ringFx.splice(i, 1);
+  for (const a of animFx) a.t += SIM_DT;
+  for (let i = animFx.length - 1; i >= 0; i--) if (animFx[i].t >= animFx[i].dur) animFx.splice(i, 1);
   // живые зоны: дым клубится, смерч ползёт и сыплет искры
   for (const z of activeZones) {
     z.t -= SIM_DT;
@@ -722,6 +734,23 @@ function render(timeSec) {
     ctx.arc(c.x, c.y - 2, sw.range, a0, cur);
     ctx.stroke();
     ctx.globalAlpha = 1;
+  }
+
+  // покадровые VFX (взрывы, слэши, всплески — CC0-паки)
+  for (const a of animFx) {
+    const frame = Math.min(a.n - 1, Math.floor(a.t / a.dur * a.n));
+    const c = cam.toScreen(a.x, a.y);
+    atlas.draw(ctx, a.base + '_' + frame, c.x, c.y, { rot: a.rot, scale: a.scale });
+  }
+  // огненный смерч: живое пламя кружит в вихре
+  for (const z of activeZones) {
+    if (z.kind !== 'firestorm') continue;
+    const c = cam.toScreen(z.x, z.y);
+    for (let i = 0; i < 3; i++) {
+      const a = performance.now() / 130 + i * 2.09;
+      atlas.draw(ctx, 'fx_fire_' + (Math.floor(performance.now() / 80 + i * 2) % 6),
+        c.x + Math.cos(a) * 14, c.y + Math.sin(a) * 12, { rot: a + Math.PI / 2 });
+    }
   }
 
   // кольца и конусы способностей
