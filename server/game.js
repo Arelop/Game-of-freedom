@@ -4530,12 +4530,43 @@ export class Game {
     return MQ.taint;
   }
 
+  // координаты текущей цели кампании (тайлы, карта over) — для маркера
+  mqTarget(p) {
+    const MQ = this.world.mq || {};
+    const S = p.story;
+    const at = o => (o ? { x: o.x, y: o.y } : null);
+    const hermit = () => at(this.world.pois.find(o => o.type === 'hermit'));
+    const stl = i => at(this.world.settlements[i]);
+    switch (S.mq) {
+      case 0: return stl(0); // Ярослава ждёт в стартовой деревне
+      case 1:
+        if (S.mqS === 0) return at(this.world.pois.find(o => o.id === MQ.dungeon));
+        if (S.mqS === 1) return stl(0);
+        return hermit();
+      case 2: {
+        const north = at(this.world.settlements.find(s => s.id === MQ.northId));
+        if (S.mqS === 1 || S.mqS === 2) return at(this.world.pois.find(o => o.id === MQ.lair)) || north;
+        return north;
+      }
+      case 3:
+        if (S.mqS === 1 && MQ.taint) return MQ.taint;
+        return stl(4);
+      case 4: return stl(2);
+      case 5:
+        if (S.mqS === 1) return at(this.world.ashPortal);
+        return hermit();
+      case 6: return hermit();
+      default: return null;
+    }
+  }
+
   // текст текущей цели кампании (HUD-строка)
   mqObjective(p) {
     const MQ = this.world.mq || {};
     const S = p.story;
     const sName = id => this.world.settlements.find(x => x.id === id)?.name || 'деревня';
     switch (S.mq) {
+      case 0: return 'Пролог · Найди капитана Ярославу в деревне (E)';
       case 1: {
         const d = this.world.pois.find(o => o.id === MQ.dungeon);
         if (S.mqS === 0) return `Гл.1 · Найди гнездо: ${d?.name || 'данж у дорог'}`;

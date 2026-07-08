@@ -1134,6 +1134,16 @@ function renderBigMap() {
       ctx.fillRect(qx - 2, qy, 5, 1); ctx.fillRect(qx, qy - 2, 1, 5);
       ctx.fillText(q.title, qx - 30, qy + 6);
     }
+    // цель кампании: светло-оранжевый маркер главного квеста
+    if (net.you?.mq?.x) {
+      const mx = px(net.you.mq.x * TILE), my = py(net.you.mq.y * TILE);
+      if (seen(mx, my)) {
+        ctx.fillStyle = '#ffb26b';
+        ctx.fillRect(mx - 3, my, 7, 1); ctx.fillRect(mx, my - 3, 1, 7);
+        ctx.fillRect(mx - 1, my - 1, 3, 3);
+        ctx.fillText('📜 Кампания', mx + 5, my - 8);
+      }
+    }
   } else {
     // Выжженные земли: лагерь, логово, портал
     const a = net.mapInfo.ash;

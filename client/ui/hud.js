@@ -185,9 +185,31 @@ export class Hud {
     if (you.mq?.t) {
       ctx.fillStyle = '#63c5ff';
       ctx.fillText('📜 ' + you.mq.t, 5, qy);
-    } else if (you.mq === undefined && (you.lvl || 1) === 1) {
-      ctx.fillStyle = '#63c5ff';
-      ctx.fillText('📜 Найди капитана Ярославу в деревне (E — говорить)', 5, qy);
+    }
+
+    // живой квест-маркер кампании: светло-оранжевая стрелка к цели
+    if (you.mq?.x && net.mapId === 'over') {
+      const tx = you.mq.x * 16 + 8, ty = you.mq.y * 16 + 8;
+      const dx = tx - net.pred.x, dy = ty - net.pred.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 170) {
+        const a = Math.atan2(dy, dx);
+        const cx2 = VIEW_W / 2 + Math.cos(a) * 74, cy2 = VIEW_H / 2 + Math.sin(a) * 58;
+        ctx.save();
+        ctx.translate(cx2, cy2);
+        ctx.rotate(a);
+        ctx.fillStyle = '#ffb26b';
+        ctx.beginPath();
+        ctx.moveTo(7, 0); ctx.lineTo(-4, -4); ctx.lineTo(-4, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,.6)';
+        ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = '#ffb26b';
+        const tiles = Math.round(dist / 16);
+        ctx.fillText(tiles + 'т', cx2 - 6, cy2 + 8);
+      }
     }
 
     this.renderAbilities(ctx, you);
@@ -312,6 +334,13 @@ export class Hud {
       ctx.fillStyle = '#fbf236';
       const qx = x0 + Math.round(net.you.q.tx * TILE * k), qy = y0 + Math.round(net.you.q.ty * TILE * k);
       ctx.fillRect(qx - 1, qy, 3, 1); ctx.fillRect(qx, qy - 1, 1, 3);
+    }
+    // цель кампании: светло-оранжевый ромбик (главный квест всегда виден)
+    if (net.you.mq?.x) {
+      ctx.fillStyle = '#ffb26b';
+      const mx = x0 + Math.round(net.you.mq.x * TILE * k), my = y0 + Math.round(net.you.mq.y * TILE * k);
+      ctx.fillRect(mx - 2, my, 5, 1); ctx.fillRect(mx, my - 2, 1, 5);
+      ctx.fillRect(mx - 1, my - 1, 3, 3);
     }
     ctx.fillStyle = '#fff';
     ctx.fillRect(x0 + Math.round(net.pred.x * k) - 1, y0 + Math.round(net.pred.y * k) - 1, 2, 2);
