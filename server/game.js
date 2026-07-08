@@ -1202,10 +1202,11 @@ export class Game {
       id, entType: 'npc', role, home, mapId, x, y, aim: 0, name,
       hp: role === 'guard' ? 12 : 6, maxHp: role === 'guard' ? 12 : 6,
       kind: extra.kind || ({
-        guard: 'npc_guard', merchant: 'npc_merchant', elder: 'npc_elder',
-        wizard: 'npc_wizard', priest: 'npc_wizard', blacksmith: 'npc_smith',
-        innkeeper: 'npc_innkeeper', hunter: 'npc_hunter',
-      }[role] || (this.rand() < 0.5 ? 'npc_villager' : 'npc_villager2')),
+        guard: 'npc_guard', merchant: 'npc_merchant', elder: 'npc_elder2',
+        wizard: 'npc_wizard', priest: 'npc_priest2', blacksmith: 'npc_smith',
+        innkeeper: 'npc_innkeeper', hunter: 'npc_hunter2',
+        captain: 'npc_captain', arenamaster: 'npc_arena', widow: 'npc_widow',
+      }[role] || (this.rand() < 0.5 ? 'npc_villager_plain' : 'npc_villager2')),
       ...extra,
     });
     return id;
@@ -1274,20 +1275,20 @@ export class Game {
         ids.push(this.spawnNpc('elder', s.id, 'over', sx + 20, sy - 10));
         // именной NPC: капитан стражи Ярослава живёт в первой деревне
         if (s === this.world.settlements[0]) {
-          const cid = this.spawnNpc('captain', s.id, 'over', sx + 42, sy + 12, { kind: 'npc_guard' });
+          const cid = this.spawnNpc('captain', s.id, 'over', sx + 42, sy + 12);
           const cpt = this.entities.get(cid);
           cpt.name = 'Ярослава';
           cpt.hp = cpt.maxHp = 24;
           ids.push(cid);
           // распорядитель арены зазывает бойцов
-          const aid = this.spawnNpc('arenamaster', s.id, 'over', sx - 44, sy - 20, { kind: 'npc_guard' });
+          const aid = this.spawnNpc('arenamaster', s.id, 'over', sx - 44, sy - 20);
           const am = this.entities.get(aid);
           am.name = 'Боривой';
           am.hp = am.maxHp = 30;
           ids.push(aid);
           // вдова Милица ждёт вестей у таверны
           const wx = (a.tavern?.x ?? s.x) * TILE, wy = (a.tavern?.y ?? s.y) * TILE;
-          const wid = this.spawnNpc('widow', s.id, 'over', wx - 14, wy + 12, { kind: 'npc_villager2' });
+          const wid = this.spawnNpc('widow', s.id, 'over', wx - 14, wy + 12);
           const wd = this.entities.get(wid);
           wd.name = 'Милица';
           ids.push(wid);

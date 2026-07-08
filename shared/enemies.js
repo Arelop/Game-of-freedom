@@ -414,10 +414,17 @@ export const ENEMIES = {
   },
 };
 
-// Рост урона с тиром: старшие твари бьют больнее той же атакой.
-// Касание: +1 на тирах 3-4, +2 на тире 5, +3 на тире 6 (боссы). Снаряды: 2 с тира 4.
-export function tierTouchBonus(tier) { return (tier || 1) >= 6 ? 3 : Math.floor(((tier || 1) - 1) / 2); }
-export function tierProjDmg(tier) { return 1 + Math.floor(((tier || 1) - 1) / 3); }
+// Рост урона с тиром: старшие твари бьют ЗАМЕТНО больнее той же атакой.
+// Касание: +1 (т3), +2 (т4), +3 (т5), +5 (т6 — боссы).
+// Снаряды: 1 (т1-2), 2 (т3-4), 3 (т5), 4 (т6).
+export function tierTouchBonus(tier) {
+  const t = tier || 1;
+  return t >= 6 ? 5 : Math.max(0, t - 2);
+}
+export function tierProjDmg(tier) {
+  const t = tier || 1;
+  return t >= 6 ? 4 : t >= 5 ? 3 : t >= 3 ? 2 : 1;
+}
 
 // Монстры тира min..max — для спавна по сложности (без боссов, войск Тьмы
 // и жителей особых регионов — те встречаются только у себя дома)
