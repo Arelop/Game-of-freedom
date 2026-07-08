@@ -77,10 +77,10 @@ export class Hud {
       ctx.fillText('+C', 50, 21);
     }
 
-    // оружие и патроны (справа снизу)
+    // оружие и патроны (слева снизу, правее счётчика монет)
     const w = getWeapon(you.w);
     if (w) {
-      const gx = VIEW_W - 78, gy = VIEW_H - 26;
+      const gx = 66, gy = VIEW_H - 26;
       ctx.fillStyle = 'rgba(14,12,20,.55)';
       ctx.fillRect(gx - 6, gy - 4, 82, 30);
       ctx.strokeStyle = 'rgba(217,160,102,.35)';
