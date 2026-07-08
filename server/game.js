@@ -181,6 +181,8 @@ export class Game {
     this.dungeons = new Map();   // mapId -> { dungeon, poi }
     this.hydratedSettlements = new Map(); // id -> [entIds]
     this.tileHp = new Map();     // "mapId:x,y" -> накопленный урон по тайлу
+    this.tempTiles = [];         // временные тайлы (ледяные стены): тают сами
+    this.zones = [];             // живые зоны: дым, огненный смерч
     this.ascensions = new Map(); // pid -> состояние Ритуала Вознесения
     this.abstract.seedTokens();
     this.events.push(1, 'Мир сотворён. Говорят, в руинах слышен рык…');
@@ -608,6 +610,7 @@ export class Game {
     this.civ.update(dt);
     this.checkDungeonRooms();
     this.stepMplus();
+    this.stepStructures(dt);
     this.checkAscensions();
     // метеоры мага: телеграф догорел — удар с неба
     if (this.meteors?.length) {
@@ -737,6 +740,16 @@ export class Game {
 
   stepPlayerTick(p, dt) {
     const map = this.mapFor(p.mapId);
+
+    // с первой минуты игрока ведёт кампания (после восстановления сейва)
+    if (!p.mqWelcomed) {
+      p.mqWelcomed = true;
+      if (p.story.mq === 0) {
+        const s0 = this.world.settlements[0];
+        if (s0) this.fx({ t: 'marker', pid: p.id, x: s0.x, y: s0.y, text: 'Ярослава' }, null);
+        this.toast(p, '📜 Капитан Ярослава ищет тебя — с южных дорог тревожные вести (E — говорить)');
+      }
+    }
 
     if (p.dead) {
       p.downT -= dt;
@@ -1084,8 +1097,20 @@ export class Game {
     const half = arcDeg * Math.PI / 360;
     const r = w.range || 26;
     const atk = this.rollAttack(p, w);
+    // стихийный заряд («Раскалённый клинок», «Освящение клинка»): тратится ударом
+    let imbue = null;
+    if (p.imbue?.n > 0) {
+      imbue = p.imbue;
+      if (--p.imbue.n <= 0) { delete p.imbue; this.toast(p, 'Заряд оружия иссяк'); }
+      atk.dmg += imbue.dmg;
+      if (imbue.kind === 'holy' && p.hp < p.maxHp) {
+        p.hp = Math.min(p.maxHp, p.hp + 1);
+        this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      }
+    }
     const hitFake = { vx: Math.cos(aim), vy: Math.sin(aim), knockback: w.knockback, owner: p.id, school: 'melee', crit: atk.crit,
-      chill: w.chill, fire: w.fire, poison: w.poison, slow: w.slow }; // стихии клинка («Зов метели»)
+      chill: w.chill, fire: w.fire || imbue?.kind === 'fire', poison: w.poison, slow: w.slow, // стихии клинка
+      ignite: imbue?.kind === 'fire' ? { time: 2, dmg: 1 } : undefined };
     for (const e of [...this.entities.values()]) {
       if (e.entType === 'enemy' && e.mapId === p.mapId) {
         const def = ENEMIES[e.kind];
@@ -1149,6 +1174,14 @@ export class Game {
     let dmg = atk.dmg;
     const fiery = p.buffs.fireArrows && (w.ammoType === 'arrow' || w.ammoType === 'bolt');
     if (fiery) { structDmg = Math.max(structDmg, 3); dmg = Math.round((dmg + 1) * 10) / 10; }
+    // стихийный заряд («Раскалённый клинок»/«Освящение клинка»): тратится выстрелом
+    let imbue = null;
+    if (p.imbue?.n > 0) {
+      imbue = p.imbue;
+      if (--p.imbue.n <= 0) { delete p.imbue; this.toast(p, 'Заряд оружия иссяк'); }
+      dmg += imbue.dmg;
+      if (imbue.kind === 'holy' && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + 1);
+    }
     for (let i = 0; i < count; i++) {
       const extraSpread = count > (w.projectilesPerShot || 1) ? Math.max(w.spreadDeg, 10) : w.spreadDeg;
       const spread = (rand() - 0.5) * extraSpread * Math.PI / 180;
@@ -1158,8 +1191,9 @@ export class Game {
         life: w.projLife, radius: w.projRadius, dmg, crit: atk.crit,
         knockback: w.knockback, slow, school: w.school,
         explode: w.explode, chain: w.chain, structDmg, fiery,
-        holy: w.holy ? w.holy + (this.hasTalent(p, 'lightheal') ? 1 : 0) : 0,
-        chill: w.chill, fire: w.fire, poison: w.poison, // стихии для реакций
+        holy: (w.holy ? w.holy + (this.hasTalent(p, 'lightheal') ? 1 : 0) : 0) + (imbue?.kind === 'holy' ? 1 : 0),
+        chill: w.chill, fire: w.fire || imbue?.kind === 'fire', poison: w.poison, // стихии для реакций
+        ignite: imbue?.kind === 'fire' ? { time: 2, dmg: 1 } : undefined,
         owner: p.id, friendly: true, mapId: p.mapId,
       });
     }
@@ -1169,6 +1203,7 @@ export class Game {
     this.projectiles.push({
       x: npc.x, y: npc.y - 4, vx: Math.cos(ang) * (opts.speed || 280), vy: Math.sin(ang) * (opts.speed || 280),
       life: 1.2, radius: 2, dmg: opts.dmg || 2, knockback: 20,
+      chill: opts.chill, slow: opts.slow, holy: opts.holy, school: opts.school,
       owner: npc.id, friendly: true, guard: true, mapId: npc.mapId,
     });
     this.fx({ t: 'shot', pid: npc.id, weapon: opts.weapon || 'bow', x: npc.x, y: npc.y, aim: ang, seed: 1, tick: this.tick }, npc.mapId, npc.x, npc.y);
@@ -1650,16 +1685,8 @@ export class Game {
     if ((p.offCd || 0) > 0) return;
     switch (it.active) {
       case 'summon_fire': { // гримуар: огненный элементаль-союзник
-        for (const e of [...this.entities.values()])
-          if (e.entType === 'npc' && e.role === 'elemental' && e.owner === p.id) this.entities.delete(e.id);
         p.offCd = 60;
-        const id = this.spawnNpc('elemental', null, p.mapId, p.x + 14, p.y - 6, { kind: 'npc_elemental' });
-        const el = this.entities.get(id);
-        el.owner = p.id;
-        el.name = 'Элементаль';
-        el.hp = el.maxHp = 10;
-        el.dieAtTick = this.tick + 25 * 30;
-        this.fx({ t: 'summon', x: el.x, y: el.y }, p.mapId, el.x, el.y);
+        this.summonAlly(p, 'npc_elemental', 'Элементаль', {});
         this.toast(p, '🔥 Огненный элементаль служит тебе (25 с)');
         break;
       }
@@ -1841,6 +1868,20 @@ export class Game {
     this.toast(p, `📖 «${ab.name}» — на клавише ${['Q', 'X', 'R'][slot]}`);
   }
 
+  // призыв союзника-элементаля: один на игрока, живёт 25 с
+  summonAlly(p, kind, name, extra = {}) {
+    for (const e of [...this.entities.values()])
+      if (e.entType === 'npc' && e.role === 'elemental' && e.owner === p.id) this.entities.delete(e.id);
+    const id = this.spawnNpc('elemental', null, p.mapId, p.x + 14, p.y - 6, { kind, ...extra });
+    const el = this.entities.get(id);
+    el.owner = p.id;
+    el.name = name;
+    el.hp = el.maxHp = 10;
+    el.dieAtTick = this.tick + 25 * 30;
+    this.fx({ t: 'summon', x: el.x, y: el.y }, p.mapId, el.x, el.y);
+    return el;
+  }
+
   useAbility(p, slot) {
     if (p.dead || p.rollT > 0) return;
     if (slot === 3) { this.useUltimate(p); return; } // F — ульта капстоуна
@@ -1903,6 +1944,60 @@ export class Game {
       }
     };
     switch (ab.id) {
+      // ═══ новые механики: стихийные заряды, структуры, зоны, призывы ═══
+      case 'ember_blade': { // воин: 6 атак несут огонь (вход в реакции)
+        p.imbue = { kind: 'fire', n: 6, dmg: 2 };
+        this.fx({ t: 'react', name: 'ОГОНЬ В КЛИНКЕ', x: p.x, y: p.y - 10 }, p.mapId, p.x, p.y);
+        this.toast(p, '🔥 Клинок раскалён: 6 атак жгут (+2 урона и поджог)');
+        break;
+      }
+      case 'holy_weapon': { // жрец: 6 атак несут свет и лечат владельца
+        p.imbue = { kind: 'holy', n: 6, dmg: 1 };
+        this.fx({ t: 'react', name: 'СВЕТ В КЛИНКЕ', x: p.x, y: p.y - 10 }, p.mapId, p.x, p.y);
+        this.toast(p, '✦ Оружие освящено: 6 атак несут свет и лечат тебя');
+        break;
+      }
+      case 'ice_wall': { // маг: стена льда поперёк прицела (тает через 6 с)
+        const cx = p.x + Math.cos(aim) * 42, cy = p.y + Math.sin(aim) * 42;
+        const px = -Math.sin(aim), py = Math.cos(aim); // перпендикуляр
+        let placed = 0;
+        for (let k = -2; k <= 2; k++) {
+          const tx = Math.floor((cx + px * k * TILE) / TILE);
+          const ty = Math.floor((cy + py * k * TILE) / TILE);
+          if (this.setTempTile(p.mapId, tx, ty, T.ICE_WALL, 6)) placed++;
+        }
+        if (!placed) { p.abCd[slot] = 1; this.toast(p, 'Здесь стене не встать'); break; }
+        this.fx({ t: 'frostnova', x: cx, y: cy, r: 40 }, p.mapId, cx, cy);
+        break;
+      }
+      case 'firestorm': { // маг: огненный смерч ползёт к прицелу
+        this.zones.push({
+          mapId: p.mapId, x: p.x + Math.cos(aim) * 20, y: p.y + Math.sin(aim) * 20,
+          vx: Math.cos(aim) * 28, vy: Math.sin(aim) * 28,
+          r: 26, t: 5, kind: 'firestorm', owner: p.id,
+          dmg: Math.round(2 * (d.dmgMagic || 1) * 10) / 10,
+        });
+        this.fx({ t: 'zone', kind: 'firestorm', x: p.x + Math.cos(aim) * 20, y: p.y + Math.sin(aim) * 20,
+          vx: Math.cos(aim) * 28, vy: Math.sin(aim) * 28, r: 26, dur: 5 }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'smoke_cloud': { // вор: облако дыма у прицела — укрытие для группы
+        const dist = Math.min(90, 90);
+        const zx = p.x + Math.cos(aim) * dist * 0.6, zy = p.y + Math.sin(aim) * dist * 0.6;
+        this.zones.push({ mapId: p.mapId, x: zx, y: zy, vx: 0, vy: 0, r: 42, t: 6, kind: 'smoke', owner: p.id });
+        this.fx({ t: 'zone', kind: 'smoke', x: zx, y: zy, vx: 0, vy: 0, r: 42, dur: 6 }, p.mapId, zx, zy);
+        break;
+      }
+      case 'summon_frost': { // маг: ледяной элементаль (снаряды студят)
+        this.summonAlly(p, 'npc_ice_elemental', 'Ледяной элементаль', { frost: true });
+        this.toast(p, '❄ Ледяной элементаль служит тебе (25 с)');
+        break;
+      }
+      case 'summon_spirit': { // жрец: светлый дух (лучи лечат союзников, жгут врагов)
+        this.summonAlly(p, 'npc_spirit', 'Дух-заступник', { holySpirit: true });
+        this.toast(p, '✦ Дух-заступник осеняет отряд (25 с)');
+        break;
+      }
       case 'power_strike': { // воин Q: сокрушительный удар по площади
         const mult = this.hasTalent(p, 'ab_power') ? 3.5 : 2.5;
         const wDmg = this.weapon(p).melee ? this.weapon(p).damage : 4;
@@ -2629,6 +2724,12 @@ export class Game {
       if (aw?.burn && pr.school === aw.school) {
         e.dotT = aw.burn.time; e.dotDmg = aw.burn.dmg; e.dotSrc = attacker.id; e.dotKind = 'ignite';
       }
+      // стихийный заряд «Раскалённый клинок»: атака поджигает
+      if (pr.ignite) {
+        e.dotT = Math.max(e.dotT || 0, pr.ignite.time);
+        e.dotDmg = Math.max(e.dotDmg || 0, pr.ignite.dmg);
+        e.dotSrc = attacker.id; e.dotKind = 'ignite';
+      }
       // сет «Волчья стая» (4): ближний бой пускает кровь
       if (pr.school === 'melee' && attacker.setFlags?.set_bleed && (e.dotT || 0) <= 0) {
         e.dotT = 3; e.dotDmg = 1; e.dotSrc = attacker.id; e.dotKind = 'venom';
@@ -2732,10 +2833,7 @@ export class Game {
     }
     // онбординг: первые победы
     for (const q of gainers) {
-      if (q.hintStage === 2 && ++q.hintKills >= 3) {
-        q.hintStage = 3;
-        this.toast(q, '✅ Три победы! Открой лист персонажа (C)');
-      }
+      if (q.hintStage === 2 && ++q.hintKills >= 3) q.hintStage = 3; // тихо: игрока ведёт кампания
     }
     // испытание данжей: «Взрывные» рвутся при смерти, владыка — победа
     if (e.volatileM) this.explodeAt(e.mapId, e.x, e.y, 3, 34, null, 0);
@@ -3412,6 +3510,74 @@ export class Game {
       if (poi.type === 'camp' && p.story?.widow === 1) {
         p.story.widow = 2;
         this.toast(p, '🕯 Записка среди хлама: «Ждан. Долговая яма. 150 монет». Он ЖИВ — расскажи Милице!');
+      }
+    }
+  }
+
+  // ---------- живые структуры: временные стены и зоны ----------
+  // временный тайл (ледяная стена): запоминает прежний и тает через dur
+  setTempTile(mapId, tx, ty, tile, dur) {
+    const prev = this.chunks.tileAt(mapId, tx, ty);
+    if (SOLID.has(prev) || prev === T.CHEST || prev === T.DUNGEON_EXIT || prev === T.LAVA) return false;
+    this.chunks.setTile(mapId, tx, ty, tile);
+    this.fx({ t: 'tile', mapId, x: tx, y: ty, tile }, null);
+    this.tempTiles.push({ mapId, x: tx, y: ty, prev, until: this.tick + dur * 30 });
+    return true;
+  }
+
+  stepStructures(dt) {
+    // тающие стены
+    for (let i = this.tempTiles.length - 1; i >= 0; i--) {
+      const t = this.tempTiles[i];
+      if (this.tick < t.until) continue;
+      if (this.chunks.tileAt(t.mapId, t.x, t.y) === T.ICE_WALL) {
+        this.chunks.setTile(t.mapId, t.x, t.y, t.prev);
+        this.fx({ t: 'tile', mapId: t.mapId, x: t.x, y: t.y, tile: t.prev }, null);
+        this.fx({ t: 'poof', x: t.x * TILE + 8, y: t.y * TILE + 8 }, t.mapId, t.x * TILE, t.y * TILE);
+      }
+      this.tempTiles.splice(i, 1);
+    }
+    // зоны: огненный смерч ползёт и жжёт, дым прячет и слепит
+    for (let i = this.zones.length - 1; i >= 0; i--) {
+      const z = this.zones[i];
+      z.t -= dt;
+      if (z.t <= 0) { this.zones.splice(i, 1); continue; }
+      if (z.vx || z.vy) {
+        const map = this.mapFor(z.mapId);
+        const nx = z.x + z.vx * dt, ny = z.y + z.vy * dt;
+        if (!map.isSolid(Math.floor(nx / TILE), Math.floor(ny / TILE))) { z.x = nx; z.y = ny; }
+        else { z.vx = 0; z.vy = 0; } // упёрся в стену — догорает на месте
+      }
+      z.tickT = (z.tickT || 0) - dt;
+      if (z.tickT > 0) continue;
+      z.tickT = z.kind === 'firestorm' ? 0.45 : 0.5;
+      if (z.kind === 'firestorm') {
+        for (const e of [...this.entities.values()]) {
+          if (e.entType !== 'enemy' || e.mapId !== z.mapId) continue;
+          if (dist2(z.x, z.y, e.x, e.y) > (z.r + (ENEMIES[e.kind]?.radius || 6)) ** 2) continue;
+          this.damageEnemy(e, z.dmg, { vx: 0, vy: 0, knockback: 30, owner: z.owner, school: 'magic' });
+          if (this.entities.has(e.id)) { // поджог — вход в реакции
+            e.dotT = Math.max(e.dotT || 0, 2); e.dotDmg = Math.max(e.dotDmg || 0, 1);
+            e.dotSrc = z.owner; e.dotKind = 'ignite';
+          }
+        }
+        // friendly fire: смерч не разбирает своих (кастера щадит)
+        for (const q of this.players.values()) {
+          if (q.dead || q.mapId !== z.mapId || q.id === z.owner) continue;
+          if (dist2(z.x, z.y, q.x, q.y) < (z.r + PLAYER_RADIUS) ** 2) this.damagePlayer(q, 1, { x: z.x, y: z.y });
+        }
+      } else if (z.kind === 'smoke') {
+        for (const q of this.players.values()) {
+          if (q.dead || q.mapId !== z.mapId) continue;
+          if (dist2(z.x, z.y, q.x, q.y) < z.r * z.r) q.invisT = Math.max(q.invisT || 0, 0.7);
+        }
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== z.mapId) continue;
+          if (dist2(z.x, z.y, e.x, e.y) < (z.r + 10) ** 2) {
+            e.aggro = false; // дым ест глаза
+            e.blindT = Math.max(e.blindT || 0, 0.7); // и не даёт снова прицелиться
+          }
+        }
       }
     }
   }
@@ -4466,8 +4632,8 @@ export class Game {
     } else {
       lines = ['«…Говорят, главарь Вольницы гуляет на твои сребреники. Уйди с глаз»'];
     }
-    // ─── кампания гл.1: «Тревожные вести» ───
-    if (p.story.mq === 0 && p.hintStage >= 5) {
+    // ─── кампания гл.1: «Тревожные вести» (ведёт игрока с первой минуты) ───
+    if (p.story.mq === 0) {
       lines.push('', '«И ещё одно. С южных застав третий день ни одного гонца.',
         'Разведка нашла гнездо у дорог — но это не Вольница. Глянешь?»');
       ch.unshift({ id: 'story:mq1_accept', label: '📜 (Кампания) Взяться за тревожные вести' });
@@ -6229,16 +6395,7 @@ export class Game {
       this.fx({ t: 'loot', pid: p.id, x: p.x, y: p.y, text: this.itemName(it.item) }, p.mapId, p.x, p.y);
       // Озёрный союз чтит торговлю: сделки с ними греют репутацию вдвое
       if (s) { p.rep[s.faction] = Math.min(100, (p.rep[s.faction] || 0) + (s.faction === 'ozerny' ? 2 : 1)); }
-      if (p.hintStage === 4) {
-        p.hintStage = 5;
-        this.toast(p, '🎓 Азы освоены — Пограничье твоё! (M — карта, P — дипломатия)');
-        // эстафета: онбординг завершён — начинается кампания
-        if (p.story.mq === 0) {
-          const s0 = this.world.settlements[0];
-          if (s0) this.fx({ t: 'marker', pid: p.id, x: s0.x, y: s0.y, text: 'Ярослава' }, null);
-          this.toast(p, '📜 Капитан Ярослава ищет тебя — с южных дорог тревожные вести');
-        }
-      }
+      if (p.hintStage === 4) p.hintStage = 5;
       return;
     }
     if (choice.startsWith('craft:')) {

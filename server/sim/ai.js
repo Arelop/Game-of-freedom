@@ -23,6 +23,8 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
   // стан (боевой клич, теневой рывок): полная заморозка мозгов
   if (e.stunT > 0) { e.stunT -= dt; return shots; }
 
+  // слепота (дымовое облако): не видит целей, бредёт наугад
+  if (e.blindT > 0) e.blindT -= dt;
   // замедление (лёд): множитель скорости, пока действует slowT
   let slowF = 1;
   if (e.slowT > 0) { e.slowT -= dt; slowF = e.slowMult || 0.65; }
@@ -50,12 +52,12 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
     const tank = players.find(p => p.id === e.tauntBy && !p.dead && p.mapId === e.mapId);
     if (tank) { target = tank; bestD = dist2(e.x, e.y, tank.x, tank.y); e.aggro = true; }
   }
-  if (!target) for (const p of players) {
+  if (!target && (e.blindT || 0) <= 0) for (const p of players) {
     if (p.dead || p.mapId !== e.mapId || p.invisT > 0) continue;
     const d = dist2(e.x, e.y, p.x, p.y);
     if (d < bestD) { bestD = d; target = p; }
   }
-  if ((e.tauntT || 0) <= 0) for (const n of npcs) { // под «Вызовом» NPC не отвлекают
+  if ((e.tauntT || 0) <= 0 && (e.blindT || 0) <= 0) for (const n of npcs) { // под «Вызовом» и в дыму NPC не видны
     if (n.mapId !== e.mapId) continue;
     // боевые призывы (элементаль, наёмник) ПРИТЯГИВАЮТ агро — работают танком;
     // мирных жителей монстры замечают неохотнее, чем игроков

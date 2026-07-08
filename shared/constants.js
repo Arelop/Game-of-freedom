@@ -73,6 +73,7 @@ export const T = {
   YURT: 62,          // степная юрта-шатёр
   PIER: 63,          // причальные мостки над водой (проходимы)
   TOWN_PORTAL: 64,   // портальный камень: сеть телепортов между деревнями
+  ICE_WALL: 65,      // ледяная стена мага: временная преграда, тает сама
 };
 
 // Реквизит подземелий: бьётся ЛЮБЫМ оружием, не только с structDmg
@@ -125,7 +126,7 @@ export const SOLID = new Set([
   T.OBELISK, T.STATUE, T.FOUNTAIN, T.DARK_ALTAR, T.CRYSTAL_WALL, T.PILLAR,
   T.LOCKED_DOOR, T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
   T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL, T.PLAQUE,
-  T.WALL_LOG, T.WALL_STONE2, T.WALL_CLAY, T.YURT, T.TOWN_PORTAL,
+  T.WALL_LOG, T.WALL_STONE2, T.WALL_CLAY, T.YURT, T.TOWN_PORTAL, T.ICE_WALL,
 ]);
 // Блокирует пули (стены — да, вода — нет)
 export const BULLET_SOLID = new Set([
@@ -133,5 +134,5 @@ export const BULLET_SOLID = new Set([
   T.MINE, T.OBELISK, T.STATUE, T.CRYSTAL_WALL, T.PILLAR, T.LOCKED_DOOR,
   T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
   T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL, T.PLAQUE,
-  T.WALL_LOG, T.WALL_STONE2, T.WALL_CLAY, T.YURT, T.TOWN_PORTAL,
+  T.WALL_LOG, T.WALL_STONE2, T.WALL_CLAY, T.YURT, T.TOWN_PORTAL, T.ICE_WALL,
 ]);

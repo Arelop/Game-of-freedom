@@ -1348,6 +1348,35 @@
     },
     "npc_darkscout": {
       "file": "assets/raw/ai/npc_darkscout.png"
+    },
+    "tile_ice_wall": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-dngn/floor/ice1.png",
+      "down": 2
+    },
+    "npc_ice_elemental": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/nonliving/air_elemental.png",
+      "down": 2
+    },
+    "ab_ember_blade": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/fire/sticky_flame.png"
+    },
+    "ab_holy_weapon": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/sure_blade.png"
+    },
+    "ab_ice_wall": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/ice/condensation_shield.png"
+    },
+    "ab_firestorm": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/fire/fire_storm.png"
+    },
+    "ab_smoke_cloud": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/poison/mephitic_cloud.png"
+    },
+    "ab_summon_frost": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/summoning/summon_ice_beast.png"
+    },
+    "ab_summon_spirit": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/enchantment/corona.png"
     }
   }
 }

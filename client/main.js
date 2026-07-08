@@ -73,6 +73,7 @@ const swings = [];       // {x,y,aim,range,arc,t,maxT,color}
 const floatTexts = [];   // летящие цифры урона {x,y,text,color,t,big}
 const chainFx = [];      // молнии {pts:[[x,y]..], t}
 const ringFx = [];       // кольца/конусы способностей {x,y,r0,r1,t,dur,color,arc?,aim?,fill?}
+const activeZones = [];  // живые зоны: дым/огненный смерч {kind,x,y,vx,vy,t}
 
 // crawl-спрайты хранятся 32px (красивые иконки) — в мире рисуем 0.5
 function worldScale(name) {
@@ -333,6 +334,11 @@ net.handlers.onFx = (kind, m) => {
       SFX.hit();
       break;
     case 'ability': spawnAbilityFx(m); break;
+    case 'zone':
+      // живая зона: дым или огненный смерч — частицы, пока живёт
+      activeZones.push({ kind: m.kind, x: m.x, y: m.y, vx: m.vx || 0, vy: m.vy || 0, t: m.dur });
+      if (m.kind === 'firestorm') SFX.boom(); else SFX.zap();
+      break;
     case 'telegraph':
       // босс замахнулся: красная зона — беги!
       ringFx.push({ x: m.x, y: m.y, r0: 6, r1: m.r, t: 0, dur: m.w, color: '#d9574a', fill: true });
@@ -565,6 +571,21 @@ function simStep() {
   for (let i = chainFx.length - 1; i >= 0; i--) if (chainFx[i].t <= 0) chainFx.splice(i, 1);
   for (const r of ringFx) r.t += SIM_DT;
   for (let i = ringFx.length - 1; i >= 0; i--) if (ringFx[i].t >= ringFx[i].dur) ringFx.splice(i, 1);
+  // живые зоны: дым клубится, смерч ползёт и сыплет искры
+  for (const z of activeZones) {
+    z.t -= SIM_DT;
+    z.x += z.vx * SIM_DT; z.y += z.vy * SIM_DT;
+    if (z.kind === 'smoke') {
+      if (Math.random() < 0.5) {
+        const a = Math.random() * Math.PI * 2, rr = Math.random() * 38;
+        particles.burst(z.x + Math.cos(a) * rr, z.y + Math.sin(a) * rr, '#9badb7', 2, 12, 0.9, 3);
+      }
+    } else if (z.kind === 'firestorm') {
+      const a = Math.random() * Math.PI * 2;
+      particles.burst(z.x + Math.cos(a) * 18, z.y + Math.sin(a) * 18, Math.random() < 0.5 ? '#df7126' : '#fbf236', 3, 70, 0.4, 2);
+    }
+  }
+  for (let i = activeZones.length - 1; i >= 0; i--) if (activeZones[i].t <= 0) activeZones.splice(i, 1);
 
   // перекат: эффекты на старте
   if (net.pred.rollT > 0 && !wasRolling) { particles.dust(net.pred.x, net.pred.y); SFX.roll(); }

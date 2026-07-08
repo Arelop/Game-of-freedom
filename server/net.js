@@ -220,7 +220,7 @@ export class Net {
           : p.cls === 'priest' ? (p.grace || 0) : undefined,
         bnt: p.bounty || 0,
         ctr: p.contract ? { tp: p.contract.type, t: Math.round(p.contract.t) } : undefined,
-        hnt: p.hintStage < 5 ? p.hintStage : undefined,
+        // (онбординг-подсказки убраны: с первой минуты ведёт кампания)
         asc: p.ascended ? 1 : 0,
         mpl: game.mplus && p.mapId === game.mplus.mapId
           ? { l: game.mplus.lvl, t: Math.max(0, Math.round((game.mplus.endTick - game.tick) / 30)) }

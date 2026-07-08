@@ -24,6 +24,11 @@ export const ABILITIES = {
       desc: 'Стиснуть зубы: +2 сердца и сброс замедления',
     },
     {
+      id: 'ember_blade', lvl: 7, cd: 16, mana: 5,
+      name: 'Раскалённый клинок', icon: 'ab_ember_blade',
+      desc: 'Следующие 6 атак несут ОГОНЬ: +2 урона и поджог (реакции!)',
+    },
+    {
       id: 'taunt', lvl: 8, cd: 12, mana: 4,
       name: 'Вызов', icon: 'ab_taunt',
       desc: 'Рёв: враги вокруг 3 с атакуют только тебя — работа для танка',
@@ -66,6 +71,11 @@ export const ABILITIES = {
       desc: '60 с: ударившие тебя вблизи враги замерзают (метка ЛЬДА)',
     },
     {
+      id: 'ice_wall', lvl: 7, cd: 14, mana: 10,
+      name: 'Ледяная стена', icon: 'ab_ice_wall',
+      desc: 'Воздвигает стену льда поперёк прицела (5 клеток, 6 с): держит врагов и пули',
+    },
+    {
       id: 'combust', lvl: 8, cd: 10, mana: 8,
       name: 'Возгорание', icon: 'ab_combust',
       desc: 'Детонирует яд/горение на враге у прицела: ×3 остатка дота разом',
@@ -76,9 +86,19 @@ export const ABILITIES = {
       desc: 'Мгновенный перенос к прицелу (до 140 px)',
     },
     {
+      id: 'summon_frost', lvl: 10, cd: 30, mana: 14,
+      name: 'Зов элементаля', icon: 'ab_summon_frost',
+      desc: 'Ледяной элементаль служит 25 с: его снаряды студят врагов (метка ЛЬДА)',
+    },
+    {
       id: 'meteor', lvl: 12, cd: 14, mana: 14,
       name: 'Метеор', icon: 'ab_meteor',
       desc: 'Красная метка у прицела, через миг — падение: ×6 урона магии по области',
+    },
+    {
+      id: 'firestorm', lvl: 14, cd: 18, mana: 16,
+      name: 'Огненный смерч', icon: 'ab_firestorm',
+      desc: 'Вихрь пламени ползёт к прицелу 5 с, сжигая всё на пути (жжёт и своих!)',
     },
     {
       id: 'living_bomb', lvl: 16, cd: 12, mana: 10,
@@ -118,6 +138,11 @@ export const ABILITIES = {
       desc: 'Веер из 12 клинков во все стороны. Комбо усиливает',
     },
     {
+      id: 'smoke_cloud', lvl: 10, cd: 16, mana: 7,
+      name: 'Дымовое облако', icon: 'ab_smoke_cloud',
+      desc: 'Облако дыма у прицела (6 с): союзники в нём невидимы, враги слепнут',
+    },
+    {
       id: 'shadowstep', lvl: 12, cd: 10, mana: 6,
       name: 'Шаг сквозь тень', icon: 'ab_shadowstep',
       desc: 'Телепорт за спину врага у прицела; следующая атака ×1.5 урона',
@@ -150,6 +175,11 @@ export const ABILITIES = {
       desc: '6 с: святой свет жжёт врагов рядом с тобой (1 урона/с)',
     },
     {
+      id: 'holy_weapon', lvl: 7, cd: 16, mana: 6,
+      name: 'Освящение клинка', icon: 'ab_holy_weapon',
+      desc: 'Следующие 6 атак несут СВЕТ: +1 урона, каждое попадание лечит тебя',
+    },
+    {
       id: 'penance', lvl: 8, cd: 10, mana: 6,
       name: 'Епитимья', icon: 'ab_penance',
       desc: 'Луч к прицелу: врага карает ×2 урона магии, союзника лечит на 2',
@@ -158,6 +188,11 @@ export const ABILITIES = {
       id: 'faith_shield', lvl: 9, cd: 25, mana: 18,
       name: 'Щит веры', icon: 'ab_faith_shield',
       desc: 'Барьер на 4 урона всем союзникам рядом (6 с)',
+    },
+    {
+      id: 'summon_spirit', lvl: 10, cd: 30, mana: 16,
+      name: 'Дух-заступник', icon: 'ab_summon_spirit',
+      desc: 'Светлый дух служит 25 с: его лучи жгут врагов и лечат союзников',
     },
     {
       id: 'consecration', lvl: 12, cd: 12, mana: 12,

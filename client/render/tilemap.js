@@ -73,6 +73,7 @@ const TILE_SPRITES = {
   [T.YURT]: ['tile_grass', 'obj_yurt'],
   [T.PIER]: ['tile_pier'],
   [T.TOWN_PORTAL]: ['tile_road'],   // сияние портала — анимированный оверлей
+  [T.ICE_WALL]: ['tile_ice_wall'],  // ледяная стена мага (тает сама)
 };
 
 // Тайлсеты подземелий: пол/стена по стилю места (шахта, склеп, пещера, форт)

@@ -32,7 +32,7 @@ export function updateNpc(npc, dt, map, game) {
   }
   // наёмник и призванный элементаль: следуют за хозяином, бьют врагов поблизости
   if (npc.role === 'mercenary' || npc.role === 'elemental') {
-    const fiery = npc.role === 'elemental';
+    const fiery = npc.role === 'elemental' && !npc.frost && !npc.holySpirit;
     const owner = game.players.get(npc.owner);
     if (!owner || owner.mapId !== npc.mapId) return; // ждёт хозяина
     let target = null, bd = 200 * 200;
@@ -48,9 +48,32 @@ export function updateNpc(npc, dt, map, game) {
       npc.fireT = (npc.fireT ?? 0.4) - dt;
       if (npc.fireT <= 0) {
         npc.fireT = fiery ? 0.9 : 1.0;
-        game.npcShoot(npc, ang, fiery ? { dmg: 3, weapon: 'firestaff', speed: 240 } : {});
+        // характер призыва: огонь жжёт, лёд студит (метка!), свет лечит своих
+        const shot = npc.frost ? { dmg: 2, weapon: 'froststaff', speed: 250, chill: { time: 2.5 }, slow: { mult: 0.65, time: 1.5 }, school: 'magic' }
+          : npc.holySpirit ? { dmg: 2, weapon: 'lightstaff', speed: 250, holy: 1, school: 'magic' }
+          : fiery ? { dmg: 3, weapon: 'firestaff', speed: 240 } : {};
+        game.npcShoot(npc, ang, shot);
       }
       return;
+    }
+    // дух-заступник в мирную минуту штопает раненых
+    if (npc.holySpirit) {
+      npc.healT = (npc.healT ?? 1) - dt;
+      if (npc.healT <= 0) {
+        npc.healT = 2;
+        let worst = null, wf = 1;
+        for (const q of game.players.values()) {
+          if (q.dead || q.mapId !== npc.mapId) continue;
+          if (dist2(npc.x, npc.y, q.x, q.y) > 130 * 130) continue;
+          const f = q.hp / q.maxHp;
+          if (f < wf) { wf = f; worst = q; }
+        }
+        if (worst && wf < 1) {
+          worst.hp = Math.min(worst.maxHp, worst.hp + 1);
+          game.fx({ t: 'heal', pid: worst.id, x: worst.x, y: worst.y }, npc.mapId, worst.x, worst.y);
+          game.fx({ t: 'chain', pts: [[npc.x, npc.y - 6], [worst.x, worst.y]] }, npc.mapId, npc.x, npc.y);
+        }
+      }
     }
     const od = dist2(npc.x, npc.y, owner.x, owner.y);
     if (od > 160 * 160) { npc.x = owner.x + 14; npc.y = owner.y; } // отстал/застрял — догоняет бегом
