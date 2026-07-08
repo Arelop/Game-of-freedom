@@ -11,24 +11,34 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'Generated arts for rpg');
 const OUT = join(ROOT, 'assets', 'raw', 'ai');
 
-// имя файла ChatGPT -> спрайт (строка = 16x16; объект задаёт размер)
+// имя файла ChatGPT -> спрайт (строка = 16x16; объект задаёт размер).
+// Стиль v2 (14_0x): чистые крупные пиксели — уменьшаются без каши.
 const MAP = {
-  'ChatGPT Image 8 июл. 2026 г., 04_33_19 (1).png': 'npc_captain',
-  'ChatGPT Image 8 июл. 2026 г., 04_33_19 (2).png': 'npc_arena',
-  'ChatGPT Image 8 июл. 2026 г., 04_33_19 (3).png': 'npc_elder2',
-  'ChatGPT Image 8 июл. 2026 г., 04_33_20 (4).png': 'npc_smith',
-  'ChatGPT Image 8 июл. 2026 г., 04_36_03 (1).png': 'npc_villager_sev',
-  'ChatGPT Image 8 июл. 2026 г., 04_36_04 (2).png': 'npc_guard_sev',
-  'ChatGPT Image 8 июл. 2026 г., 04_36_04 (3).png': 'npc_merchant_sev',
-  'ChatGPT Image 8 июл. 2026 г., 04_38_23 (1).png': 'npc_villager_oz',
-  'ChatGPT Image 8 июл. 2026 г., 04_38_23 (2).png': 'npc_guard_oz',
-  'ChatGPT Image 8 июл. 2026 г., 04_38_23 (3).png': 'npc_merchant_oz',
-  'ChatGPT Image 8 июл. 2026 г., 04_40_28 (1).png': { name: 'obj_tower', w: 16, h: 32 },
+  // из первой партии оставлены только удачные (детализованные не пережили 16px)
   'ChatGPT Image 8 июл. 2026 г., 04_40_29 (2).png': 'obj_yurt',
-  'ChatGPT Image 8 июл. 2026 г., 04_40_29 (3).png': 'tile_wall_log',
-  'ChatGPT Image 8 июл. 2026 г., 04_40_29 (4).png': 'tile_pier',
   'ChatGPT Image 8 июл. 2026 г., 04_41_50 (1).png': { name: 'enemy_ash_lord', w: 24, h: 24 },
   'ChatGPT Image 8 июл. 2026 г., 04_41_50 (2).png': 'obj_darkheart',
+  // ═══ зеленокожие враги ═══
+  'ChatGPT Image 8 июл. 2026 г., 14_04_59 (1).png': 'enemy_goblin',
+  'ChatGPT Image 8 июл. 2026 г., 14_05_00 (2).png': 'enemy_hobgoblin',
+  'ChatGPT Image 8 июл. 2026 г., 14_05_00 (3).png': 'enemy_orc_warrior',
+  'ChatGPT Image 8 июл. 2026 г., 14_05_00 (4).png': 'enemy_demonologist',
+  'ChatGPT Image 8 июл. 2026 г., 14_05_01 (5).png': 'enemy_gnoll',
+  'ChatGPT Image 8 июл. 2026 г., 14_05_01 (6).png': 'enemy_orc_knight',
+  'ChatGPT Image 8 июл. 2026 г., 14_05_02 (7).png': 'enemy_shieldbearer',
+  'ChatGPT Image 8 июл. 2026 г., 14_05_02 (8).png': 'enemy_orc_warlord',
+  'ChatGPT Image 8 июл. 2026 г., 14_05_03 (10).png': 'enemy_orc_priest',
+  'ChatGPT Image 8 июл. 2026 г., 14_05_03 (9).png': { name: 'enemy_ogre', w: 18, h: 18 },
+  // ═══ жители ═══
+  'ChatGPT Image 8 июл. 2026 г., 14_07_16 (1).png': 'npc_villager_sev',
+  'ChatGPT Image 8 июл. 2026 г., 14_07_16 (2).png': 'npc_elder2',
+  'ChatGPT Image 8 июл. 2026 г., 14_07_16 (3).png': 'npc_smith',
+  'ChatGPT Image 8 июл. 2026 г., 14_07_16 (4).png': 'npc_merchant_sev',
+  'ChatGPT Image 8 июл. 2026 г., 14_07_16 (5).png': 'npc_villager_oz',
+  'ChatGPT Image 8 июл. 2026 г., 14_07_16 (6).png': 'npc_merchant_oz',
+  'ChatGPT Image 8 июл. 2026 г., 14_07_17 (7).png': 'npc_widow',
+  'ChatGPT Image 8 июл. 2026 г., 14_07_17 (8).png': 'npc_innkeeper',
+  'ChatGPT Image 8 июл. 2026 г., 14_08_55.png': { name: 'obj_tower', w: 16, h: 32 },
 };
 
 function isMagenta(r, g, b) { return r > 160 && b > 160 && g < Math.min(r, b) - 60; }

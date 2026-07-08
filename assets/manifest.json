@@ -211,16 +211,13 @@
       "file": "assets/raw/ai/obj_darkheart.png"
     },
     "enemy_shieldbearer": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/blork_the_orc.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_shieldbearer.png"
     },
     "enemy_orc_priest": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/orc_priest.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_orc_priest.png"
     },
     "enemy_demonologist": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/kobold_demonologist.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_demonologist.png"
     },
     "enemy_spore": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/fungi_plants/giant_spore.png",
@@ -264,40 +261,33 @@
       "down": 2
     },
     "enemy_goblin": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/goblin.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_goblin.png"
     },
     "enemy_hobgoblin": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/hobgoblin.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_hobgoblin.png"
     },
     "enemy_gnoll": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/gnoll.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_gnoll.png"
     },
     "enemy_orc_warrior": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/orc_warrior.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_orc_warrior.png"
     },
     "enemy_ghoul": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/undead/ghoul.png",
       "down": 2
     },
     "enemy_orc_knight": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/orc_knight.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_orc_knight.png"
     },
     "enemy_ogre": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/ogre.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_ogre.png"
     },
     "enemy_minotaur": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/minotaur.png",
       "down": 2
     },
     "enemy_orc_warlord": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/orc_warlord.png",
-      "down": 2
+      "file": "assets/raw/ai/enemy_orc_warlord.png"
     },
     "wpn_mace": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/weapon/mace1.png"
@@ -697,9 +687,7 @@
       "ty": 8
     },
     "npc_innkeeper": {
-      "pack": "d",
-      "tx": 2,
-      "ty": 7
+      "file": "assets/raw/ai/npc_innkeeper.png"
     },
     "npc_hunter": {
       "pack": "d",
@@ -1294,7 +1282,8 @@
       "file": "assets/raw/ai/npc_villager_sev.png"
     },
     "npc_guard_sev": {
-      "file": "assets/raw/ai/npc_guard_sev.png"
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/dwarf.png",
+      "down": 2
     },
     "npc_merchant_sev": {
       "file": "assets/raw/ai/npc_merchant_sev.png"
@@ -1303,7 +1292,8 @@
       "file": "assets/raw/ai/npc_villager_oz.png"
     },
     "npc_guard_oz": {
-      "file": "assets/raw/ai/npc_guard_oz.png"
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/merfolk_impaler.png",
+      "down": 2
     },
     "npc_merchant_oz": {
       "file": "assets/raw/ai/npc_merchant_oz.png"
@@ -1321,7 +1311,9 @@
       "down": 2
     },
     "tile_wall_log": {
-      "file": "assets/raw/ai/tile_wall_log.png"
+      "pack": "t",
+      "tx": 1,
+      "ty": 6
     },
     "tile_wall_stone2": {
       "pack": "t",
@@ -1344,14 +1336,15 @@
       "down": 2
     },
     "npc_captain": {
-      "file": "assets/raw/ai/npc_captain.png"
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/maud.png",
+      "down": 2
     },
     "npc_arena": {
-      "file": "assets/raw/ai/npc_arena.png"
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/norris.png",
+      "down": 2
     },
     "npc_widow": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/unique/erica.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_widow.png"
     },
     "npc_elder2": {
       "file": "assets/raw/ai/npc_elder2.png"
@@ -1365,7 +1358,9 @@
       "down": 2
     },
     "tile_pier": {
-      "file": "assets/raw/ai/tile_pier.png"
+      "pack": "d",
+      "tx": 1,
+      "ty": 4
     }
   }
 }
