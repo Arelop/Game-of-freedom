@@ -63,7 +63,10 @@ export class Admin {
       entities: g.entities.size, tokens: g.abstract.tokens.length,
       event: w.event ? { type: w.event.type, t: Math.round(w.event.t) } : null,
       arena: { active: w.arena ? { wave: w.arena.wave, fighters: w.arena.lastName } : null, record: w.arenaRecord },
-      dark: w.citadel ? { power: Math.round(w.citadel.power), forts: w.citadel.forts.length, dead: w.citadel.dead, owned: w.citadel.owned } : null,
+      dark: w.citadel ? { power: Math.round(w.citadel.power), forts: w.citadel.forts.length, dead: w.citadel.dead, owned: w.citadel.owned,
+        ziggurats: (w.citadel.ziggurats || []).length } : null,
+      sieges: w.settlements.filter(s => s.siege).map(s =>
+        ({ name: s.name, wave: s.siege.wave, waves: s.siege.waves, faction: s.siege.faction })),
       daily: w.daily ? { name: w.daily.name } : null,
       players: [...g.players.values()].map(p => ({
         id: p.id, name: p.name, cls: p.cls, level: p.level,
@@ -71,9 +74,12 @@ export class Admin {
         x: Math.round(p.x / TILE), y: Math.round(p.y / TILE),
         dead: !!p.dead, bounty: p.bounty || 0, ascended: !!p.ascended,
       })),
-      settlements: w.settlements.map(s => ({
-        name: s.name, faction: s.faction, population: s.population,
+      settlements: w.settlements.map((s, i) => ({
+        sid: s.id ?? i, name: s.name, faction: s.faction, population: s.population,
         prosperity: Math.round(s.prosperity), food: Math.round(s.food),
+        guards: s.guards || 0,
+        garrison: s.garrison ? `${s.garrison.militia || 0}/${s.garrison.archer || 0}/${s.garrison.veteran || 0}` : '—',
+        siege: s.siege ? `${s.siege.wave}/${s.siege.waves}` : null,
         status: s.ruined ? 'руины' : s.captured ? (s.faction === 'darkness' ? 'форт Тьмы' : 'захвачена') : 'живёт',
       })),
     };
@@ -164,6 +170,54 @@ export class Admin {
         g.toastAll(`📣 ${text}`, true);
         g.events.push(g.world.day, `Глас небес: ${text}`);
         return { ok: true };
+      }
+      // ---------- война и Тьма (тест новых механик) ----------
+      case 'darkpower': { // задать мощь Тьмы (питает рейды/зиккураты)
+        const c = g.world.citadel;
+        if (!c) return { error: 'Цитадели нет' };
+        c.power = Math.max(0, Math.min(200, +m.value || 0));
+        c.dead = false;
+        chronicle(`задала мощь Тьмы: ${Math.round(c.power)}`);
+        return { ok: true, power: Math.round(c.power) };
+      }
+      case 'ziggurat': { // форсировать постройку зиккурата
+        const c = g.world.citadel;
+        if (!c) return { error: 'Цитадели нет' };
+        c.power = Math.max(c.power, 45); c.zigCd = 0; c.dead = false;
+        const before = (c.ziggurats || []).length;
+        g.civ.buildZigguratMaybe(c);
+        if ((c.ziggurats || []).length <= before) return { error: 'не удалось поставить (лимит/нет места)' };
+        chronicle('воздвигла зиккурат Тьмы');
+        return { ok: true, ziggurats: c.ziggurats.length };
+      }
+      case 'cleanse': { // снять всю порчу и убрать зиккураты
+        g.civ.cleanseAllTaint();
+        chronicle('очистила порчу зиккуратов');
+        return { ok: true };
+      }
+      case 'siege': { // форсировать живую осаду деревни (у которой стоит игрок)
+        let s = null;
+        if (m.sid != null) s = g.world.settlements.find(x => (x.id ?? -1) === m.sid) || g.world.settlements[+m.sid];
+        else if (p) { // ближняя к игроку живая деревня
+          let bd = Infinity;
+          for (const x of g.world.settlements) {
+            if (x.ruined || x.captured || x.siege) continue;
+            const d = (x.x * TILE - p.x) ** 2 + (x.y * TILE - p.y) ** 2;
+            if (d < bd) { bd = d; s = x; }
+          }
+        }
+        if (!s) return { error: 'деревня не найдена (встань в живую деревню или выбери её)' };
+        if (s.ruined || s.captured) return { error: 'эта деревня уже пала' };
+        if (s.siege) return { error: 'уже в осаде' };
+        const tok = {
+          id: 'tok' + g.abstract.nextId++, type: 'pack', faction: 'darkness',
+          units: ['darkSoldier', 'darkSoldier', 'darkArcher', 'darkKnight'],
+          x: s.x * TILE, y: s.y * TILE, hydrated: null,
+        };
+        g.abstract.tokens.push(tok);
+        g.startSiege(s, tok);
+        chronicle(`наслала осаду на ${s.name}`);
+        return { ok: true, name: s.name };
       }
       default: return { error: 'неизвестное действие' };
     }

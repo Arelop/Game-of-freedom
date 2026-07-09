@@ -82,15 +82,32 @@
       </div>
     </div>
 
-    <div class="panel blue">
-      <h2>🛡 Игроки</h2>
-      <table id="players"></table>
-      <div class="hint">🎁 — выдать: «coins», «bandage», «sword@e», «war_helm@e»…</div>
+    <div class="panel red">
+      <h2>⚔ Война и Тьма</h2>
+      <div id="war"></div>
+      <div class="btnrow">
+        <button onclick="act({type:'ziggurat'})">⛧ Воздвигнуть зиккурат</button>
+        <button class="danger" onclick="act({type:'cleanse'})">✦ Очистить порчу</button>
+      </div>
+      <div class="btnrow">
+        <span style="font-size:11px;color:#847e87;align-self:center">Мощь Тьмы:</span>
+        <input id="dpow" type="number" min="0" max="200" value="60" style="width:70px">
+        <button onclick="act({type:'darkpower',value:+dpow.value})">Задать</button>
+      </div>
+      <div class="hint">Осаду насылай кнопкой ⚔ в строке игрока — она ударит по
+        деревне, в которой он стоит (нужен игрок рядом, чтобы штурм волнами пошёл).</div>
     </div>
 
-    <div class="panel green">
+    <div class="panel blue" style="grid-column: 1 / -1;">
+      <h2>🛡 Игроки</h2>
+      <div style="overflow-x:auto"><table id="players"></table></div>
+      <div class="hint">🎁 — выдать: «coins», «bandage», «sword@e», «war_helm@e»… · ⚔ — наслать осаду на деревню игрока</div>
+    </div>
+
+    <div class="panel green" style="grid-column: 1 / -1;">
       <h2>🏘 Поселения</h2>
-      <table id="setts"></table>
+      <div style="overflow-x:auto"><table id="setts"></table></div>
+      <div class="hint">Гарнизон — ополченцы / лучники / латники</div>
     </div>
 
     <div class="panel red">
@@ -150,7 +167,7 @@ function giveDlg(pid, name) {
   act({ type: 'give', pid, item: item.trim(), count });
 }
 
-const CLS = { warrior: '⚔ Воин', mage: '✦ Маг', rogue: '🏹 Вор', priest: '☀ Жрец' };
+const CLS = { warrior: '⚔ Воин', mage: '✦ Маг', rogue: '🏹 Вор', priest: '☀ Жрец', necromancer: '💀 Некромант' };
 const WT = { clear: 'ясно', rain: '🌧 дождь', snow: '❄ снег' };
 const EV = { bloodMoon: '🌕 Кровавая луна', rift: '⛧ разлом', meteor: '☄ метеорит', trader: '🧳 торговец', hunt: '🐺 именной зверь', cult: '🕯 культ' };
 
@@ -159,14 +176,22 @@ async function refresh() {
   try { s = await fetch(api('status')).then(x => x.json()); } catch { $('topline').textContent = '⚠ сервер недоступен'; return; }
   if (s.error) { localStorage.removeItem('adminKey'); $('main').style.display = 'none'; $('keybox').style.display = 'block'; return; }
   const h = Math.floor(s.time * 24), mnt = Math.floor((s.time * 24 % 1) * 60);
-  $('topline').textContent = `день ${s.day} · ${String(h).padStart(2, '0')}:${String(mnt).padStart(2, '0')} · тик ${s.tickMs.toFixed(1)} мс · сущностей ${s.entities} · отрядов ${s.tokens}`;
+  const nSieges = (s.sieges || []).length;
+  $('topline').textContent = `день ${s.day} · ${String(h).padStart(2, '0')}:${String(mnt).padStart(2, '0')} · тик ${s.tickMs.toFixed(1)} мс · сущностей ${s.entities} · отрядов ${s.tokens}${nSieges ? ' · ОСАД ' + nSieges : ''}`;
   $('world').innerHTML =
     kv('Погода', WT[s.weather] || s.weather) +
     kv('Событие', s.event ? `${EV[s.event.type] || s.event.type} (${s.event.t}с)` : '—') +
     kv('Задание дня', s.daily ? s.daily.name : '—') +
-    (s.dark ? kv('Мощь Тьмы', `${s.dark.power}${s.dark.dead ? ' · повержена' : s.dark.owned ? ' · подчинена' : ''} · фортов ${s.dark.forts}`) : '') +
     kv('Арена', s.arena.active ? `волна ${s.arena.active.wave} (${esc(s.arena.active.fighters || '')})` :
       s.arena.record ? `рекорд ${s.arena.record.wave} (${esc(s.arena.record.name)})` : 'пусто');
+  // панель войны с Тьмой
+  const d = s.dark;
+  $('war').innerHTML = d
+    ? kv('Мощь Тьмы', `${d.power}${d.dead ? ' · повержена' : d.owned ? ' · подчинена' : ''}`) +
+      kv('Форты Тьмы', d.forts) +
+      kv('Зиккуратов', d.ziggurats || 0) +
+      kv('Активных осад', nSieges + (nSieges ? ' — ' + s.sieges.map(g => `${esc(g.name)} (${g.wave}/${g.waves})`).join(', ') : ''))
+    : '<div class="kv"><span>Цитадели нет</span><b>—</b></div>';
   $('players').innerHTML = '<tr><th>Имя</th><th>Кл.</th><th>Ур.</th><th>HP</th><th>Мон.</th><th>Где</th><th></th></tr>' +
     (s.players.length ? s.players.map(p => `<tr>
       <td>${esc(p.name)}${p.ascended ? ' 👑' : ''}${p.bounty ? ' 💀' + p.bounty : ''}${p.dead ? ' ☠' : ''}</td>
@@ -178,11 +203,14 @@ async function refresh() {
         <button title="исцелить" onclick="act({type:'heal',pid:${p.id}})">✨</button>
         <button title="выдать" onclick="giveDlg(${p.id},'${esc(p.name)}')">🎁</button>
         <button title="в деревню" onclick="act({type:'tp',pid:${p.id}})">🏘</button>
+        <button title="наслать осаду на деревню игрока" onclick="act({type:'siege',pid:${p.id}})">⚔</button>
         <button title="кикнуть" class="danger" onclick="if(confirm('Кикнуть ${esc(p.name)}?'))act({type:'kick',pid:${p.id}})">✖</button>
       </td></tr>`).join('') : '<tr><td colspan="7" style="color:#696a6a">никого нет</td></tr>');
-  $('setts').innerHTML = '<tr><th>Деревня</th><th>Фракция</th><th>Жителей</th><th>Еда</th><th>Статус</th></tr>' +
+  $('setts').innerHTML = '<tr><th>Деревня</th><th>Фракция</th><th>Жит.</th><th>Еда</th><th>Гарнизон</th><th>Статус</th><th></th></tr>' +
     s.settlements.map(t => `<tr><td>${esc(t.name)}</td><td>${t.faction}</td><td>${t.population}</td><td>${t.food}</td>
-      <td class="${t.status === 'живёт' ? 'stset' : t.status === 'руины' ? 'struin' : t.status === 'форт Тьмы' ? 'stdark' : 'stcap'}">${t.status}</td></tr>`).join('');
+      <td title="ополченцы/лучники/латники">${t.garrison}${t.guards ? ' (' + t.guards + ')' : ''}</td>
+      <td class="${t.status === 'живёт' ? 'stset' : t.status === 'руины' ? 'struin' : t.status === 'форт Тьмы' ? 'stdark' : 'stcap'}">${t.siege ? '⚔ осада ' + t.siege : t.status}</td>
+      <td>${t.status === 'живёт' && !t.siege ? `<button title="осадить" onclick="act({type:'siege',sid:${JSON.stringify(t.sid)}})">⚔</button>` : ''}</td></tr>`).join('');
 }
 
 async function refreshLog() {
