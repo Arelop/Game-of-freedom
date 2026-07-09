@@ -43,6 +43,23 @@ const MAP = {
   'Thief.png': 'player_rogue',
   'Priest.png': 'player_priest',
   'Necromancer.png': 'player_necromancer',
+  // ═══ Армия Тьмы (партия 15:48) ═══
+  'ChatGPT Image 9 июл. 2026 г., 15_48_23 (1).png': 'enemy_dark_soldier',
+  'ChatGPT Image 9 июл. 2026 г., 15_48_23 (2).png': 'enemy_dark_knight',
+  'ChatGPT Image 9 июл. 2026 г., 15_48_23 (3).png': 'enemy_dark_archer',
+  'ChatGPT Image 9 июл. 2026 г., 15_48_23 (4).png': 'enemy_dark_mage',      // чернокнижник
+  'ChatGPT Image 9 июл. 2026 г., 15_48_23 (5).png': { name: 'enemy_dark_lord', w: 20, h: 20 },
+  'ChatGPT Image 9 июл. 2026 г., 15_48_23 (6).png': 'enemy_dark_soldier2',  // тёмный секирщик (резерв)
+  // ═══ городские юниты гарнизона (партия 16:04): фракция × архетип ═══
+  'ChatGPT Image 9 июл. 2026 г., 16_03_58 (1).png': 'npc_sev_veteran',   // северный латник (крестовый шлем)
+  'ChatGPT Image 9 июл. 2026 г., 16_03_58 (2).png': 'npc_sev_militia',   // северный ополченец (двойные топоры)
+  'ChatGPT Image 9 июл. 2026 г., 16_03_59 (3).png': 'npc_battlemage',    // ледяной боевой маг (резерв)
+  'ChatGPT Image 9 июл. 2026 г., 16_03_59 (4).png': 'npc_step_veteran',  // степной копейщик
+  'ChatGPT Image 9 июл. 2026 г., 16_04_00 (5).png': 'npc_step_militia',  // степной ополченец (две сабли)
+  'ChatGPT Image 9 июл. 2026 г., 16_04_00 (6).png': 'npc_guard_archer',  // лучник (общий для фракций)
+  'ChatGPT Image 9 июл. 2026 г., 16_04_00 (7).png': 'npc_oz_veteran',    // озёрный латник (тризубец)
+  'ChatGPT Image 9 июл. 2026 г., 16_04_01 (8).png': 'npc_wizard',        // синий маг (апгрейд арта NPC)
+  'ChatGPT Image 9 июл. 2026 г., 16_04_01 (9).png': 'npc_oz_militia',    // озёрный копейщик
   // ═══ монстры ═══
   'ChatGPT Image 8 июл. 2026 г., 16_59_45 (1).png': 'enemy_skeleton',
   'ChatGPT Image 8 июл. 2026 г., 16_59_45 (2).png': 'enemy_wolf',

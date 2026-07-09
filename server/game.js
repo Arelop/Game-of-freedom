@@ -44,6 +44,13 @@ const FACTION_KINDS = {
   ozerny: { villager: 'npc_villager_oz', guard: 'npc_guard_oz', merchant: 'npc_merchant_oz' },
   stepnyaki: { villager: 'npc_villager_step', guard: 'npc_guard_step', merchant: 'npc_merchant_step' },
 };
+// Спрайты городских юнитов по фракции и архетипу (ИИ-арты игрока).
+// Лучник — общий; милиция/латник — свои у каждого народа.
+const FACTION_UNIT_SPRITES = {
+  severane: { militia: 'npc_sev_militia', archer: 'npc_guard_archer', veteran: 'npc_sev_veteran' },
+  ozerny: { militia: 'npc_oz_militia', archer: 'npc_guard_archer', veteran: 'npc_oz_veteran' },
+  stepnyaki: { militia: 'npc_step_militia', archer: 'npc_guard_archer', veteran: 'npc_step_veteran' },
+};
 
 // звери степной охоты: за них Степняки уважают (каждый четвёртый — +1 реп)
 const BEAST_KINDS = new Set(['wolf', 'bear', 'boar', 'spider', 'warg', 'slime']);
@@ -1489,10 +1496,11 @@ export class Game {
     veteran: { hp: 20, dmg: 5, melee: true },   // латник: танк
   };
 
-  // Заспавнить стража-NPC заданного архетипа со статами и фракц. спрайтом
+  // Заспавнить стража-NPC заданного архетипа со статами и спрайтом фракции+типа
   spawnGuardUnit(s, unit, x, y) {
     const fk = FACTION_KINDS[s.faction] || {};
-    const id = this.spawnNpc('guard', s.id, 'over', x, y, fk.guard ? { kind: fk.guard } : {});
+    const kind = FACTION_UNIT_SPRITES[s.faction]?.[unit] || fk.guard;
+    const id = this.spawnNpc('guard', s.id, 'over', x, y, kind ? { kind } : {});
     const g = this.entities.get(id);
     const prof = this.GUARD_UNITS[unit] || this.GUARD_UNITS.militia;
     g.unit = unit; g.hp = g.maxHp = prof.hp; g.dmg = prof.dmg; g.melee = prof.melee;
