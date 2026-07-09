@@ -231,6 +231,11 @@ export class Net {
         mq: p.story.mq < 10 ? { c: p.story.mq, t: game.mqObjective(p), ...(game.mqTarget(p) || {}) } : undefined,
       },
       ents,
+      // активные осады и зиккураты (для HUD и маркеров карты) — только на 'over'
+      sieges: p.mapId === 'over' ? game.world.settlements.filter(s => s.siege).map(s =>
+        ({ x: s.x, y: s.y, name: s.name, w: s.siege.wave, wm: s.siege.waves })) : undefined,
+      zigs: p.mapId === 'over' && game.world.citadel?.ziggurats?.length
+        ? game.world.citadel.ziggurats.map(z => ({ x: z.x, y: z.y })) : undefined,
     };
   }
 }

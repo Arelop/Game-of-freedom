@@ -74,10 +74,13 @@ export const T = {
   PIER: 63,          // причальные мостки над водой (проходимы)
   TOWN_PORTAL: 64,   // портальный камень: сеть телепортов между деревнями
   ICE_WALL: 65,      // ледяная стена мага: временная преграда, тает сама
+  // Наступление Тьмы: порча земли и зиккураты
+  TAINT: 66,         // осквернённая земля вокруг зиккурата (проходима)
+  ZIGGURAT: 67,      // ядро зиккурата Тьмы: разрушаемо, снимает порчу
 };
 
 // Реквизит подземелий: бьётся ЛЮБЫМ оружием, не только с structDmg
-export const PROP_TILES = new Set([T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL]);
+export const PROP_TILES = new Set([T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL, T.ZIGGURAT]);
 
 // Разрушаемые тайлы: прочность, во что превращаются, дроп.
 export const DESTRUCTIBLE = {
@@ -110,6 +113,9 @@ export const DESTRUCTIBLE = {
   [T.WALL_STONE2]: { hp: 15, becomes: T.RUBBLE, drops: { metal: 0.3 } },
   [T.WALL_CLAY]: { hp: 10, becomes: T.RUBBLE, drops: {} },
   [T.YURT]: { hp: 8, becomes: T.GRASS, drops: { wood: 0.5 } },
+  // ядро зиккурата Тьмы: крепкое, но бьётся любым оружием (в PROP_TILES);
+  // разрушение обрабатывается спецветкой damageTile (снимает порчу)
+  [T.ZIGGURAT]: { hp: 80, becomes: T.RUBBLE, drops: { crystal: 2 } },
 };
 
 // Сезоны: 3 игровых дня каждый. Влияют на урожай и агрессию монстров.
@@ -127,6 +133,7 @@ export const SOLID = new Set([
   T.LOCKED_DOOR, T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
   T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL, T.PLAQUE,
   T.WALL_LOG, T.WALL_STONE2, T.WALL_CLAY, T.YURT, T.TOWN_PORTAL, T.ICE_WALL,
+  T.ZIGGURAT,
 ]);
 // Блокирует пули (стены — да, вода — нет)
 export const BULLET_SOLID = new Set([
@@ -135,4 +142,5 @@ export const BULLET_SOLID = new Set([
   T.OBSIDIAN, T.BURNT_TREE, T.EMBER, T.PORTAL,
   T.BARREL, T.CRATE, T.SACK, T.BARREL_FIRE, T.CRACKED_WALL, T.PLAQUE,
   T.WALL_LOG, T.WALL_STONE2, T.WALL_CLAY, T.YURT, T.TOWN_PORTAL, T.ICE_WALL,
+  T.ZIGGURAT,
 ]);

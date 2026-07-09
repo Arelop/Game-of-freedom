@@ -150,6 +150,8 @@ export class Net {
 
   onSnapshot(snap) {
     this.you = snap.you;
+    this.sieges = snap.sieges || null; // активные осады (HUD + маркеры)
+    this.zigs = snap.zigs || null;     // зиккураты Тьмы (маркеры карты)
     this.worldTime = snap.time; this.day = snap.day;
     // статы от экипировки/бафов — в предсказание
     this.pred.speedMult = snap.you.sm || 1;

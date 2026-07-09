@@ -123,7 +123,8 @@ export function makeWorld(seed) {
       wood: randInt(rand, 4, 10),
       metal: randInt(rand, 2, 6),
       crystal: randInt(rand, 0, 2),
-      guards: 2, towers: 0, fields: 1, mines: 0, shrines: 0,
+      guards: 2, garrison: { militia: 2, archer: 0, veteran: 0 }, // 3 архетипа стражи
+      towers: 0, fields: 1, mines: 0, shrines: 0,
       housingCap: 0,        // заполнит stampSettlement по числу домов
       forestRich: Math.min(4, 1 + Math.floor(forest / 5)),
       rockRich: Math.min(3, Math.floor(rock / 4)),        // руда: только у скал
@@ -249,6 +250,9 @@ export function makeWorld(seed) {
     x: cSite.x, y: cSite.y, name: 'Чернокаменная Цитадель',
     power: 8,        // мощь Тьмы: растёт каждый цив-тик, питает рейды
     forts: [],       // id захваченных деревень — форты Тьмы
+    ziggurats: [],   // возведённые зиккураты { id, x, y, taintR, taintMax }
+    zigCd: 0,        // кулдаун постройки зиккурата (цив-тики)
+    nextZig: 1,      // счётчик id зиккуратов
   };
   stampCitadel(world, cSite);
 

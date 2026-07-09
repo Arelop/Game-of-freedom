@@ -26,7 +26,7 @@ export function saveWorld(game) {
       settlements: w.settlements.map(s => ({
         id: s.id, population: s.population, prosperity: s.prosperity, food: s.food,
         wood: s.wood, metal: s.metal, crystal: s.crystal,
-        guards: s.guards, towers: s.towers, fields: s.fields,
+        guards: s.guards, garrison: s.garrison, towers: s.towers, fields: s.fields,
         mines: s.mines, shrines: s.shrines, wardT: s.wardT,
         housingCap: s.housingCap, project: s.project,
         captured: s.captured, ruined: s.ruined, faction: s.faction,
@@ -35,7 +35,8 @@ export function saveWorld(game) {
       pois: w.pois.map(o => ({ id: o.id, cleared: o.cleared, pressed: o.pressed, looted: o.looted })),
       wildChests: w.wildChests || [],
       citadel: w.citadel
-        ? { power: w.citadel.power, forts: w.citadel.forts, weakened: w.citadel.weakened, dead: w.citadel.dead, owned: w.citadel.owned }
+        ? { power: w.citadel.power, forts: w.citadel.forts, weakened: w.citadel.weakened, dead: w.citadel.dead, owned: w.citadel.owned,
+            ziggurats: w.citadel.ziggurats || [], zigCd: w.citadel.zigCd || 0, nextZig: w.citadel.nextZig || 1 }
         : null,
       war: w.war ? { stage: w.war.stage } : null,
       stash: w.stash || {},
@@ -122,6 +123,10 @@ export function applyWorldData(game, data) {
       w.citadel.weakened = data.citadel.weakened || false;
       w.citadel.dead = data.citadel.dead || false;
       w.citadel.owned = data.citadel.owned || false;
+      // зиккураты: guardIds эфемерны — обнуляем (застава пересоздастся при подходе)
+      w.citadel.ziggurats = (data.citadel.ziggurats || []).map(z => ({ ...z, guardIds: null }));
+      w.citadel.zigCd = data.citadel.zigCd || 0;
+      w.citadel.nextZig = data.citadel.nextZig || 1;
     }
     if (data.banditsWeakT) w.banditsWeakT = data.banditsWeakT;
     if (data.smithBoon) w.smithBoon = true;

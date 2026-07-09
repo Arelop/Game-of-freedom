@@ -59,6 +59,16 @@ export class AbstractSim {
     this.timer = 0;
   }
 
+  // Насколько сильно порча зиккуратов давит на оборону деревни (для осадной математики)
+  taintNear(s) {
+    const c = this.game.world.citadel;
+    if (!c?.ziggurats?.length) return 0;
+    let t = 0;
+    for (const z of c.ziggurats)
+      if ((s.x - z.x) ** 2 + (s.y - z.y) ** 2 < (z.taintR + 6) ** 2) t += 4;
+    return t;
+  }
+
   // Демоны из тёмных/провальных ритуалов: сильная стая у точки (в тайлах)
   spawnDemonPack(tx, ty) {
     this.tokens.push({
@@ -90,6 +100,7 @@ export class AbstractSim {
 
     for (const tok of this.tokens) {
       if (tok.hydrated) continue;
+      if (tok.besieging) continue; // осадное войско стоит лагерем — им правит stepSieges
       // блуждание / движение к цели
       if (tok.type === 'caravan' && tok.target) {
         const s = world.settlements.find(x => x.id === tok.target);
@@ -194,7 +205,12 @@ export class AbstractSim {
         const s = world.settlements.find(s => !s.ruined && !s.captured &&
           (s.x * TILE - tok.x) ** 2 + (s.y * TILE - tok.y) ** 2 < (TILE * 30) ** 2);
         if (s) {
-          const defense = s.guards * 2 + s.towers * 3 + (s.wardT > 0 ? 6 : 0) + (s.spiritT > 0 ? 5 : 0);
+          // если рядом есть игрок и это войско Тьмы/бандитов — не решаем числом,
+          // а начинаем ЖИВУЮ ОСАДУ волнами (герои могут отбить)
+          if ((dark || tok.faction === 'bandits') && !s.siege && this.game.trySiege(s, tok)) continue;
+          // порча вокруг зиккуратов ослабляет оборону
+          const taintNear = this.taintNear(s);
+          const defense = Math.max(1, s.guards * 2 + s.towers * 3 + (s.wardT > 0 ? 6 : 0) + (s.spiritT > 0 ? 5 : 0) - taintNear);
           // элита Тьмы и громилы бьют сильнее рядовых
           const elite = tok.units.filter(u => u === 'banditHeavy' || u === 'darkKnight' || u === 'darkMage').length;
           const strength = tok.units.length * 2 + elite * 2;

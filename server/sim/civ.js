@@ -2,8 +2,9 @@
 // кристаллы), растут, строят дома/поля/башни/шахты/святилища, нанимают
 // стражу за металл, проводят магические ритуалы, голодают и вымирают.
 // Все значимые исходы идут в журнал событий и тостами игрокам поблизости.
-import { TILE, CHUNK, SEASONS, seasonOf, SEASON_HARVEST } from '../../shared/constants.js';
-import { findBuildSite, buildHouse, buildField, buildTower, buildMine, buildShrine, buildPortal } from '../world/structures.js';
+import { T, TILE, CHUNK, SEASONS, seasonOf, SEASON_HARVEST } from '../../shared/constants.js';
+import { findBuildSite, buildHouse, buildField, buildTower, buildMine, buildShrine, buildPortal, buildZiggurat } from '../world/structures.js';
+import { baseTile } from '../world/worldgen.js';
 import { RELATIONS, FACTIONS } from './factions.js';
 import { DARK_KINDS } from '../../shared/enemies.js';
 import { pick } from '../../shared/rng.js';
@@ -52,9 +53,17 @@ export class CivSim {
     const c = g.world.citadel;
     if (!c) return;
     g.warUpkeep(); // страховка реликвий/Сердца кампании
-    if (c.dead) return; // Тьма повержена в Войне — Цитадель мертва
-    c.power = Math.min(200, c.power + 0.05 + c.forts.length * 0.05);
+    if (c.dead) { this.cleanseAllTaint(); return; } // Тьма повержена — порча спадает
+    // мощь растёт от фортов И зиккуратов (зиккурат — двигатель экспансии)
+    c.ziggurats = c.ziggurats || [];
+    c.power = Math.min(200, c.power + 0.05 + c.forts.length * 0.05 + c.ziggurats.length * 0.08);
     if (c.raidCd > 0) c.raidCd--;
+    if (c.zigCd > 0) c.zigCd--;
+
+    // --- Тьма возводит зиккурат в глуши: форпост порчи ---
+    this.buildZigguratMaybe(c);
+    // --- порча расползается вокруг каждого зиккурата ---
+    this.spreadTaint(c);
 
     // гарнизон Цитадели: Лорд Тьмы и элита всегда на месте
     // (после великого ритуала — ослабленный состав)
@@ -104,6 +113,94 @@ export class CivSim {
     });
     g.events.push(g.world.day, `⛧ Войско Тьмы выступило из ${src.name || 'Цитадели'} к ${target.name}!`, { x: src.x, y: src.y });
     g.toastAll(`⛧ Войско Тьмы идёт к ${target.name}!`, true); // война — всплывает
+  }
+
+  // Тьма при достатке мощи возводит зиккурат в глуши — форпост порчи.
+  // Лимит небольшой (мир оттесняем): не больше min(3, 1+фортов).
+  buildZigguratMaybe(c) {
+    const g = this.game;
+    if (c.zigCd > 0 || c.power < 40) return;
+    const cap = Math.min(3, 1 + c.forts.length);
+    if (c.ziggurats.length >= cap) return;
+    // цель: ближняя живая деревня; ставим на полпути от Цитадели/форта к ней
+    const targets = g.world.settlements.filter(s => !s.ruined && !s.captured);
+    if (!targets.length) return;
+    targets.sort((a, b) =>
+      ((a.x - c.x) ** 2 + (a.y - c.y) ** 2) - ((b.x - c.x) ** 2 + (b.y - c.y) ** 2));
+    const t = targets[Math.floor(g.rand() * Math.min(3, targets.length))];
+    // база вылазки — ближайший к цели форт или сама Цитадель
+    let src = c;
+    for (const fid of c.forts) {
+      const f = g.world.settlements.find(s => s.id === fid);
+      if (f && !f.ruined && (f.x - t.x) ** 2 + (f.y - t.y) ** 2 < (src.x - t.x) ** 2 + (src.y - t.y) ** 2) src = f;
+    }
+    // точка ~на полпути, но не ближе 20 тайлов к деревне (порча ползёт к ней)
+    let zx = Math.round(src.x + (t.x - src.x) * 0.55);
+    let zy = Math.round(src.y + (t.y - src.y) * 0.55);
+    const d = Math.hypot(t.x - zx, t.y - zy);
+    if (d < 20) { const k = 20 / (d || 1); zx = Math.round(t.x - (t.x - zx) * k); zy = Math.round(t.y - (t.y - zy) * k); }
+    // проходимое место (не в воде/скале): findBuildSite вернёт свободную площадку рядом
+    const site = findBuildSite(g.world, { x: zx, y: zy }, 5, 5, g.rand);
+    if (!site) return;
+    zx = site.x + 2; zy = site.y + 2;
+    buildZiggurat(g.world, zx, zy);
+    this.remapArea(zx - 3, zy - 3, 8, 8);
+    const zig = { id: 'zig' + (c.nextZig++), x: zx, y: zy, taintR: 1, taintMax: 12 };
+    c.ziggurats.push(zig);
+    c.zigCd = 40; // ~8 минут между зиккуратами
+    g.events.push(g.world.day, `⛧ Тьма воздвигла ЗИККУРАТ близ ${t.name} — порча ползёт по земле!`, { x: zx, y: zy });
+    g.toastAll(`⛧ Зиккурат Тьмы вырос у ${t.name}! Разрушьте его, пока порча не поглотила округу`, true);
+  }
+
+  // Порча: вокруг каждого зиккурата растущее кольцо T.TAINT переписывает
+  // траву/лес/землю. Бюджетно: несколько тайлов за цив-тик на зиккурат.
+  spreadTaint(c) {
+    const g = this.game;
+    const TAINTABLE = new Set([T.GRASS, T.FOREST_FLOOR, T.DIRT, T.SAND, T.FIELD]);
+    for (const z of c.ziggurats) {
+      if (z.taintR < z.taintMax && g.rand() < 0.5) z.taintR++;
+      const R = z.taintR;
+      let painted = 0;
+      for (let tries = 0; tries < 30 && painted < 4; tries++) {
+        const a = g.rand() * Math.PI * 2, rr = g.rand() * R;
+        const tx = Math.round(z.x + Math.cos(a) * rr), ty = Math.round(z.y + Math.sin(a) * rr);
+        const cur = g.chunks.tileAt('over', tx, ty);
+        if (!TAINTABLE.has(cur)) continue;
+        g.chunks.setTile('over', tx, ty, T.TAINT);
+        g.fx({ t: 'tile', mapId: 'over', x: tx, y: ty, tile: T.TAINT }, null);
+        painted++;
+      }
+      // порча гнетёт деревни в радиусе: тихо теряют процветание
+      for (const s of g.world.settlements) {
+        if (s.ruined || s.captured) continue;
+        if ((s.x - z.x) ** 2 + (s.y - z.y) ** 2 < (R + 6) ** 2 && g.rand() < 0.4)
+          s.prosperity = Math.max(0, s.prosperity - 1);
+      }
+    }
+  }
+
+  // Снять всю порчу зиккурата (при разрушении ядра) — переписать TAINT обратно
+  cleanseTaint(z) {
+    const g = this.game;
+    const R = z.taintR + 1;
+    for (let dy = -R; dy <= R; dy++)
+      for (let dx = -R; dx <= R; dx++) {
+        if (dx * dx + dy * dy > R * R) continue;
+        const tx = z.x + dx, ty = z.y + dy;
+        if (g.chunks.tileAt('over', tx, ty) !== T.TAINT) continue;
+        // возвращаем родной тайл рельефа
+        const base = baseTile(g.world.seed, tx, ty);
+        g.chunks.setTile('over', tx, ty, base === T.FOREST_FLOOR ? T.FOREST_FLOOR : T.GRASS);
+        g.fx({ t: 'tile', mapId: 'over', x: tx, y: ty, tile: base === T.FOREST_FLOOR ? T.FOREST_FLOOR : T.GRASS }, null);
+      }
+  }
+
+  // Тьма повержена: очистить порчу всех зиккуратов
+  cleanseAllTaint() {
+    const c = this.game.world.citadel;
+    if (!c?.ziggurats?.length) return;
+    for (const z of c.ziggurats) this.cleanseTaint(z);
+    c.ziggurats = [];
   }
 
   // Процветающая деревня отправляет поселенцев возрождать руины
@@ -192,14 +289,28 @@ export class CivSim {
       this.say(s, `Деревня растёт: уже ${s.population} жителей`);
     }
 
-    // --- наём стражи: нужен металл на снаряжение ---
+    // --- наём стражи: разные юниты по достатку. Ополченец дёшев, лучник дороже,
+    // латник — только у зажиточных с кузницей. s.guards — агрегат обороны ---
+    s.garrison = s.garrison || { militia: s.guards || 0, archer: 0, veteran: 0 };
     const guardQuota = 2 + s.towers;
     if (s.guards < guardQuota && s.prosperity >= 25 && s.population > 3) {
-      if (s.metal >= 2) {
-        s.metal -= 2;
+      const hasSmithy = !!s.anchors?.smithy;
+      // выбор архетипа: латник (богатство+кузница) > лучник (металл) > ополченец
+      let unit = null, cost = 0;
+      if (hasSmithy && s.metal >= 4 && s.prosperity >= 50 && (s.garrison.veteran || 0) < 1 + s.towers) {
+        unit = 'veteran'; cost = 4;
+      } else if (s.metal >= 3 && (s.garrison.archer || 0) <= (s.garrison.militia || 0)) {
+        unit = 'archer'; cost = 3;
+      } else if (s.metal >= 2) {
+        unit = 'militia'; cost = 2;
+      }
+      if (unit) {
+        s.metal -= cost;
+        s.garrison[unit] = (s.garrison[unit] || 0) + 1;
         s.guards++;
         s.prosperity -= 8;
-        this.say(s, 'Нанят новый стражник (−2 металла)');
+        const NM = { militia: 'ополченец', archer: 'лучник', veteran: 'латник' };
+        this.say(s, `Нанят ${NM[unit]} (−${cost} металла)`);
         this.game.syncSettlementNpcs(s, false); // новичок приходит, никто не телепортируется
       } else if (rand() < 0.3) {
         this.say(s, 'Не хватает металла для снаряжения стражи');

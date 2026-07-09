@@ -225,6 +225,8 @@ export class Game {
     // огненная бочка: взрыв жжёт всех вокруг и детонирует соседние бочки
     if (tile === T.BARREL_FIRE)
       this.explodeAt(mapId, tx * TILE + 8, ty * TILE + 8, 3, 40, attacker?.id, 6);
+    // ЗИККУРАТ РАЗРУШЕН: порча спадает, мощь Тьмы подрублена, награда героям
+    if (tile === T.ZIGGURAT) this.onZigguratDestroyed(tx, ty, attacker);
     // треснувшая стена рухнула — тайник открыт
     if (tile === T.CRACKED_WALL) {
       const inst = this.dungeons.get(mapId);
@@ -613,6 +615,7 @@ export class Game {
 
     this.hydrateSettlements();
     this.hydratePois();
+    this.hydrateZiggurats();
     this.stepEntities(dt);
     this.separateEntities();
     this.stepProjectiles(dt);
@@ -622,6 +625,7 @@ export class Game {
     this.stepMplus();
     this.stepStructures(dt);
     this.stepTraps();
+    this.stepSieges(dt);
     this.checkAscensions();
     // метеоры мага: телеграф догорел — удар с неба
     if (this.meteors?.length) {
@@ -1441,10 +1445,12 @@ export class Game {
         if (s.shrines > 0 && s !== this.world.settlements[4])
           ids.push(this.spawnNpc('priest', s.id, 'over', sx - 20, sy - 24));
         if (s.forestRich >= 2) ids.push(this.spawnNpc('hunter', s.id, 'over', sx - 40, sy + 30));
+        const gu = [];
         for (let gi = 0; gi < (s.guards || 2); gi++) {
           const ga = gi / Math.max(1, s.guards) * Math.PI * 2;
-          ids.push(this.spawnNpc('guard', s.id, 'over', sx + Math.cos(ga) * 34, sy + Math.sin(ga) * 34,
-            fk.guard ? { kind: fk.guard } : {}));
+          const id = this.spawnGuardUnit(s, this.nextGuardUnit(s, gu),
+            sx + Math.cos(ga) * 34, sy + Math.sin(ga) * 34);
+          gu.push(id); ids.push(id);
         }
         // призванный дух-хранитель: парит у святилища, разит врагов
         if (s.spiritT > 0) {
@@ -1476,6 +1482,40 @@ export class Game {
 
   // Мягкая синхронизация населения: досеваем новичков, лишних не трогаем
   // (удаляем только вдали от глаз — жители «уезжают», а не испаряются)
+  // Стат-профиль архетипа городской стражи (общий для найма и досева)
+  GUARD_UNITS = {
+    militia: { hp: 12, dmg: 3, melee: true },   // ополченец: ближний бой
+    archer: { hp: 10, dmg: 2, melee: false },   // лучник: дальний (текущее поведение)
+    veteran: { hp: 20, dmg: 5, melee: true },   // латник: танк
+  };
+
+  // Заспавнить стража-NPC заданного архетипа со статами и фракц. спрайтом
+  spawnGuardUnit(s, unit, x, y) {
+    const fk = FACTION_KINDS[s.faction] || {};
+    const id = this.spawnNpc('guard', s.id, 'over', x, y, fk.guard ? { kind: fk.guard } : {});
+    const g = this.entities.get(id);
+    const prof = this.GUARD_UNITS[unit] || this.GUARD_UNITS.militia;
+    g.unit = unit; g.hp = g.maxHp = prof.hp; g.dmg = prof.dmg; g.melee = prof.melee;
+    return id;
+  }
+
+  // Какого архетипа не хватает среди живых стражей относительно s.garrison
+  nextGuardUnit(s, aliveGuards) {
+    const gar = s.garrison || { militia: s.guards || 0, archer: 0, veteran: 0 };
+    const have = { militia: 0, archer: 0, veteran: 0 };
+    for (const id of aliveGuards) {
+      const u = this.entities.get(id)?.unit || 'militia';
+      have[u] = (have[u] || 0) + 1;
+    }
+    // добираем самый недокомплектованный тип
+    let best = 'militia', deficit = -Infinity;
+    for (const u of ['veteran', 'archer', 'militia']) {
+      const d = (gar[u] || 0) - (have[u] || 0);
+      if (d > deficit) { deficit = d; best = u; }
+    }
+    return best;
+  }
+
   syncSettlementNpcs(s, near) {
     const ids = this.hydratedSettlements.get(s.id);
     if (!ids || s.captured || s.ruined) return;
@@ -1486,8 +1526,8 @@ export class Game {
     const guards = alive.filter(id => this.entities.get(id)?.role === 'guard'
       && this.entities.get(id)?.kind !== 'npc_spirit');
     for (let i = guards.length; i < (s.guards || 0); i++) {
-      const id = this.spawnNpc('guard', s.id, 'over', sx + 20, sy + 20, fk.guard ? { kind: fk.guard } : {});
-      ids.push(id);
+      const id = this.spawnGuardUnit(s, this.nextGuardUnit(s, guards), sx + 20, sy + 20);
+      guards.push(id); ids.push(id);
     }
     // дух-хранитель: появляется с ритуалом, уходит по сроку
     const spirit = alive.map(id => this.entities.get(id)).find(e => e?.kind === 'npc_spirit');
@@ -3947,6 +3987,166 @@ export class Game {
     if (closed && cur === T.DUNGEON_FLOOR) this.chunks.setTile(mapId, d.x, d.y, T.DUNGEON_DOOR);
     if (!closed && cur === T.DUNGEON_DOOR) this.chunks.setTile(mapId, d.x, d.y, T.DUNGEON_FLOOR);
     this.fx({ t: 'tile', mapId, x: d.x, y: d.y, tile: closed ? T.DUNGEON_DOOR : T.DUNGEON_FLOOR }, mapId, d.x * TILE, d.y * TILE);
+  }
+
+  // Зиккурат разрушен игроком: порча спадает, Тьма слабеет, награда фракции
+  onZigguratDestroyed(tx, ty, attacker) {
+    const c = this.world.citadel;
+    if (!c?.ziggurats?.length) return;
+    // ближайший зиккурат к разрушенному тайлу
+    let zi = -1, bd = 6 * 6;
+    for (let i = 0; i < c.ziggurats.length; i++) {
+      const z = c.ziggurats[i];
+      const d = (z.x - tx) ** 2 + (z.y - ty) ** 2;
+      if (d <= bd) { bd = d; zi = i; }
+    }
+    if (zi < 0) return;
+    const z = c.ziggurats[zi];
+    this.civ.cleanseTaint(z);          // порча откатывается
+    c.ziggurats.splice(zi, 1);
+    c.power = Math.max(3, c.power - 20); // мощь Тьмы подрублена
+    delete z.guardIds;
+    this.fx({ t: 'boom', x: z.x * TILE + 8, y: z.y * TILE + 8, r: 50 }, 'over', z.x * TILE, z.y * TILE);
+    // награда: репутация ближайшей угрожаемой фракции + xp героям рядом
+    const near = [...this.players.values()].filter(q =>
+      !q.dead && q.mapId === 'over' && dist2(q.x, q.y, z.x * TILE, z.y * TILE) < 500 ** 2);
+    let fac = null, fd = Infinity;
+    for (const s of this.world.settlements) {
+      if (s.ruined || s.captured) continue;
+      const d = (s.x - z.x) ** 2 + (s.y - z.y) ** 2;
+      if (d < fd) { fd = d; fac = s.homeFaction; }
+    }
+    for (const q of (near.length ? near : (attacker ? [attacker] : []))) {
+      this.addXp(q, 120);
+      if (fac) q.rep[fac] = Math.min(100, (q.rep[fac] || 0) + 15);
+    }
+    this.toastAll('★ Зиккурат Тьмы разрушен — порча отступает!', true);
+    this.events.push(this.world.day, 'Путники разрушили зиккурат Тьмы', { x: z.x, y: z.y });
+  }
+
+  // Охрана зиккуратов: при подходе игрока гидратирует стражу Тьмы у ядра
+  hydrateZiggurats() {
+    const c = this.world.citadel;
+    if (!c?.ziggurats?.length) return;
+    for (const z of c.ziggurats) {
+      const zx = z.x * TILE, zy = z.y * TILE;
+      let near = false;
+      for (const p of this.players.values())
+        if (p.mapId === 'over' && !p.dead && dist2(p.x, p.y, zx, zy) < 360 ** 2) { near = true; break; }
+      if (near && !z.guardIds) {
+        z.guardIds = [];
+        const guard = ['darkSoldier', 'darkArcher', 'darkMage', 'darkSoldier'];
+        for (let i = 0; i < guard.length; i++) {
+          const a = i / guard.length * Math.PI * 2;
+          const id = this.spawnEnemy(guard[i], 'over', zx + Math.cos(a) * 40, zy + Math.sin(a) * 40,
+            { faction: 'darkness', noElite: true });
+          if (id) z.guardIds.push(id);
+        }
+      } else if (!near && z.guardIds) {
+        for (const id of z.guardIds) this.entities.delete(id);
+        z.guardIds = null;
+      }
+    }
+  }
+
+  // ---------- ОСАДЫ: живой штурм волнами, когда рядом есть герои ----------
+  SIEGE_R = 480; // px: осада «оживает», если игрок ближе
+
+  // Игрок рядом с осаждаемой деревней? → превратить абстрактную осаду в живую
+  trySiege(s, tok) {
+    const sx = s.x * TILE, sy = s.y * TILE;
+    const near = [...this.players.values()].some(p =>
+      !p.dead && p.mapId === 'over' && dist2(p.x, p.y, sx, sy) < this.SIEGE_R ** 2);
+    if (!near) return false;
+    this.startSiege(s, tok);
+    return true;
+  }
+
+  startSiege(s, tok) {
+    const elite = tok.units.filter(u => u === 'banditHeavy' || u === 'darkKnight' || u === 'darkMage').length;
+    const strength = tok.units.length * 2 + elite * 2;
+    const waves = Math.min(4, 2 + Math.floor(strength / 8));
+    tok.besieging = s.id;
+    tok.x = s.x * TILE; tok.y = s.y * TILE; // войско встало лагерем у деревни
+    s.siege = {
+      faction: tok.faction, tokenId: tok.id, waves, wave: 0,
+      spawnT: 0, timeLeft: waves * 40 + 30, enemyIds: [], kinds: [...tok.units],
+    };
+    this.toastAll(`⚔ ${FACTIONS[tok.faction]?.name || 'Враг'} осаждает ${s.name}! Спасите город — отбейте штурм!`, true);
+    this.events.push(this.world.day, `Осада ${s.name}: враг у ворот`, { x: s.x, y: s.y });
+  }
+
+  // спавн волны врагов у случайных подходов к деревне
+  spawnSiegeWave(s, sg) {
+    sg.wave++;
+    const n = 2 + sg.wave + (sg.faction === 'darkness' ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      const a = this.rand() * Math.PI * 2, r = (24 + this.rand() * 4) * TILE;
+      const kind = sg.kinds[i % sg.kinds.length];
+      const id = this.spawnEnemy(kind, 'over', s.x * TILE + Math.cos(a) * r, s.y * TILE + Math.sin(a) * r,
+        { faction: sg.faction, siege: s.id, noElite: true });
+      if (id) { const e = this.entities.get(id); if (e) e.aggro = true; sg.enemyIds.push(id); }
+    }
+    this.toastAll(`⚔ ${s.name}: волна ${sg.wave}/${sg.waves}!`, true);
+  }
+
+  stepSieges(dt) {
+    for (const s of this.world.settlements) {
+      const sg = s.siege;
+      if (!sg) continue;
+      const sx = s.x * TILE, sy = s.y * TILE;
+      // герои разбежались — осада «остывает» обратно в абстрактный токен
+      const near = [...this.players.values()].some(p =>
+        !p.dead && p.mapId === 'over' && dist2(p.x, p.y, sx, sy) < (this.SIEGE_R + 200) ** 2);
+      if (!near) {
+        for (const id of sg.enemyIds) this.entities.delete(id);
+        const tok = this.abstract.tokens.find(t => t.id === sg.tokenId);
+        if (tok) tok.besieging = null;
+        s.siege = null;
+        continue;
+      }
+      sg.timeLeft -= dt;
+      sg.enemyIds = sg.enemyIds.filter(id => this.entities.has(id));
+      // поражение: время вышло — деревня пала (обратимо: форт освобождается)
+      if (sg.timeLeft <= 0) {
+        this.endSiege(s, false);
+        continue;
+      }
+      // следующая волна: когда прежняя перебита (пауза 3 с)
+      if (!sg.enemyIds.length) {
+        sg.spawnT -= dt;
+        if (sg.wave >= sg.waves) { this.endSiege(s, true); continue; } // все волны отбиты
+        if (sg.spawnT <= 0) { this.spawnSiegeWave(s, sg); sg.spawnT = 3; }
+      }
+    }
+  }
+
+  endSiege(s, won) {
+    const sg = s.siege;
+    if (!sg) return;
+    for (const id of sg.enemyIds) this.entities.delete(id);
+    const tok = this.abstract.tokens.find(t => t.id === sg.tokenId);
+    s.siege = null;
+    if (won) {
+      if (tok) tok.dead = true;
+      this.abstract.tokens = this.abstract.tokens.filter(t => !t.dead);
+      const heroes = [...this.players.values()].filter(p =>
+        !p.dead && p.mapId === 'over' && dist2(p.x, p.y, s.x * TILE, s.y * TILE) < 600 ** 2);
+      for (const p of heroes) {
+        this.addXp(p, 100);
+        p.rep[s.homeFaction] = Math.min(100, (p.rep[s.homeFaction] || 0) + 20);
+      }
+      // защитники ликуют: чуть процветания и стражи
+      s.prosperity = Math.min(100, s.prosperity + 6);
+      this.toastAll(`★ Осада ${s.name} отбита! Город спасён`, true);
+      this.events.push(this.world.day, `Герои отбили осаду ${s.name}`, { x: s.x, y: s.y });
+    } else {
+      // деревня пала — но обратимо
+      if (sg.faction === 'bandits') this.civ.captureSettlement(s);
+      else if (sg.faction === 'darkness') { this.civ.captureByDarkness(s); if (tok) tok.dead = true; }
+      else this.civ.ruinSettlement(s, 'пала под осадой');
+      this.abstract.tokens = this.abstract.tokens.filter(t => !t.dead);
+    }
   }
 
   onPoiCleared(poi) {

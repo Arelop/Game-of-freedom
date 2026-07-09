@@ -133,6 +133,25 @@ export class TileRenderer {
           if (!eastTower && !southTower) this.atlas.blit(ctx, 'obj_tower', x * TILE, y * TILE - 16);
           continue;
         }
+        // ПОРЧА Тьмы: земля под тёмно-фиолетовой пеленой (процедурно)
+        if (t === T.TAINT) {
+          const h = hash2(11, cx * CHUNK + x, cy * CHUNK + y) % 100;
+          this.atlas.blit(ctx, h < 30 ? 'tile_dirt' : 'tile_grass', x * TILE, y * TILE);
+          ctx.fillStyle = h < 50 ? 'rgba(58,36,74,0.62)' : 'rgba(45,58,32,0.55)';
+          ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+          if (h < 12) { ctx.fillStyle = 'rgba(106,190,48,0.5)'; ctx.fillRect(x * TILE + (h % 8), y * TILE + (h % 6), 2, 2); }
+          continue;
+        }
+        // ЯДРО ЗИККУРАТА: ступенчатый тёмный блок с зелёным огнём наверху
+        if (t === T.ZIGGURAT) {
+          this.atlas.blit(ctx, 'tile_floor_stone', x * TILE, y * TILE);
+          const bx = x * TILE, by = y * TILE;
+          ctx.fillStyle = '#241830'; ctx.fillRect(bx + 1, by + 4, 14, 11);
+          ctx.fillStyle = '#3a2450'; ctx.fillRect(bx + 3, by + 2, 10, 12);
+          ctx.fillStyle = '#523070'; ctx.fillRect(bx + 5, by, 6, 13);
+          animated.push({ x: cx * CHUNK + x, y: cy * CHUNK + y, tile: t });
+          continue;
+        }
         if (style) {
           if (t === T.DUNGEON_FLOOR) spec = [styledFloor(x, y)];
           else if (t === T.DUNGEON_WALL) spec = [style.wall];
@@ -203,6 +222,11 @@ export class TileRenderer {
         // фитиль огненной бочки тлеет — заметно и тревожно
         const frame = Math.floor(timeSec * 6 + a.x) % 2;
         this.atlas.draw(ctx, 'obj_campfire_' + frame, s.x, s.y - 6, { scale: 0.55 });
+      } else if (a.tile === T.ZIGGURAT) {
+        // зелёный огонь душ пляшет на вершине зиккурата
+        const fl = 2 + Math.sin(timeSec * 7 + a.x) * 1.5;
+        ctx.fillStyle = '#6abe30'; ctx.fillRect(s.x - 1, s.y - 10 - fl, 3, 3 + fl);
+        ctx.fillStyle = '#b8ef6e'; ctx.fillRect(s.x, s.y - 9 - fl, 1, 2 + fl);
       }
     }
   }

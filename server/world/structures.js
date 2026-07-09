@@ -78,6 +78,20 @@ export function buildPortal(world, s, site) {
   return { w: 1, h: 1 };
 }
 
+// Зиккурат Тьмы: ядро T.ZIGGURAT на осквернённых плитах, алтари по углам.
+// Стампится в world.edits (переживает рестарт). Возвращает занятый прямоугольник.
+export function buildZiggurat(world, cx, cy) {
+  // плита 5×5 из осквернённого камня (проходима — к ядру можно подойти вплотную)
+  for (let dy = -2; dy <= 2; dy++)
+    for (let dx = -2; dx <= 2; dx++)
+      if (Math.abs(dx) + Math.abs(dy) <= 3) set(world, cx + dx, cy + dy, T.FLOOR_STONE);
+  set(world, cx, cy, T.ZIGGURAT);            // ядро — цель разрушения
+  // алтари на «остриях» ромба (декор, не перекрывают подход к ядру)
+  set(world, cx - 2, cy, T.DARK_ALTAR); set(world, cx + 2, cy, T.DARK_ALTAR);
+  set(world, cx, cy - 2, T.DARK_ALTAR); set(world, cx, cy + 2, T.DARK_ALTAR);
+  return { x: cx - 2, y: cy - 2, w: 5, h: 5 };
+}
+
 // Дом размером w x h с дверью снизу; внутри кровать (+стол в больших)
 export function stampHouse(world, x0, y0, w, h, anchors, wallT = T.WALL) {
   for (let y = y0; y < y0 + h; y++)

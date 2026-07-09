@@ -186,6 +186,12 @@ export class Hud {
       ctx.fillStyle = '#63c5ff';
       ctx.fillText('📜 ' + you.mq.t, 5, qy);
     }
+    // ОСАДА рядом: тревожная красная строка (война)
+    if (net.sieges?.length) {
+      const sg = net.sieges[0];
+      ctx.fillStyle = '#d9574a';
+      ctx.fillText(`⚔ ${sg.name} в осаде: волна ${sg.w}/${sg.wm}`, 5, qy + (you.mq?.t ? 8 : 0));
+    }
 
     // (стрелку-указатель к цели кампании убрали по просьбе игрока —
     // светло-оранжевые маркеры на карте M и миникарте остаются)
@@ -319,6 +325,17 @@ export class Hud {
       const mx = x0 + Math.round(net.you.mq.x * TILE * k), my = y0 + Math.round(net.you.mq.y * TILE * k);
       ctx.fillRect(mx - 2, my, 5, 1); ctx.fillRect(mx, my - 2, 1, 5);
       ctx.fillRect(mx - 1, my - 1, 3, 3);
+    }
+    // зиккураты Тьмы: зелёные метки порчи (цель — разрушить)
+    for (const z of net.zigs || []) {
+      ctx.fillStyle = '#6abe30';
+      ctx.fillRect(x0 + Math.round(z.x * TILE * k) - 1, y0 + Math.round(z.y * TILE * k) - 1, 3, 3);
+    }
+    // осады: пульсирующие красные кресты (спешите на помощь)
+    for (const sg of net.sieges || []) {
+      ctx.fillStyle = '#d9574a';
+      const gx = x0 + Math.round(sg.x * TILE * k), gy = y0 + Math.round(sg.y * TILE * k);
+      ctx.fillRect(gx - 2, gy, 5, 1); ctx.fillRect(gx, gy - 2, 1, 5);
     }
     ctx.fillStyle = '#fff';
     ctx.fillRect(x0 + Math.round(net.pred.x * k) - 1, y0 + Math.round(net.pred.y * k) - 1, 2, 2);

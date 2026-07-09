@@ -140,12 +140,31 @@ export function updateNpc(npc, dt, map, game) {
       const ang = Math.atan2(danger.y - npc.y, danger.x - npc.x);
       const d2 = dist2(npc.x, npc.y, danger.x, danger.y);
       npc.aim = ang;
+      if (npc.melee) {
+        // ополченец/латник: сближается и бьёт в упор
+        const reach = npc.unit === 'veteran' ? 22 : 18;
+        if (d2 > reach * reach)
+          moveWithCollision(npc, Math.cos(ang) * GUARD_SPEED * 1.25 * dt, Math.sin(ang) * GUARD_SPEED * 1.25 * dt, 5, map);
+        npc.swingT = (npc.swingT ?? 0) - dt;
+        if (npc.swingT <= 0 && d2 < (reach + 8) * (reach + 8)) {
+          npc.swingT = npc.unit === 'veteran' ? 1.0 : 0.8;
+          if (danger.entType === 'enemy') {
+            game.damageEnemy(danger, npc.dmg || 3,
+              { vx: Math.cos(ang), vy: Math.sin(ang), knockback: npc.unit === 'veteran' ? 50 : 25, owner: npc.id, school: 'melee' });
+          } else {
+            game.damagePlayer(danger, npc.dmg || 3, npc); // враждебный игрок
+          }
+          game.fx({ t: 'swing', pid: npc.id, weapon: 'sword', x: npc.x, y: npc.y, aim: ang, range: reach, arc: 90 }, npc.mapId, npc.x, npc.y);
+        }
+        return;
+      }
+      // лучник: держит дистанцию и стреляет
       if (d2 > 30 * 30)
         moveWithCollision(npc, Math.cos(ang) * GUARD_SPEED * dt, Math.sin(ang) * GUARD_SPEED * dt, 5, map);
       npc.fireT = (npc.fireT ?? 0.5) - dt;
       if (npc.fireT <= 0 && d2 < 200 * 200) {
         npc.fireT = 1.2;
-        game.npcShoot(npc, ang);
+        game.npcShoot(npc, ang, { dmg: npc.dmg || 2 });
       }
       return;
     }
