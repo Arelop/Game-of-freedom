@@ -406,6 +406,7 @@ export class Game {
     }
     if (this.hasTalent(p, 'deadly')) d.critMult = 3;
     if (p.buffs.speed) speed += p.buffs.speed.mult;
+    if (p.buffs.slowed) speed += p.buffs.slowed.mult; // ловушки/эффекты: mult < 0
     if (p.buffs.blessed) { // благословение жреца: весь урон
       const b = 1 + p.buffs.blessed.mult;
       d.dmgMelee *= b; d.dmgRanged *= b; d.dmgMagic *= b;
@@ -616,6 +617,7 @@ export class Game {
     this.checkDungeonRooms();
     this.stepMplus();
     this.stepStructures(dt);
+    this.stepTraps();
     this.checkAscensions();
     // метеоры мага: телеграф догорел — удар с неба
     if (this.meteors?.length) {
@@ -1008,16 +1010,7 @@ export class Game {
         this.fx({ t: 'hit', kind: 'wall', x: p.x, y: p.y }, p.mapId, p.x, p.y);
         if (!p.lavaHinted) { p.lavaHinted = true; this.toast(p, '🔥 ЛАВА! Перекатом можно проскочить реку огня'); }
       }
-      if (tHere === T.TRAP) {
-        const key = p.mapId + ':' + ttx + ',' + tty;
-        this.trapCd = this.trapCd || new Map();
-        if ((this.trapCd.get(key) || 0) <= this.tick) {
-          this.trapCd.set(key, this.tick + 75); // ловушка взводится 2.5 с
-          this.damagePlayer(p, 1, null);
-          this.fx({ t: 'hit', kind: 'wall', x: p.x, y: p.y }, p.mapId, p.x, p.y);
-          this.toast(p, '⚔ Лезвия из пола! Перекатом ловушки можно проскочить');
-        }
-      }
+      if (tHere === T.TRAP) this.armTrap(p.mapId, ttx, tty, p);
     }
 
     // применяем накопленные инпуты
@@ -1132,11 +1125,8 @@ export class Game {
       imbue = p.imbue;
       if (--p.imbue.n <= 0) { delete p.imbue; this.toast(p, 'Заряд оружия иссяк'); }
       atk.dmg += imbue.dmg;
-      if (imbue.kind === 'holy' && p.hp < p.maxHp) {
-        p.hp = Math.min(p.maxHp, p.hp + (imbue.heal || 1));
-        this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
-      }
     }
+    let hitEnemy = false; // «Освящение клинка» лечит только когда клинок нашёл врага
     const hitFake = { vx: Math.cos(aim), vy: Math.sin(aim), knockback: w.knockback, owner: p.id, school: 'melee', crit: atk.crit,
       chill: w.chill, fire: w.fire || imbue?.kind === 'fire', poison: w.poison, slow: w.slow, // стихии клинка
       ignite: imbue?.kind === 'fire' ? { time: 2, dmg: 1 } : undefined };
@@ -1148,6 +1138,7 @@ export class Game {
         da = Math.atan2(Math.sin(da), Math.cos(da));
         if (arcDeg >= 360 || Math.abs(da) <= half) {
           this.damageEnemy(e, atk.dmg, hitFake);
+          hitEnemy = true;
           // Оглушающий удар: шанс ошеломить врага
           if (this.hasTalent(p, 'stunhit') && this.rand() < 0.15 && this.entities.has(e.id))
             e.stunT = Math.max(e.stunT || 0, 0.6);
@@ -1180,6 +1171,11 @@ export class Game {
       if (structDmg > 0) this.damageTile(p.mapId, tx, ty, structDmg, p);
       break;
     }
+    // «Освящение клинка»: свет лечит владельца ТОЛЬКО за попадание по врагу
+    if (imbue?.kind === 'holy' && hitEnemy && p.hp < p.maxHp) {
+      p.hp = Math.min(p.maxHp, p.hp + (imbue.heal || 1));
+      this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+    }
     this.fx({ t: 'swing', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, range: r, arc: arcDeg }, p.mapId, p.x, p.y);
   }
 
@@ -1209,8 +1205,9 @@ export class Game {
       imbue = p.imbue;
       if (--p.imbue.n <= 0) { delete p.imbue; this.toast(p, 'Заряд оружия иссяк'); }
       dmg += imbue.dmg;
-      if (imbue.kind === 'holy' && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + (imbue.heal || 1));
     }
+    // «Освящение клинка» на посохе/луке: свет лечит владельца при попадании по врагу
+    const healHit = imbue?.kind === 'holy' ? (imbue.heal || 1) : 0;
     // заряженный выстрел мага: тяжёлый и быстрый снаряд за двойную ману
     if (charged) dmg = Math.round(dmg * 2 * 10) / 10;
     const projR = w.projRadius + (charged ? 1.5 : 0);
@@ -1227,6 +1224,7 @@ export class Game {
         holy: (w.holy ? w.holy + (this.hasTalent(p, 'lightheal') ? 1 : 0) : 0) + (imbue?.kind === 'holy' ? 1 : 0),
         chill: w.chill, fire: w.fire || imbue?.kind === 'fire', poison: w.poison, // стихии для реакций
         ignite: imbue?.kind === 'fire' ? { time: 2, dmg: 1 } : undefined,
+        healHit, // лечит владельца при попадании по врагу (Освящение клинка)
         owner: p.id, friendly: true, mapId: p.mapId,
       });
     }
@@ -1580,6 +1578,9 @@ export class Game {
       const map = this.mapFor(e.mapId);
       if (e.entType === 'enemy') {
         if ((e.chillT || 0) > 0) e.chillT -= dt; // метка льда тает
+        // враг наступил на плиту ловушки — тоже взводит (его можно заманить)
+        if (e.mapId !== 'over' && this.chunks.tileAt(e.mapId, Math.floor(e.x / TILE), Math.floor(e.y / TILE)) === T.TRAP)
+          this.armTrap(e.mapId, Math.floor(e.x / TILE), Math.floor(e.y / TILE), e);
         // доты: яд и горение тикают раз в секунду
         if ((e.dotT || 0) > 0) {
           e.dotT -= dt;
@@ -2706,6 +2707,14 @@ export class Game {
                 const o = this.players.get(pr.owner);
                 if (o) o.ammo.knife = (o.ammo.knife || 0) + 1;
               }
+              // «Освящение клинка»: свет посоха лечит владельца за попадание
+              if (pr.healHit) {
+                const o = this.players.get(pr.owner);
+                if (o && o.hp < o.maxHp) {
+                  o.hp = Math.min(o.maxHp, o.hp + pr.healHit);
+                  this.fx({ t: 'heal', pid: o.id, x: o.x, y: o.y }, o.mapId, o.x, o.y);
+                }
+              }
             }
             hit = true; break;
           }
@@ -3012,7 +3021,11 @@ export class Game {
     const luck = killer?.effStats?.lck ?? killer?.stats?.lck ?? 0;
     const dropBonus = killer?.derived?.dropBonus || 0;
     for (const [item, range] of Object.entries(def.drops || {})) {
-      if (item === 'weapon') { this.dropRandomWeapon(e.mapId, e.x, e.y, luck, 2); continue; }
+      // оружие с моба — теперь не гарантия, а редкая удача (событие, не рутина)
+      if (item === 'weapon') {
+        if (this.rand() < 0.35 * (1 + dropBonus)) this.dropRandomWeapon(e.mapId, e.x, e.y, luck, 2);
+        continue;
+      }
       let n = Array.isArray(range) ? randInt(this.rand, range[0], range[1]) : range;
       if (item === 'coin') n = Math.ceil(n * 0.6); // мир прижимист: монет поменьше
       else if (this.rand() > 0.6 + dropBonus) continue; // припасы падают не с каждого
@@ -3023,7 +3036,7 @@ export class Game {
       if (n > 0) this.spawnDrop(item, n, e.mapId, e.x + (this.rand() - 0.5) * 14, e.y + (this.rand() - 0.5) * 14);
     }
     // элита: дроп экипировки (пореже — вещь должна оставаться событием)
-    if (e.elite && this.rand() < 0.28) this.dropRandomGear(e.mapId, e.x, e.y, false, luck + 4);
+    if (e.elite && this.rand() < 0.18) this.dropRandomGear(e.mapId, e.x, e.y, false, luck + 4);
     // именной зверь из заказа старейшины
     if (e.slayFor) {
       const owner = this.players.get(e.slayFor);
@@ -3163,7 +3176,7 @@ export class Game {
     if (this.rand() < 0.15 * (1 + dropBonus * 2)) this.spawnDrop('herb', 1, e.mapId, e.x, e.y);
     if (this.rand() < 0.05 * (1 + dropBonus * 3)) this.spawnDrop('heal_potion', 1, e.mapId, e.x, e.y);
     if (e.kind === 'wolf' && this.rand() < 0.5 * (1 + dropBonus)) this.spawnDrop('hide', 1, e.mapId, e.x, e.y);
-    if (e.kind === 'banditHeavy' && this.rand() < 0.25 * (1 + dropBonus)) this.dropRandomGear(e.mapId, e.x, e.y, false, luck);
+    if (e.kind === 'banditHeavy' && this.rand() < 0.14 * (1 + dropBonus)) this.dropRandomGear(e.mapId, e.x, e.y, false, luck);
     // удача: шанс дополнительной находки
     if (this.rand() < dropBonus) this.spawnDrop('coin', 2 + Math.floor(this.rand() * 3), e.mapId, e.x + 8, e.y);
     if (e.token) this.abstract.onTokenUnitKilled(e.token, e.x, e.y);
@@ -3326,11 +3339,13 @@ export class Game {
         if (source && source.x !== undefined) {
           let da = Math.atan2(source.y - p.y, source.x - p.x) - p.aim;
           da = Math.atan2(Math.sin(da), Math.cos(da));
-          frontal = Math.abs(da) <= (this.hasTalent(p, 'blockwide') ? Math.PI / 1.3 : Math.PI / 2.5);
+          // сектор блока сузили: раньше 144° гасили любой удар в ноль
+          frontal = Math.abs(da) <= (this.hasTalent(p, 'blockwide') ? Math.PI / 1.9 : Math.PI / 3.2);
         }
         this.fx({ t: 'block', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
-        if (frontal) { p.hurtT = 0.3; return; } // лобовой удар полностью погашен
-        dmg = Math.max(0.5, Math.round(dmg * 0.5 * 10) / 10);
+        // лобовой удар гасится на 75% (не в ноль — тяжёлые удары всё равно щиплют),
+        // боковой — на 40%. «Хватать урон щитом бесконечно» больше не выйдет.
+        dmg = Math.max(0.5, Math.round(dmg * (frontal ? 0.25 : 0.6) * 10) / 10);
       }
     }
     // Ледяная кора: четверть урона уходит в ману (3 маны за 1 урона)
@@ -3362,11 +3377,18 @@ export class Game {
           source.slowT = Math.max(source.slowT || 0, 1.6);
           source.slowMult = 0.6;
         }
-        const thorn = (this.hasTalent(p, 'thorns3') ? 3 : this.hasTalent(p, 'thorns') ? 1 : 0)
-          + (p.procs?.thorns?.dmg || 0);
-        if (thorn > 0)
+        // Шипы бьют В ПРОЦЕНТАХ от здоровья обидчика — чем толще враг, тем
+        // больнее ему бросаться на шипы (флэт-порог, потолок против боссов)
+        const tPct = this.hasTalent(p, 'thorns3') ? 0.12 : this.hasTalent(p, 'thorns') ? 0.06 : 0;
+        const procT = p.procs?.thorns?.dmg || 0;
+        if (tPct > 0 || procT > 0) {
+          const emax = source.maxHp || def?.hp || 1;
+          const cap = tPct >= 0.12 ? 16 : 8;
+          const thorn = procT + (tPct > 0 ? (tPct >= 0.12 ? 2 : 1) : 0)
+            + Math.min(cap, Math.round(tPct * emax));
           this.damageEnemy(source, thorn,
             { vx: -Math.cos(a), vy: -Math.sin(a), knockback: 30, owner: p.id, school: 'melee', isDot: true });
+        }
       }
     }
     // сет «Пепельный орден» (4): боль отвечает огненной новой
@@ -3416,14 +3438,28 @@ export class Game {
     }
   }
 
+  // свободная клетка у ориентира (кровать/тайл — солидные, вставать на них нельзя)
+  safeSpotNear(mapId, tx, ty) {
+    const map = this.mapFor(mapId);
+    // по расширяющимся кольцам ищем ближайший проходимый тайл (сама кровать солидна)
+    for (let r = 1; r <= 4; r++)
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          if (!map.isSolid(tx + dx, ty + dy))
+            return { x: (tx + dx) * TILE + 8, y: (ty + dy) * TILE + 8 };
+        }
+    return { x: tx * TILE + 8, y: ty * TILE + 8 };
+  }
+
   respawn(p) {
     p.dead = false;
     p.hp = p.maxHp;
     p.hunger = Math.max(p.hunger, 40);
     p.mapId = 'over';
-    if (p.home) { // возрождение в своей кровати
-      p.x = p.home.x * TILE + 8;
-      p.y = p.home.y * TILE + 8;
+    if (p.home) { // возрождение рядом со своей кроватью (не В ней — тайл солидный)
+      const spot = this.safeSpotNear('over', p.home.x, p.home.y);
+      p.x = spot.x; p.y = spot.y;
     } else {
       const s = this.world.settlements[0];
       p.x = (s ? s.x : 256) * TILE + 40;
@@ -3632,7 +3668,12 @@ export class Game {
             this.dropRandomWeapon(mapId, room.x * TILE + 8, room.y * TILE + 8, 2, 1);
             this.toastMap(mapId, '⚔ На оружейной стойке казармы что-то блеснуло');
           }
-          if (!dungeon.rooms.some(r => !r.cleared)) {
+          // Босс-данж завершается смертью босса (боковые залы можно обойти —
+          // требовать буквально КАЖДУЮ комнату нельзя: незаходимый зал вешал
+          // квест кампании навсегда). Данж без босса — когда все залы чисты.
+          const hasBoss = dungeon.rooms.some(r => r.isBoss);
+          const done = hasBoss ? room.isBoss : !dungeon.rooms.some(r => !r.cleared);
+          if (done && !poi.cleared) {
             poi.cleared = true;
             this.events.push(this.world.day, `Путники зачистили ${poi.name}`, { x: poi.x, y: poi.y });
             this.toastMap(mapId, `${poi.name} — зачищено!`);
@@ -3687,6 +3728,82 @@ export class Game {
 
   // ---------- живые структуры: временные стены и зоны ----------
   // временный тайл (ледяная стена): запоминает прежний и тает через dur
+  // ── ЛОВУШКИ подземелий: не тупые колья, а ловушки с характером ──
+  // Стиль данжа задаёт «начинку»: шахта — газ, склеп — могильный холод,
+  // пещера — шипы с кровью, форт — стрелы со стен. Ловушка телеграфит
+  // (можно уйти перекатом) и бьёт ВСЁ на клетке — врагов туда можно заманить.
+  trapKind(mapId) {
+    const style = this.dungeons.get(mapId)?.dungeon?.style;
+    return style === 'mine' ? 'gas' : style === 'crypt' ? 'frost'
+      : style === 'fort' ? 'dart' : 'spikes';
+  }
+
+  // взвод: игрок или враг наступил — ловушка «щёлкает» и через 0.4 с бьёт
+  armTrap(mapId, tx, ty, by) {
+    if (mapId === 'over') return;
+    const key = mapId + ':' + tx + ',' + ty;
+    this.trapCd = this.trapCd || new Map();
+    this.armedTraps = this.armedTraps || [];
+    if ((this.trapCd.get(key) || 0) > this.tick) return; // ещё на перезарядке
+    if (this.armedTraps.some(a => a.key === key)) return; // уже взведена
+    const kind = this.trapKind(mapId);
+    this.trapCd.set(key, this.tick + 90); // 3 с до нового щелчка
+    this.armedTraps.push({ mapId, tx, ty, key, kind, fire: this.tick + 12 }); // 0.4 с телеграф
+    this.fx({ t: 'telegraph', x: tx * TILE + 8, y: ty * TILE + 8, r: 12, w: 0.4 }, mapId, tx * TILE + 8, ty * TILE + 8);
+    if (by?.entType === undefined && !by?.trapHinted) { // подсказка игроку — единожды
+      by.trapHinted = true;
+      const say = { gas: '☠ Шипящий газ из плит! Перекатом можно проскочить',
+        frost: '❄ Могильный холод сковал плиту! Перекат спасёт',
+        dart: '➶ Стрелы из стен! Перекатом ловушки можно проскочить',
+        spikes: '⚔ Лезвия из пола! Перекатом ловушки можно проскочить' }[kind];
+      this.toast(by, say);
+    }
+  }
+
+  // разряд взведённых ловушек: бьёт игроков (не в перекате) и врагов на клетке
+  stepTraps() {
+    if (!this.armedTraps?.length) return;
+    const still = [];
+    for (const a of this.armedTraps) {
+      if (this.tick < a.fire) { still.push(a); continue; }
+      const cx = a.tx * TILE + 8, cy = a.ty * TILE + 8;
+      let struck = false;
+      for (const p of this.players.values()) {
+        if (p.dead || p.mapId !== a.mapId || p.rollT > 0) continue;
+        if (Math.floor(p.x / TILE) !== a.tx || Math.floor(p.y / TILE) !== a.ty) continue;
+        struck = true;
+        this.damagePlayer(p, a.kind === 'spikes' || a.kind === 'dart' ? 2 : 1, null);
+        if (a.kind === 'frost') { p.buffs.slowed = { mult: -0.4, t: 1.6 }; this.recomputeStats(p); }
+        if (a.kind === 'gas') { p.buffs.slowed = { mult: -0.25, t: 2 }; this.recomputeStats(p); }
+        if (a.kind === 'dart') this.shove(p, a.mapId, p.x - cx, p.y - cy, 34);
+      }
+      for (const e of this.entities.values()) {
+        if (e.entType !== 'enemy' || e.mapId !== a.mapId) continue;
+        if (Math.floor(e.x / TILE) !== a.tx || Math.floor(e.y / TILE) !== a.ty) continue;
+        struck = true;
+        this.damageEnemy(e, a.kind === 'spikes' || a.kind === 'dart' ? 3 : 2,
+          { owner: null, school: 'melee', vx: 0, vy: 0, knockback: 0, isDot: true });
+        if (!this.entities.has(e.id)) continue;
+        if (a.kind === 'frost') { e.slowT = Math.max(e.slowT || 0, 2); e.slowMult = 0.4; e.chillT = Math.max(e.chillT || 0, 1.6); }
+        if (a.kind === 'gas') { e.dotT = Math.max(e.dotT || 0, 3); e.dotDmg = Math.max(e.dotDmg || 0, 1); e.dotKind = 'venom'; e.aggro = true; }
+        if (a.kind === 'spikes') { e.dotT = Math.max(e.dotT || 0, 2); e.dotDmg = Math.max(e.dotDmg || 0, 1); e.dotKind = 'venom'; }
+        if (a.kind === 'dart') { e.stunT = Math.max(e.stunT || 0, 0.6); e.aggro = true; }
+      }
+      this.fx({ t: 'trap', kind: a.kind, x: cx, y: cy }, a.mapId, cx, cy);
+      void struck;
+    }
+    this.armedTraps = still;
+  }
+
+  // короткий толчок сущности прочь (ловушка-дротик): по коллизии карты
+  shove(ent, mapId, dx, dy, dist) {
+    const map = this.mapFor(mapId);
+    const n = Math.hypot(dx, dy) || 1;
+    const nx = ent.x + dx / n * dist, ny = ent.y + dy / n * dist;
+    if (!map.isSolid(Math.floor(nx / TILE), Math.floor(ent.y / TILE))) ent.x = nx;
+    if (!map.isSolid(Math.floor(ent.x / TILE), Math.floor(ny / TILE))) ent.y = ny;
+  }
+
   setTempTile(mapId, tx, ty, tile, dur) {
     const prev = this.chunks.tileAt(mapId, tx, ty);
     if (SOLID.has(prev) || prev === T.CHEST || prev === T.DUNGEON_EXIT || prev === T.LAVA) return false;

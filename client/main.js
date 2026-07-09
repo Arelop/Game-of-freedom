@@ -351,10 +351,20 @@ net.handlers.onFx = (kind, m) => {
       if (m.kind === 'firestorm') SFX.boom(); else SFX.zap();
       break;
     case 'telegraph':
-      // босс замахнулся: красная зона — беги!
+      // босс замахнулся / ловушка щёлкнула: красная зона — беги!
       ringFx.push({ x: m.x, y: m.y, r0: 6, r1: m.r, t: 0, dur: m.w, color: '#d9574a', fill: true });
       SFX.enemy_shot();
       break;
+    case 'trap': { // ловушка разрядилась — начинка по стилю данжа
+      const c = m.kind === 'gas' ? '#6abe30' : m.kind === 'frost' ? '#63c5ff'
+        : m.kind === 'dart' ? '#cbdbfc' : '#d9574a';
+      if (m.kind === 'gas') { playFx('fx_poison', 8, m.x, m.y, { dur: 0.6, scale: 1.3 }); particles.burst(m.x, m.y, c, 12, 40, 0.8, 3); }
+      else if (m.kind === 'frost') { playFx('fx_splash', 6, m.x, m.y, { dur: 0.45, scale: 1.4 }); particles.burst(m.x, m.y, c, 10, 60, 0.4); }
+      else { playFx('fx_boom', 8, m.x, m.y, { dur: 0.35, scale: 1 }); particles.burst(m.x, m.y, c, 12, 90, 0.35, 2); }
+      cam.addTrauma(0.25);
+      SFX.hit();
+      break;
+    }
     case 'telegraphLine':
       // босс метит рывок: красная полоса — уйди с траектории!
       ringFx.push({ x: m.x, y: m.y, line: true, aim: m.a, len: m.len, t: 0, dur: m.w, color: '#d9574a' });
