@@ -4601,7 +4601,7 @@ export class Game {
     const cx = d.camp.x * TILE, cy = d.camp.y * TILE;
     this.ashCampIds = [
       this.spawnNpc('ashtrader', null, 'ash', cx - 4 * TILE, cy - 1 * TILE, { kind: 'npc_merchant' }),
-      this.spawnNpc('enchanter', null, 'ash', cx + 4 * TILE, cy - 1 * TILE, { kind: 'npc_priest' }),
+      this.spawnNpc('enchanter', null, 'ash', cx + 4 * TILE, cy - 1 * TILE, { kind: 'npc_priest2' }),
       this.spawnNpc('firewalker', null, 'ash', cx, cy - 3 * TILE, { kind: 'npc_guard' }),
     ];
     const names = ['Жарох', 'Искра', 'Огневзор'];

@@ -1272,8 +1272,7 @@
       "file": "assets/raw/ai/npc_villager_oz.png"
     },
     "npc_guard_oz": {
-      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/dc-mon/merfolk_impaler.png",
-      "down": 2
+      "file": "assets/raw/ai/npc_guard_oz.png"
     },
     "npc_merchant_oz": {
       "file": "assets/raw/ai/npc_merchant_oz.png"
