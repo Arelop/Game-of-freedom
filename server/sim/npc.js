@@ -30,6 +30,53 @@ export function updateNpc(npc, dt, map, game) {
     else if (od > 34 * 34) walkTo(npc, owner.x, owner.y, NPC_SPEED * 1.4, dt, map);
     return;
   }
+  // нежить-миньон некроманта (скелет/вурдалак/голем): рвётся в ближний бой,
+  // держится хозяина в затишье; вурдалак лечится за убийства, голем крушит по площади
+  if (npc.role === 'minion') {
+    const owner = game.players.get(npc.owner);
+    if (!owner || owner.mapId !== npc.mapId) return;
+    const speed = (npc.golem ? GUARD_SPEED : GUARD_SPEED * (npc.fast ? 1.5 : 1.15));
+    let target = null, bd = 260 * 260;
+    for (const e of game.entities.values()) {
+      if (e.entType !== 'enemy' || e.mapId !== npc.mapId) continue;
+      const d = dist2(npc.x, npc.y, e.x, e.y);
+      if (d < bd) { bd = d; target = e; }
+    }
+    if (target) {
+      const ang = Math.atan2(target.y - npc.y, target.x - npc.x);
+      npc.aim = ang;
+      const reach = npc.golem ? 26 : 20;
+      if (bd > reach * reach) walkTo(npc, target.x, target.y, speed, dt, map);
+      npc.swingT = (npc.swingT ?? 0) - dt;
+      if (bd <= (reach + 8) * (reach + 8) && npc.swingT <= 0) {
+        npc.swingT = npc.fast ? 0.7 : 1.0;
+        const before = target.hp;
+        game.damageEnemy(target, npc.dmg || 3,
+          { vx: Math.cos(ang), vy: Math.sin(ang), knockback: npc.golem ? 60 : 25, owner: npc.owner, school: 'melee' });
+        game.fx({ t: 'swing', pid: npc.id, weapon: 'sword', x: npc.x, y: npc.y, aim: ang, range: reach, arc: 90 }, npc.mapId, npc.x, npc.y);
+        // костяной голем: удар сотрясает землю — задевает соседей
+        if (npc.golem) {
+          for (const e of game.entities.values()) {
+            if (e === target || e.entType !== 'enemy' || e.mapId !== npc.mapId) continue;
+            if (dist2(target.x, target.y, e.x, e.y) > 30 * 30) continue;
+            game.damageEnemy(e, Math.round((npc.dmg || 8) * 0.5), { vx: 0, vy: 0, knockback: 40, owner: npc.owner, school: 'melee' });
+          }
+        }
+        // вурдалак: пожирая добычу, латает раны
+        if (npc.ghoul && !game.entities.has(target.id) && npc.hp < npc.maxHp) {
+          npc.hp = Math.min(npc.maxHp, npc.hp + 3);
+          game.fx({ t: 'heal', pid: npc.id, x: npc.x, y: npc.y }, npc.mapId, npc.x, npc.y);
+        }
+        void before;
+      }
+      return;
+    }
+    const od = dist2(npc.x, npc.y, owner.x, owner.y);
+    if (od > 200 * 200) { npc.x = owner.x + 14; npc.y = owner.y; }
+    else if (od > 46 * 46) walkTo(npc, owner.x, owner.y, speed, dt, map);
+    return;
+  }
+
   // наёмник и призванный элементаль: следуют за хозяином, бьют врагов поблизости
   if (npc.role === 'mercenary' || npc.role === 'elemental') {
     const fiery = npc.role === 'elemental' && !npc.frost && !npc.holySpirit;

@@ -26,6 +26,11 @@ export const SPECS = {
     { id: 'wrath', name: 'Кара', color: '#df7126', desc: 'Гнев небес и палящий свет' },
     { id: 'bastion', name: 'Оплот', color: '#5fcde4', desc: 'Барьеры, стойкость и вера' },
   ],
+  necromancer: [
+    { id: 'bone', name: 'Кости', color: '#e8e0c8', desc: 'Скелеты, легион и костяной голем' },
+    { id: 'blight', name: 'Порча', color: '#6abe30', desc: 'Мор, проклятия и распад' },
+    { id: 'soul', name: 'Души', color: '#8f6fe0', desc: 'Дренаж, жатва и вампиризм' },
+  ],
 };
 
 export const TALENTS = {
@@ -149,6 +154,38 @@ export const TALENTS = {
     { id: 'p_cdr', spec: 'bastion', tier: 3, ranks: 1, name: 'Собранность', desc: 'Способности перезаряжаются на 20% быстрее', flag: 'cdr' },
     { id: 'p_martyr', spec: 'bastion', tier: 4, ranks: 1, name: 'Несокрушимость', desc: '+2 сердца, смертельный удар оставляет 1 ХП (раз в 60 с). УЛЬТА (F) «Небесный оплот»: 8 с отряду барьер 6 и −40% урона', flag: 'laststand', effects: { maxHp: 4 }, ult: 'martyr_ult' },
   ],
+  necromancer: [
+    // ═══ КОСТИ: повелитель нежити ═══
+    { id: 'n_bone', spec: 'bone', tier: 1, ranks: 3, name: 'Костяная воля', desc: '+6% урона магии за ранг', effects: { dmgMagic: 0.06 } },
+    { id: 'n_raise2', spec: 'bone', tier: 1, ranks: 1, name: 'Крепкие кости', desc: 'Скелеты крепче (+6 хп) и служат дольше', flag: 'ab_raise2' },
+    { id: 'n_legion', spec: 'bone', tier: 2, ranks: 1, name: 'Легион', desc: 'Поднять скелета зовёт сразу двоих', flag: 'ab_raise_two' },
+    { id: 'n_swift', spec: 'bone', tier: 2, ranks: 1, name: 'Резвые мертвецы', desc: 'Твои мертвецы быстрее и бьют чаще', flag: 'minion_haste' },
+    { id: 'n_spear2', spec: 'bone', tier: 2, ranks: 1, name: 'Град костей', desc: 'Костяное копьё раскалывается на 3 осколка веером', flag: 'ab_spear2' },
+    { id: 'n_command', spec: 'bone', tier: 3, ranks: 1, name: 'Повелитель костей', desc: 'Твои мертвецы наносят +40% урона', flag: 'minion_dmg' },
+    { id: 'n_army2', spec: 'bone', tier: 3, ranks: 1, name: 'Нескончаемая орда', desc: 'Армия мёртвых поднимает на 2 скелета больше', flag: 'ab_army2' },
+    { id: 'n_bonecdr', spec: 'bone', tier: 3, ranks: 1, name: 'Тёмная воля', desc: 'Способности перезаряжаются на 20% быстрее', flag: 'cdr' },
+    { id: 'n_bonelord', spec: 'bone', tier: 4, ranks: 1, name: 'Костяной владыка', desc: 'Мертвецы +2 хп и +20% урона. УЛЬТА (F) «Костяной голем»: огромный голем-страж крушит врагов 20 с', flag: 'minion_lord', ult: 'bonelord_ult' },
+    // ═══ ПОРЧА: чумной маг ═══
+    { id: 'n_blight', spec: 'blight', tier: 1, ranks: 3, name: 'Гниль', desc: '+6% урона магии за ранг', effects: { dmgMagic: 0.06 } },
+    { id: 'n_touch', spec: 'blight', tier: 1, ranks: 1, name: 'Прикосновение смерти', desc: 'Атаки посоха насылают порчу (дот 1/с на 3 с)', flag: 'blighttouch' },
+    { id: 'n_plague2', spec: 'blight', tier: 2, ranks: 1, name: 'Заразный мор', desc: 'Мор перекидывается на новых врагов, входящих в облако', flag: 'ab_plague2' },
+    { id: 'n_curse2', spec: 'blight', tier: 2, ranks: 1, name: 'Тяжкое проклятие', desc: 'Проклятие немощи сильнее (+40% урона) и длится 9 с', flag: 'ab_curse2' },
+    { id: 'n_burst2', spec: 'blight', tier: 2, ranks: 1, name: 'Обильный труп', desc: 'Взрыв трупа шире и оставляет облако чумы', flag: 'ab_burst2' },
+    { id: 'n_wither', spec: 'blight', tier: 3, ranks: 1, name: 'Увядание', desc: 'Все твои доты (порча, яд, чума) бьют на +1', flag: 'dotpower' },
+    { id: 'n_spread', spec: 'blight', tier: 3, ranks: 1, name: 'Эпидемия', desc: 'Смерть отравленного врага заражает соседей', flag: 'plaguespread' },
+    { id: 'n_echo', spec: 'blight', tier: 3, ranks: 1, name: 'Эхо смерти', desc: '20% шанс: способность почти без кулдауна', flag: 'echo' },
+    { id: 'n_pestlord', spec: 'blight', tier: 4, ranks: 1, name: 'Владыка чумы', desc: '+15% урона магии, доты +1. УЛЬТА (F) «Чумной вихрь»: огромное расползающееся облако мора', effects: { dmgMagic: 0.15 }, flag: 'dotpower', ult: 'plague_ult' },
+    // ═══ ДУШИ: вампир смерти ═══
+    { id: 'n_soul', spec: 'soul', tier: 1, ranks: 3, name: 'Сбор душ', desc: '+1 к регену маны за ранг', effects: { manaRegen: 1 } },
+    { id: 'n_drain2', spec: 'soul', tier: 1, ranks: 1, name: 'Жадный дренаж', desc: 'Высасывание жизни возвращает весь нанесённый урон', flag: 'ab_drain2' },
+    { id: 'n_harvest', spec: 'soul', tier: 2, ranks: 1, name: 'Жатва', desc: 'Убийства рядом дают +2 маны и чаще дарят души', flag: 'soulharvest' },
+    { id: 'n_leech', spec: 'soul', tier: 2, ranks: 1, name: 'Пиявка душ', desc: 'Попадания посоха лечат тебя на 1 (не чаще раза в 0.6 с)', flag: 'lifesteal' },
+    { id: 'n_soularmor', spec: 'soul', tier: 2, ranks: 1, name: 'Панцирь душ', desc: 'Костяной доспех держит 9 урона и жалит больнее', flag: 'ab_bonearmor2' },
+    { id: 'n_soulpower', spec: 'soul', tier: 3, ranks: 1, name: 'Сила душ', desc: 'На каждую душу +5% урона магии (пока души при тебе)', flag: 'soulpower' },
+    { id: 'n_ward', spec: 'soul', tier: 3, ranks: 1, name: 'Оберег смерти', desc: 'Смертельный удар оставляет 1 ХП (раз в 60 с)', flag: 'laststand' },
+    { id: 'n_soulcrit', spec: 'soul', tier: 3, ranks: 2, name: 'Хладный расчёт', desc: '+5% шанса крита за ранг', effects: { critChance: 0.05 } },
+    { id: 'n_reaper', spec: 'soul', tier: 4, ranks: 1, name: 'Жнец', desc: '+2 сердца. УЛЬТА (F) «Жатва душ»: вытягивает души всех врагов вокруг — урон, массовое лечение, полные души', effects: { maxHp: 4 }, ult: 'reaper_ult' },
+  ],
 };
 
 // ═══ УЛЬТЫ: венец каждой ветки талантов (клавиша F) ═══
@@ -166,6 +203,9 @@ export const ULTS = {
   rez_ult: { id: 'rez_ult', name: 'Чудо', icon: 'ult_rez', cd: 90, mana: 25, desc: 'Полное исцеление отряда и воскрешение всех павших рядом' },
   wrath_ult: { id: 'wrath_ult', name: 'Гнев Господень', icon: 'ult_wrath', cd: 75, mana: 20, desc: 'Столбы света бьют всех врагов вокруг: ×2.5 урона магии и стан 1 с' },
   martyr_ult: { id: 'martyr_ult', name: 'Небесный оплот', icon: 'ult_martyr', cd: 90, mana: 20, desc: '8 с отряду: барьер на 6 и −40% входящего урона' },
+  bonelord_ult: { id: 'bonelord_ult', name: 'Костяной голем', icon: 'ult_bonelord', cd: 90, mana: 18, desc: 'Призывает огромного костяного голема-стража: крушит врагов и держит удар 20 с' },
+  plague_ult: { id: 'plague_ult', name: 'Чумной вихрь', icon: 'ult_plague', cd: 80, mana: 20, desc: 'Огромное облако мора у прицела: расползается, травит и слепит всё живое (кроме своих)' },
+  reaper_ult: { id: 'reaper_ult', name: 'Жатва душ', icon: 'ult_reaper', cd: 80, mana: 16, desc: 'Вытягивает души всех врагов вокруг: тяжёлый урон, лечит тебя за каждого и наполняет души' },
 };
 
 // ульта героя: по взятому капстоуну (взять можно только один — очков впритык)

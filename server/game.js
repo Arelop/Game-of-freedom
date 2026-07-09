@@ -268,6 +268,7 @@ export class Game {
       rage: 0,                    // ЯРОСТЬ воина: растёт в бою, сжигается способностями
       combo: 0, comboT: 0,        // КОМБО вора: серия попаданий усиливает приёмы
       grace: 0,                   // БЛАГОДАТЬ жреца: лечение заряжает кару
+      souls: 0,                   // ДУШИ некроманта: смерти рядом дают заряд (до 5)
       abCd: [0, 0, 0, 0], invisT: 0, offCd: 0, shieldHp: 0, shieldT: 0, // [3] — ульта (F)
       abilities: defaultLoadout(cls), // раскладка Q/X/R — настраивается в Книге способностей (K)
       coins: 20, hunger: HUNGER_MAX,
@@ -439,6 +440,9 @@ export class Game {
     // Чародейские заряды мага: +4% урона магии за заряд
     if (w.school === 'magic' && p.cls === 'mage' && p.arcaneN)
       mult *= 1 + 0.04 * p.arcaneN;
+    // «Сила душ» некроманта: пока души при тебе, магия крепче (+5% за душу)
+    if (w.school === 'magic' && p.cls === 'necromancer' && p.souls && this.hasTalent(p, 'soulpower'))
+      mult *= 1 + 0.05 * p.souls;
     if (this.hasTalent(p, 'rage') && p.hp <= p.maxHp * 0.3) mult *= 1.4;
     if (p.contract?.type === 'glass') mult *= 1.3; // Стеклянная пушка
     if (p.shadowT > 0 && this.hasTalent(p, 'shadow')) { mult *= 1.5; p.shadowT = 0; }
@@ -805,6 +809,20 @@ export class Game {
     p.poisonBladeT = Math.max(0, (p.poisonBladeT || 0) - dt); // яд на клинках вора
     p.rageUltT = Math.max(0, (p.rageUltT || 0) - dt); // «Кровавая жатва»
     p.goldUltT = Math.max(0, (p.goldUltT || 0) - dt); // «Дым и золото»
+    // «Костяной вихрь» некроманта: осколки кости режут врагов вокруг раз в 0.4 с
+    if ((p.boneStormT || 0) > this.tick) {
+      p.boneStormAcc = (p.boneStormAcc || 0) + dt;
+      if (p.boneStormAcc >= 0.4) {
+        p.boneStormAcc -= 0.4;
+        for (const e of [...this.entities.values()]) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) > 46 * 46) continue;
+          this.damageEnemy(e, p.boneStormDmg || 3,
+            { vx: 0, vy: 0, knockback: 20, owner: p.id, school: 'magic', isDot: true });
+        }
+        this.fx({ t: 'bonestorm', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+      }
+    }
     // «Сияние» жреца: святой свет жжёт врагов рядом раз в секунду
     if ((p.radianceT || 0) > 0) {
       p.radianceT -= dt;
@@ -1587,11 +1605,17 @@ export class Game {
           e.dotAcc = (e.dotAcc || 0) + dt;
           if (e.dotAcc >= 1) {
             e.dotAcc -= 1;
-            this.damageEnemy(e, e.dotDmg || 1,
+            // «Увядание» некроманта: его доты бьют на +1
+            const src = this.players.get(e.dotSrc);
+            const bonus = src && this.hasTalent(src, 'dotpower') ? 1 : 0;
+            this.damageEnemy(e, (e.dotDmg || 1) + bonus,
               { owner: e.dotSrc, school: 'magic', isDot: true, vx: 0, vy: 0, knockback: 0 });
             if (!this.entities.has(e.id)) continue; // дот добил
           }
         }
+        // метки некроманта тают (проклятие немощи / слабость)
+        if ((e.curseT || 0) > 0) e.curseT -= dt;
+        if ((e.weakT || 0) > 0) e.weakT -= dt;
         const def0 = ENEMIES[e.kind];
         // шаман-лекарь: лечит самого раненого союзника рядом
         if (def0.healer && (e.stunT || 0) <= 0) {
@@ -1919,6 +1943,33 @@ export class Game {
         });
         break;
       }
+      case 'bonelord_ult': { // кости: костяной голем-страж
+        this.summonMinion(p, { kind: 'enemy_golem', name: 'Костяной голем', hp: 60, dmg: 8, golem: true, dur: 20, cap: 12 });
+        this.toastMap(p.mapId, '💀 Костяной голем восстал из земли!');
+        break;
+      }
+      case 'plague_ult': { // порча: чумной вихрь
+        const tx = p.x + Math.cos(aim) * 70, ty = p.y + Math.sin(aim) * 70;
+        this.zones.push({ mapId: p.mapId, x: tx, y: ty, vx: 0, vy: 0, r: 80, t: 9, kind: 'plague', owner: p.id, spread: true });
+        this.fx({ t: 'zone', kind: 'plague', x: tx, y: ty, vx: 0, vy: 0, r: 80, dur: 9 }, p.mapId, tx, ty);
+        break;
+      }
+      case 'reaper_ult': { // души: жатва душ
+        let reaped = 0;
+        foesIn(140, e => {
+          this.fx({ t: 'chain', pts: [[p.x, p.y - 6], [e.x, e.y]] }, p.mapId, p.x, p.y);
+          this.damageEnemy(e, Math.round(5 * (d.dmgMagic || 1) * 2 * 10) / 10,
+            { vx: 0, vy: 0, knockback: 0, owner: p.id, school: 'magic' });
+          reaped++;
+        });
+        if (reaped) {
+          p.hp = Math.min(p.maxHp, p.hp + Math.min(6, reaped));
+          this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        }
+        p.souls = 5; // жатва наполняет души до предела
+        this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        break;
+      }
     }
     this.fx({ t: 'react', name: ult.name.toUpperCase() + '!', x: p.x, y: p.y - 14 }, p.mapId, p.x, p.y);
     this.gainArcane(p);
@@ -1936,6 +1987,38 @@ export class Game {
     p.abilities[slot] = id;
     p.abCd[slot] = Math.max(p.abCd[slot] || 0, 1); // маленькая пауза после перестановки
     this.toast(p, `📖 «${ab.name}» — на клавише ${['Q', 'X', 'R'][slot]}`);
+  }
+
+  // призыв нежити-миньона (скелет/вурдалак/голем): держит строй, бьёт в ближнем.
+  // Несколько на игрока — с лимитом; таланты усиливают.
+  summonMinion(p, opts = {}) {
+    const cap = opts.cap || (this.hasTalent(p, 'minion_lord') ? 8 : 6);
+    const mine = [...this.entities.values()].filter(e => e.entType === 'npc' && e.role === 'minion' && e.owner === p.id);
+    if (mine.length >= cap) { // старший упокаивается, освобождая место
+      mine.sort((a, b) => (a.dieAtTick || 0) - (b.dieAtTick || 0));
+      this.entities.delete(mine[0].id);
+    }
+    const ang = this.rand() * Math.PI * 2;
+    const id = this.spawnNpc('minion', null, p.mapId, p.x + Math.cos(ang) * 16, p.y + Math.sin(ang) * 16,
+      { kind: opts.kind || 'enemy_skeleton' });
+    const m = this.entities.get(id);
+    m.role = 'minion';
+    m.owner = p.id;
+    m.name = opts.name || 'Нежить';
+    m.ghoul = !!opts.ghoul;   // вурдалак: быстрый, лечится за убийства
+    m.golem = !!opts.golem;   // костяной голем: огромный, крушит по площади
+    let hp = opts.hp || 12;
+    if (this.hasTalent(p, 'ab_raise2')) hp += 6;
+    if (this.hasTalent(p, 'minion_lord')) hp += 2;
+    m.hp = m.maxHp = hp;
+    m.dmg = opts.dmg || 3;
+    if (this.hasTalent(p, 'minion_dmg')) m.dmg = Math.round(m.dmg * 1.4 * 10) / 10;
+    if (this.hasTalent(p, 'minion_lord')) m.dmg = Math.round(m.dmg * 1.2 * 10) / 10;
+    m.fast = this.hasTalent(p, 'minion_haste') || !!opts.fast;
+    const dur = (opts.dur || 30) + (this.hasTalent(p, 'ab_raise2') ? 10 : 0);
+    m.dieAtTick = this.tick + dur * 30;
+    this.fx({ t: 'summon', x: m.x, y: m.y }, p.mapId, m.x, m.y);
+    return m;
   }
 
   // призыв союзника-элементаля: один на игрока, живёт 25 с
@@ -1990,6 +2073,13 @@ export class Game {
       resMult = 1 + p.grace * 0.2; // +20% за заряд благодати
       this.fx({ t: 'react', name: 'БЛАГОДАТЬ!', x: p.x, y: p.y - 10 }, p.mapId, p.x, p.y);
       p.grace = 0;
+    }
+    // ДУШИ некроманта: боевые способности жгут запас (+12% урона за душу)
+    if (p.cls === 'necromancer' && (p.souls || 0) > 0
+      && ['bone_spear', 'drain_life', 'corpse_burst', 'bone_storm'].includes(ab.id)) {
+      resMult = 1 + p.souls * 0.12;
+      this.fx({ t: 'react', name: `ДУШИ ×${p.souls}`, x: p.x, y: p.y - 10 }, p.mapId, p.x, p.y);
+      p.souls = 0;
     }
     const d = {
       ...(p.derived || {}),
@@ -2555,6 +2645,118 @@ export class Game {
         } else { p.abCd[slot] = 1; this.toast(p, 'Луч не нашёл цели'); }
         break;
       }
+      // ═══════════ НЕКРОМАНТ ═══════════
+      case 'bone_spear': { // некромант Q: пронзающий осколок кости («Град костей» — веером)
+        const dirs = this.hasTalent(p, 'ab_spear2') ? [-0.18, 0, 0.18] : [0];
+        for (const off of dirs) {
+          const a = aim + off;
+          this.projectiles.push({
+            x: p.x, y: p.y - 4, vx: Math.cos(a) * 380, vy: Math.sin(a) * 380,
+            life: 0.85, radius: 3, dmg: Math.round(4 * (d.dmgMagic || 1) * 2.5 * 10) / 10,
+            knockback: 30, school: 'magic', pierce: true, owner: p.id, friendly: true, mapId: p.mapId,
+          });
+        }
+        break;
+      }
+      case 'raise_skeleton': { // некромант: поднять скелета-воина («Легион» — двоих)
+        let n = this.hasTalent(p, 'ab_raise_two') ? 2 : 1;
+        n += Math.floor((p.souls || 0) / 3); // души поднимают ещё
+        if (p.souls) p.souls = Math.max(0, p.souls - (n - (this.hasTalent(p, 'ab_raise_two') ? 2 : 1)) * 3);
+        for (let i = 0; i < n; i++)
+          this.summonMinion(p, { kind: 'enemy_skeleton', name: 'Скелет-воин', hp: 12, dmg: 3 });
+        this.toast(p, `☠ Восстал${n > 1 ? 'и ' + n + ' скелета' : ' скелет-воин'}`);
+        break;
+      }
+      case 'drain_life': { // некромант X: луч крадёт жизнь у цели
+        const tx = p.x + Math.cos(aim) * 120, ty = p.y + Math.sin(aim) * 120;
+        let best = null, bd = 130 * 130;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          const d2 = dist2(tx, ty, e.x, e.y);
+          if (d2 < bd) { bd = d2; best = e; }
+        }
+        if (!best) { p.abCd[slot] = 1; this.toast(p, 'Луч не нашёл жертву'); break; }
+        const dmg = Math.round(4 * (d.dmgMagic || 1) * 2 * 10) / 10;
+        this.fx({ t: 'chain', pts: [[p.x, p.y - 6], [best.x, best.y]] }, p.mapId, p.x, p.y);
+        this.damageEnemy(best, dmg, { vx: 0, vy: 0, knockback: 0, owner: p.id, school: 'magic' });
+        const heal = this.hasTalent(p, 'ab_drain2') ? dmg : dmg / 2;
+        if (p.hp < p.maxHp) { p.hp = Math.min(p.maxHp, p.hp + Math.max(1, Math.round(heal))); this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y); }
+        break;
+      }
+      case 'bone_armor': { // некромант: панцирь костей — барьер и костяные шипы
+        const strong = this.hasTalent(p, 'ab_bonearmor2');
+        p.shieldHp = Math.max(p.shieldHp || 0, strong ? 9 : 6);
+        p.shieldT = Math.max(p.shieldT || 0, 12);
+        p.boneArmorT = this.tick + 12 * 30; // 12 с шипов
+        p.boneArmorDmg = strong ? 3 : 2;
+        this.fx({ t: 'barrier', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        this.toast(p, `🦴 Костяной доспех: барьер ${strong ? 9 : 6}, шипы ${p.boneArmorDmg}`);
+        break;
+      }
+      case 'corpse_burst': { // некромант: детонирует дот на враге — взрыв + чума
+        const tx = p.x + Math.cos(aim) * 110, ty = p.y + Math.sin(aim) * 110;
+        let best = null, bd = 110 * 110;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId || (e.dotT || 0) <= 0) continue;
+          const d2 = dist2(tx, ty, e.x, e.y);
+          if (d2 < bd) { bd = d2; best = e; }
+        }
+        if (!best) { p.abCd[slot] = 1; this.toast(p, 'Нужен отравленный или горящий враг'); break; }
+        const burst = Math.round((best.dotDmg || 1) * best.dotT * 3 * (d.dmgMagic || 1) * 10) / 10;
+        best.dotT = 0;
+        this.explodeAt(p.mapId, best.x, best.y, burst, 40, p.id, 0);
+        this.fx({ t: 'boom', x: best.x, y: best.y, r: 40 }, p.mapId, best.x, best.y);
+        // «Обильный труп»: остаётся облако чумы
+        if (this.hasTalent(p, 'ab_burst2')) {
+          this.zones.push({ mapId: p.mapId, x: best.x, y: best.y, vx: 0, vy: 0, r: 40, t: 5, kind: 'plague', owner: p.id, spread: this.hasTalent(p, 'ab_plague2') });
+          this.fx({ t: 'zone', kind: 'plague', x: best.x, y: best.y, vx: 0, vy: 0, r: 40, dur: 5 }, p.mapId, best.x, best.y);
+        }
+        break;
+      }
+      case 'curse_weakness': { // некромант: проклятие немощи по области
+        const strong = this.hasTalent(p, 'ab_curse2');
+        let n = 0;
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
+          if (dist2(p.x, p.y, e.x, e.y) > 90 * 90) continue;
+          e.curseT = strong ? 9 : 6;
+          e.curseAmp = strong ? 1.4 : 1.25; // входящий урон ×
+          e.slowT = Math.max(e.slowT || 0, strong ? 9 : 6); e.slowMult = 0.6;
+          e.weakT = strong ? 9 : 6; // слабость: их урон меньше
+          e.aggro = true; n++;
+        }
+        if (!n) { p.abCd[slot] = 1; this.toast(p, 'Некого проклинать'); break; }
+        this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        this.toast(p, `💀 Проклятие немощи: ${n} врагов ослаблены`);
+        break;
+      }
+      case 'summon_ghoul': { // некромант: быстрый вурдалак-пожиратель
+        this.summonMinion(p, { kind: 'enemy_ghoul', name: 'Вурдалак', hp: 16, dmg: 4, ghoul: true, fast: true });
+        this.toast(p, '🩸 Вурдалак вышел на охоту');
+        break;
+      }
+      case 'pestilence': { // некромант: ядовитое облако мора у прицела
+        const zx = p.x + Math.cos(aim) * 60, zy = p.y + Math.sin(aim) * 60;
+        this.zones.push({ mapId: p.mapId, x: zx, y: zy, vx: 0, vy: 0, r: 46, t: 6, kind: 'plague', owner: p.id, spread: this.hasTalent(p, 'ab_plague2') });
+        this.fx({ t: 'zone', kind: 'plague', x: zx, y: zy, vx: 0, vy: 0, r: 46, dur: 6 }, p.mapId, zx, zy);
+        break;
+      }
+      case 'bone_storm': { // некромант R: осколки кости кружат вокруг
+        p.boneStormT = this.tick + 5 * 30;
+        p.boneStormDmg = Math.round(3 * (d.dmgMagic || 1) * 10) / 10;
+        this.fx({ t: 'nova', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        break;
+      }
+      case 'army_of_dead': { // некромант: поднять легион скелетов разом
+        let n = 3 + (this.hasTalent(p, 'ab_army2') ? 2 : 0) + Math.floor((p.souls || 0) / 2);
+        p.souls = 0;
+        n = Math.min(8, n);
+        for (let i = 0; i < n; i++)
+          this.summonMinion(p, { kind: 'enemy_skeleton', name: 'Скелет легиона', hp: 12, dmg: 3, cap: 12 });
+        this.fx({ t: 'summon', x: p.x, y: p.y }, p.mapId, p.x, p.y);
+        this.toast(p, `☠ Восстала армия мёртвых (${n})!`);
+        break;
+      }
     }
     this.fx({ t: 'ability', pid: p.id, id: ab.id, x: p.x, y: p.y, aim }, p.mapId, p.x, p.y);
   }
@@ -2697,6 +2899,14 @@ export class Game {
           if (e.entType !== 'enemy' || e.mapId !== pr.mapId) continue;
           const def = ENEMIES[e.kind];
           if (circlesOverlap(pr.x, pr.y, pr.radius, e.x, e.y, def.radius)) {
+            // пронзающий снаряд (Костяное копьё): бьёт каждого раз и летит дальше
+            if (pr.pierce) {
+              pr.hitSet = pr.hitSet || new Set();
+              if (pr.hitSet.has(e.id)) continue;
+              pr.hitSet.add(e.id);
+              this.damageEnemy(e, pr.dmg, pr);
+              continue;
+            }
             if (pr.explode) {
               this.explodeAt(pr.mapId, pr.x, pr.y, pr.dmg, pr.explode.radius, pr.owner, pr.structDmg || 0);
             } else {
@@ -2723,6 +2933,7 @@ export class Game {
         if (!hit && !pr.guard) {
           for (const n of this.entities.values()) {
             if (n.entType !== 'npc' || n.mapId !== pr.mapId) continue;
+            if (n.role === 'minion' || n.role === 'elemental') continue; // призванные союзники неуязвимы для своих
             if (circlesOverlap(pr.x, pr.y, pr.radius, n.x, n.y, 5)) {
               this.damageNpc(n, pr.dmg, this.players.get(pr.owner));
               hit = true; break;
@@ -2792,6 +3003,8 @@ export class Game {
 
   // ---------- урон ----------
   damageEnemy(e, dmg, pr) {
+    // Проклятие немощи некроманта: враг получает усиленный урон
+    if ((e.curseT || 0) > 0) dmg *= (e.curseAmp || 1.25);
     // щитоносец: гасит удары в фронтальный конус (оглушённый — нет)
     const defS = ENEMIES[e.kind];
     if (defS?.shielded && pr && !pr.isDot && (e.stunT || 0) <= 0) {
@@ -2873,6 +3086,18 @@ export class Game {
         attacker.rage = Math.min(100, (attacker.rage || 0) + 2);
       // «Жажда крови»: заряды недавних убийств
       if (attacker.blT > 0 && attacker.blStacks) dmg *= 1 + 0.04 * attacker.blStacks;
+      // «Прикосновение смерти» некроманта: магия насылает порчу (дот)
+      if (pr.school === 'magic' && !pr.isDot && this.hasTalent(attacker, 'blighttouch') && (e.dotT || 0) <= 0) {
+        e.dotT = 3; e.dotDmg = 1 + (this.hasTalent(attacker, 'dotpower') ? 1 : 0);
+        e.dotSrc = attacker.id; e.dotKind = 'venom';
+      }
+      // «Пиявка душ»: попадания посоха лечат некроманта (раз в 0.6 с)
+      if (pr.school === 'magic' && !pr.isDot && this.hasTalent(attacker, 'lifesteal')
+        && (attacker.leechT || 0) <= this.tick && attacker.hp < attacker.maxHp) {
+        attacker.leechT = this.tick + 18;
+        attacker.hp = Math.min(attacker.maxHp, attacker.hp + 1);
+        this.fx({ t: 'heal', pid: attacker.id, x: attacker.x, y: attacker.y }, attacker.mapId, attacker.x, attacker.y);
+      }
       dmg = Math.round(dmg * 10) / 10;
       // сет «Ледяной чертог» (4): магия студит врагов
       if (pr.school === 'magic' && attacker.setFlags?.set_chill && (e.slowT || 0) <= 0) {
@@ -2973,6 +3198,27 @@ export class Game {
     // Мана-всплеск: маг восполняет ману убийствами магией
     if (killer && killer.cls === 'mage' && pr.school === 'magic')
       killer.mana = Math.min(killer.manaMax, killer.mana + 3);
+    // ДУШИ некроманта: всякая смерть рядом дарит заряд (до 5).
+    // «Жатва» усиливает — +2 маны за душу и заряд с большей дистанции
+    for (const q of this.players.values()) {
+      if (q.cls !== 'necromancer' || q.dead || q.mapId !== e.mapId) continue;
+      const harvest = this.hasTalent(q, 'soulharvest');
+      if (dist2(q.x, q.y, e.x, e.y) > (harvest ? 320 : 220) ** 2) continue;
+      if ((q.souls || 0) < 5) {
+        q.souls = (q.souls || 0) + 1;
+        this.fx({ t: 'soul', x: e.x, y: e.y, tx: q.x, ty: q.y }, q.mapId, e.x, e.y);
+      }
+      if (harvest) q.mana = Math.min(q.manaMax, q.mana + 2);
+      // «Эпидемия»: смерть отравленного заражает соседей
+      if (this.hasTalent(q, 'plaguespread') && (e.dotT || 0) > 0 && e.dotKind === 'venom') {
+        for (const o of this.entities.values()) {
+          if (o === e || o.entType !== 'enemy' || o.mapId !== e.mapId) continue;
+          if (dist2(e.x, e.y, o.x, o.y) > 55 * 55) continue;
+          o.dotT = Math.max(o.dotT || 0, 3); o.dotDmg = Math.max(o.dotDmg || 0, e.dotDmg || 1);
+          o.dotSrc = q.id; o.dotKind = 'venom';
+        }
+      }
+    }
     // сюжет: счётчик бандитов для Ярославы — всем участникам боя
     if (['bandit', 'banditHeavy', 'archer'].includes(e.kind))
       for (const q of gainers) if (q.story) q.story.bandits++;
@@ -3310,6 +3556,17 @@ export class Game {
 
   damagePlayer(p, dmg, source) {
     if (p.dead || hasIFrames(p)) return;
+    // Проклятие немощи: ослабленный враг бьёт слабее
+    if (source && source.entType === 'enemy' && (source.weakT || 0) > 0) dmg *= 0.6;
+    // «Костяной доспех» некроманта: обидчик вблизи напарывается на кости —
+    // жалит даже сквозь барьер (контакт есть контакт), раз в 0.5 с на врага
+    if ((p.boneArmorT || 0) > this.tick && source && source.entType === 'enemy'
+      && source.x !== undefined && dist2(p.x, p.y, source.x, source.y) < 42 * 42
+      && (source.boneHitCd || 0) <= this.tick) {
+      source.boneHitCd = this.tick + 15;
+      this.damageEnemy(source, p.boneArmorDmg || 2,
+        { vx: 0, vy: 0, knockback: 20, owner: p.id, school: 'magic', isDot: true });
+    }
     // контракт «Стеклянная пушка»: входящий урон удвоен
     if (p.contract?.type === 'glass') dmg *= 2;
     // Дух-хранитель жреца бережёт от боли
@@ -3874,6 +4131,20 @@ export class Game {
             e.blindT = Math.max(e.blindT || 0, 0.7); // и не даёт снова прицелиться
           }
         }
+      } else if (z.kind === 'plague') {
+        // МОР некроманта: травит и слепит врагов в облаке; своих щадит.
+        // «Заразный мор» (z.spread): цепляет всех входящих. Урон — раз в 0.5 с (tickT).
+        const dead = [];
+        for (const e of this.entities.values()) {
+          if (e.entType !== 'enemy' || e.mapId !== z.mapId) continue;
+          if (dist2(z.x, z.y, e.x, e.y) > z.r * z.r) continue;
+          this.damageEnemy(e, 1, { owner: z.owner, school: 'magic', isDot: true, vx: 0, vy: 0, knockback: 0 });
+          if (!this.entities.has(e.id)) { dead.push(e); continue; }
+          e.blindT = Math.max(e.blindT || 0, 0.6);
+          e.dotT = Math.max(e.dotT || 0, 2); e.dotDmg = Math.max(e.dotDmg || 0, 1);
+          e.dotSrc = z.owner; e.dotKind = 'venom';
+        }
+        void dead;
       }
     }
   }
@@ -4320,7 +4591,7 @@ export class Game {
     const heroes = [...this.players.values()].filter(q =>
       !q.dead && q.mapId === 'over' && dist2(q.x, q.y, c.x * TILE, c.y * TILE) < 500 ** 2);
     const grp = heroes.length ? heroes : [p];
-    const LEG = { warrior: 'sunblade', mage: 'dawnstaff', rogue: 'windbow', priest: 'dawnstaff' };
+    const LEG = { warrior: 'sunblade', mage: 'dawnstaff', rogue: 'windbow', priest: 'dawnstaff', necromancer: 'dawnstaff' };
     for (const q of grp) {
       const lw = (LEG[q.cls] || 'sunblade') + '@l';
       q.inventory['weapon:' + lw] = (q.inventory['weapon:' + lw] || 0) + 1;

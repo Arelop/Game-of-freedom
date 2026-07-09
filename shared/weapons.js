@@ -118,6 +118,14 @@ export const WEAPONS = {
     sprite: 'wpn_taxe', projSprite: 'proj_taxe', sound: 'shot_knife',
     projRadius: 3, projLife: 0.9, ammoType: 'knife', price: 95, structDmg: 3,
   },
+  bonestaff: {
+    id: 'bonestaff', name: 'Посох душ', school: 'magic', damage: 4, projectilesPerShot: 1,
+    spreadDeg: 3, projectileSpeed: 250, fireRate: 2.6, manaCost: 1,
+    knockback: 10, recoilShake: 0.1,
+    sprite: 'wpn_bonestaff', projSprite: 'proj_soul', sound: 'shot_frost',
+    projRadius: 3, projLife: 1.1, price: 100,
+    poison: { time: 2, dmg: 1 },          // разряд смерти: лёгкая порча (дот)
+  },
   venomstaff: {
     id: 'venomstaff', name: 'Посох яда', school: 'magic', damage: 5, projectilesPerShot: 2,
     spreadDeg: 14, projectileSpeed: 260, fireRate: 2.2, manaCost: 2,

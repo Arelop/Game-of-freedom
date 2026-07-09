@@ -52,6 +52,16 @@ export const CLASSES = {
     ammo: { arrow: 0, bolt: 0, knife: 0 },
     sprite: 'player_priest',
   },
+  necromancer: {
+    id: 'necromancer', name: 'Некромант',
+    desc: 'Повелитель смерти. Поднимает мёртвых, сеет порчу, пьёт души.',
+    baseStats: { str: 0, agi: 1, int: 3, lck: 1 },
+    maxHpBonus: 1,   // мертвецы прикрывают хозяина — можно чуть крепче мага
+    manaBase: 40,
+    weapons: ['bonestaff', 'sword'],
+    ammo: { arrow: 0, bolt: 0, knife: 0 },
+    sprite: 'player_necromancer',
+  },
 };
 
 // Кривая опыта: сколько нужно до следующего уровня

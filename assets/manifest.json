@@ -1034,6 +1034,28 @@
     "player_priest": {
       "file": "assets/raw/ai/player_priest.png"
     },
+    "player_necromancer": {
+      "file": "assets/raw/ai/player_necromancer.png"
+    },
+    "ab_bone_spear": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/bone_shards.png" },
+    "ab_raise_skeleton": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/animate_skeleton.png" },
+    "ab_drain_life": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/vampiric_draining.png" },
+    "ab_bone_armor": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/deaths_door.png" },
+    "ab_corpse_burst": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/corpse_rot.png" },
+    "ab_curse_weakness": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/agony.png" },
+    "ab_summon_ghoul": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/animate_dead.png" },
+    "ab_pestilence": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/cigotuvis_degeneration.png" },
+    "ab_bone_storm": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/excruciating_wounds.png" },
+    "ab_army_of_dead": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/haunt.png" },
+    "ult_bonelord": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/simulacrum.png" },
+    "ult_plague": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/symbol_of_torment.png" },
+    "ult_reaper": { "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/death_channel.png" },
+    "wpn_bonestaff": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/staff/staff08.png"
+    },
+    "proj_soul": {
+      "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/spells/necromancy/bolt_of_draining.png"
+    },
     "wpn_lightstaff": {
       "file": "assets/raw/crawl-tiles/crawl-tiles Oct-5-2010/item/staff/staff05.png"
     },

@@ -53,7 +53,7 @@ export class Net {
       if (game.players.size >= MAX_PLAYERS) { ws.send(JSON.stringify({ t: 'full' })); return; }
       const id = this.nextPlayerId++;
       const name = String(m.name || 'Игрок').slice(0, 16) || 'Игрок';
-      const cls = ['warrior', 'mage', 'rogue', 'priest'].includes(m.cls) ? m.cls : 'warrior';
+      const cls = ['warrior', 'mage', 'rogue', 'priest', 'necromancer'].includes(m.cls) ? m.cls : 'warrior';
       const p = game.addPlayer(id, name, ws, cls);
       ws.playerId = id;
       console.log(`[net] ${name} (${cls}) вошёл (id=${id})`);
@@ -218,7 +218,8 @@ export class Net {
         chg: p.chg ? r2(p.chg) : undefined, // заряд посоха мага (0..1)
         rsc: p.cls === 'warrior' ? Math.round(p.rage || 0)
           : p.cls === 'rogue' ? (p.combo || 0)
-          : p.cls === 'priest' ? (p.grace || 0) : undefined,
+          : p.cls === 'priest' ? (p.grace || 0)
+          : p.cls === 'necromancer' ? (p.souls || 0) : undefined,
         bnt: p.bounty || 0,
         ctr: p.contract ? { tp: p.contract.type, t: Math.round(p.contract.t) } : undefined,
         // (онбординг-подсказки убраны: с первой минуты ведёт кампания)

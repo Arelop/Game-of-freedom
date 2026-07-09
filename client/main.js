@@ -347,13 +347,23 @@ net.handlers.onFx = (kind, m) => {
     case 'ability': spawnAbilityFx(m); break;
     case 'zone':
       // живая зона: дым или огненный смерч — частицы, пока живёт
-      activeZones.push({ kind: m.kind, x: m.x, y: m.y, vx: m.vx || 0, vy: m.vy || 0, t: m.dur });
+      activeZones.push({ kind: m.kind, x: m.x, y: m.y, vx: m.vx || 0, vy: m.vy || 0, t: m.dur, r: m.r || 44 });
       if (m.kind === 'firestorm') SFX.boom(); else SFX.zap();
       break;
     case 'telegraph':
       // босс замахнулся / ловушка щёлкнула: красная зона — беги!
       ringFx.push({ x: m.x, y: m.y, r0: 6, r1: m.r, t: 0, dur: m.w, color: '#d9574a', fill: true });
       SFX.enemy_shot();
+      break;
+    case 'soul': // душа улетает от трупа к некроманту — зелёный огонёк
+      particles.burst(m.x, m.y, '#6abe30', 5, 30, 0.5, 2);
+      if (m.tx !== undefined) chainFx.push({ pts: [[m.x, m.y], [m.tx, m.ty]], t: 0.2, color: '#6abe30' });
+      break;
+    case 'bonestorm': // костяной вихрь: белые осколки кружат вокруг героя
+      for (let i = 0; i < 5; i++) {
+        const a = performance.now() / 90 + i * 1.25;
+        particles.burst(m.x + Math.cos(a) * 26, m.y + Math.sin(a) * 20, '#e8e0c8', 1, 20, 0.25, 2);
+      }
       break;
     case 'trap': { // ловушка разрядилась — начинка по стилю данжа
       const c = m.kind === 'gas' ? '#6abe30' : m.kind === 'frost' ? '#63c5ff'
@@ -613,6 +623,12 @@ function simStep() {
       if (Math.random() < 0.45) {
         const a = Math.random() * Math.PI * 2, rr = Math.random() * 50;
         particles.burst(z.x + Math.cos(a) * rr, z.y + Math.sin(a) * rr, '#fbf236', 2, 14, 0.7, 2);
+      }
+    } else if (z.kind === 'plague') {
+      // облако мора: болезненно-зелёные споры клубятся
+      if (Math.random() < 0.6) {
+        const a = Math.random() * Math.PI * 2, rr = Math.random() * (z.r || 44);
+        particles.burst(z.x + Math.cos(a) * rr, z.y + Math.sin(a) * rr, Math.random() < 0.5 ? '#6abe30' : '#4b692f', 2, 12, 0.9, 3);
       }
     }
   }

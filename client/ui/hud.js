@@ -50,9 +50,9 @@ export class Hud {
         ctx.fillRect(5, 13, 30, 2);
         ctx.fillStyle = you.rsc >= 30 ? '#df7126' : '#6e3a1e';
         ctx.fillRect(5, 13, Math.round(30 * you.rsc / 100), 2);
-      } else { // пипсы комбо (5) и благодати (3)
-        const n = you.cls === 'rogue' ? 5 : 3;
-        const col = you.cls === 'rogue' ? '#d9574a' : '#fbf236';
+      } else { // пипсы комбо (5), благодати (3), душ (5)
+        const n = you.cls === 'rogue' ? 5 : you.cls === 'necromancer' ? 5 : 3;
+        const col = you.cls === 'rogue' ? '#d9574a' : you.cls === 'necromancer' ? '#8f6fe0' : '#fbf236';
         for (let i = 0; i < n; i++) {
           ctx.fillStyle = i < you.rsc ? col : '#2c2a38';
           ctx.fillRect(5 + i * 6, 13, 4, 2);

@@ -205,6 +205,58 @@ export const ABILITIES = {
       desc: 'Осеняет отряд: −30% входящего урона на 8 с',
     },
   ],
+  necromancer: [
+    {
+      id: 'bone_spear', lvl: 2, cd: 5, mana: 4,
+      name: 'Костяное копьё', icon: 'ab_bone_spear',
+      desc: 'Пронзающий осколок кости: ×2.5 урона магии по всем на линии. Души усиливают',
+    },
+    {
+      id: 'raise_skeleton', lvl: 3, cd: 12, mana: 8,
+      name: 'Поднять скелета', icon: 'ab_raise_skeleton',
+      desc: 'Скелет-воин рвётся в бой на 30 с. Души поднимают крепче',
+    },
+    {
+      id: 'drain_life', lvl: 5, cd: 8, mana: 8,
+      name: 'Высасывание жизни', icon: 'ab_drain_life',
+      desc: 'Луч к цели: ×2 урона магии, половину украденного забираешь себе',
+    },
+    {
+      id: 'bone_armor', lvl: 6, cd: 18, mana: 6,
+      name: 'Костяной доспех', icon: 'ab_bone_armor',
+      desc: 'Броня из костей: барьер на 6, ударившие вблизи получают урон',
+    },
+    {
+      id: 'corpse_burst', lvl: 7, cd: 10, mana: 8,
+      name: 'Взрыв трупа', icon: 'ab_corpse_burst',
+      desc: 'Детонирует порчу/горение на враге у прицела: ×3 остатка дота по области + чума',
+    },
+    {
+      id: 'curse_weakness', lvl: 8, cd: 12, mana: 6,
+      name: 'Проклятие немощи', icon: 'ab_curse_weakness',
+      desc: 'Враги в области 6 с получают +25% урона и слабеют (−урон, замедление)',
+    },
+    {
+      id: 'summon_ghoul', lvl: 9, cd: 16, mana: 8,
+      name: 'Призвать вурдалака', icon: 'ab_summon_ghoul',
+      desc: 'Быстрый упырь рвёт врагов и лечится, пожирая мёртвых (30 с)',
+    },
+    {
+      id: 'pestilence', lvl: 10, cd: 14, mana: 10,
+      name: 'Мор', icon: 'ab_pestilence',
+      desc: 'Ядовитое облако у прицела (6 с): травит и слепит врагов (не задевает своих)',
+    },
+    {
+      id: 'bone_storm', lvl: 12, cd: 14, mana: 12,
+      name: 'Костяной вихрь', icon: 'ab_bone_storm',
+      desc: 'Осколки кости кружат вокруг тебя 5 с, кромсая всех врагов рядом',
+    },
+    {
+      id: 'army_of_dead', lvl: 16, cd: 35, mana: 18,
+      name: 'Армия мёртвых', icon: 'ab_army_of_dead',
+      desc: 'Поднимает 3 скелетов разом (души добавляют ещё). Легион на 30 с',
+    },
+  ],
 };
 
 export function abilitiesOf(cls) { return ABILITIES[cls] || ABILITIES.warrior; }

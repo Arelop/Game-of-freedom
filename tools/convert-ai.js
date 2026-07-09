@@ -42,6 +42,7 @@ const MAP = {
   // ═══ классы игроков ═══
   'Thief.png': 'player_rogue',
   'Priest.png': 'player_priest',
+  'Necromancer.png': 'player_necromancer',
   // ═══ монстры ═══
   'ChatGPT Image 8 июл. 2026 г., 16_59_45 (1).png': 'enemy_skeleton',
   'ChatGPT Image 8 июл. 2026 г., 16_59_45 (2).png': 'enemy_wolf',
