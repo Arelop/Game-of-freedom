@@ -3762,6 +3762,11 @@ export class Game {
     p.hp = p.maxHp;
     p.hunger = Math.max(p.hunger, 40);
     p.mapId = 'over';
+    // смерть смывает розыск: кровью заплачено, охотники отзываются
+    if ((p.bounty || 0) > 0) {
+      p.bounty = 0; p.bountyWarned = false;
+      this.toast(p, '💀 Смерть смыла твой розыск — охотники за головой отозваны');
+    }
     if (p.home) { // возрождение рядом со своей кроватью (не В ней — тайл солидный)
       const spot = this.safeSpotNear('over', p.home.x, p.home.y);
       p.x = spot.x; p.y = spot.y;

@@ -7,6 +7,23 @@ import { isHostileToPlayer } from './factions.js';
 const NPC_SPEED = 40;
 const GUARD_SPEED = 60;
 
+// Цель для призванного существа: враг рядом с ПРИЗЫВОМ или с ХОЗЯИНОМ.
+// Так питомец всегда кидается на то, с чем дерётся хозяин, даже если тот
+// убежал вперёд. Приоритет — тем, кто уже агрессивен (в бою).
+function summonTarget(npc, owner, game, R = 340) {
+  let best = null, bd = Infinity;
+  for (const e of game.entities.values()) {
+    if (e.entType !== 'enemy' || e.mapId !== npc.mapId) continue;
+    const dSelf = dist2(e.x, e.y, npc.x, npc.y);
+    const dOwner = dist2(e.x, e.y, owner.x, owner.y);
+    let d = Math.min(dSelf, dOwner);
+    if (d > R * R) continue;
+    if (e.aggro) d *= 0.25; // враг в бою — приоритетнее (ближе «на глаз»)
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+
 // Куда NPC хочет по времени суток (t: 0..1, 0=полночь)
 function scheduleAnchor(npc, s, t) {
   if (npc.role === 'guard') return null;       // стража патрулирует всегда
@@ -36,13 +53,9 @@ export function updateNpc(npc, dt, map, game) {
     const owner = game.players.get(npc.owner);
     if (!owner || owner.mapId !== npc.mapId) return;
     const speed = (npc.golem ? GUARD_SPEED : GUARD_SPEED * (npc.fast ? 1.5 : 1.15));
-    let target = null, bd = 260 * 260;
-    for (const e of game.entities.values()) {
-      if (e.entType !== 'enemy' || e.mapId !== npc.mapId) continue;
-      const d = dist2(npc.x, npc.y, e.x, e.y);
-      if (d < bd) { bd = d; target = e; }
-    }
+    const target = summonTarget(npc, owner, game, 360); // враг хозяина или свой
     if (target) {
+      const bd = dist2(npc.x, npc.y, target.x, target.y);
       const ang = Math.atan2(target.y - npc.y, target.x - npc.x);
       npc.aim = ang;
       const reach = npc.golem ? 26 : 20;
@@ -82,13 +95,9 @@ export function updateNpc(npc, dt, map, game) {
     const fiery = npc.role === 'elemental' && !npc.frost && !npc.holySpirit;
     const owner = game.players.get(npc.owner);
     if (!owner || owner.mapId !== npc.mapId) return; // ждёт хозяина
-    let target = null, bd = 200 * 200;
-    for (const e of game.entities.values()) {
-      if (e.entType !== 'enemy' || e.mapId !== npc.mapId) continue;
-      const d = dist2(npc.x, npc.y, e.x, e.y);
-      if (d < bd) { bd = d; target = e; }
-    }
+    const target = summonTarget(npc, owner, game, 320); // враг хозяина или свой
     if (target) {
+      const bd = dist2(npc.x, npc.y, target.x, target.y);
       const ang = Math.atan2(target.y - npc.y, target.x - npc.x);
       npc.aim = ang;
       if (bd > 60 * 60) walkTo(npc, target.x, target.y, GUARD_SPEED, dt, map);
