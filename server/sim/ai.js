@@ -15,8 +15,10 @@ const FEARLESS = new Set([
   'darkSoldier', 'darkArcher', 'darkMage', 'darkKnight', 'darkLord', 'heartKeeper',
 ]);
 
-// npcs — жители/стража: монстры враждебны им так же, как игрокам
-export function updateEnemy(e, dt, map, players, rand, npcs = []) {
+// npcs — жители/стража: монстры враждебны им так же, как игрокам.
+// atk — «токены атаки» (Map цель→число замахивающихся): одновременно на одну
+// цель замахиваются максимум двое, остальные кружат — бой с толпой читается
+export function updateEnemy(e, dt, map, players, rand, npcs = [], atk = null) {
   const def = ENEMIES[e.kind];
   const shots = [];
 
@@ -147,6 +149,15 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
       } else {
         e.cd = Math.max(0, (e.cd || 0) - dt);
         if (dist < def.lungeRange && e.cd <= 0) {
+          // ТОКЕН АТАКИ: на цель уже замахиваются двое? — кружи и жди очереди
+          const busy = atk && target.id && (atk.get(target.id) || 0) >= 2;
+          if (busy) {
+            const orbitA = ang + Math.PI / 2 * (e.strafeDir || (e.strafeDir = rand() < 0.5 ? 1 : -1));
+            moveWithCollision(e, Math.cos(orbitA) * def.speed * 0.8 * slowF * dt, Math.sin(orbitA) * def.speed * 0.8 * slowF * dt, def.radius, map);
+            break;
+          }
+          if (atk && target.id) atk.set(target.id, (atk.get(target.id) || 0) + 1);
+          e.atkTarget = target.id;
           e.state = 'windup';
           e.stateT = def.lungeWindup * (e.berserk ? 0.75 : 1);
           e.lungeA = ang; // направление удара решено ЗДЕСЬ — уворот читается
@@ -241,6 +252,10 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
         }
         if (step.charge) { // телеграфированный рывок по прямой — обрабатывает game
           shots.push({ charge: step.charge, aim: ang });
+          break;
+        }
+        if (step.combo) { // КОМБО-СЕРИЯ замахов (Боссы 2.0) — обрабатывает game
+          shots.push({ combo: step.combo, aim: ang });
           break;
         }
         e.shotIndex = (e.shotIndex || 0) + 1;

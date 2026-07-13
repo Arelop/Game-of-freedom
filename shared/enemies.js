@@ -112,6 +112,7 @@ export const ENEMIES = {
       { hpAbove: 0, adds: { kind: 'darkKnight', n: 1 }, enrage: true, steps: [
         { pattern: 'spiral', interval: 0.16, move: 'strafe' },
         { charge: { dmg: 4, speed: 380, windup: 0.9 }, interval: 3.4 }, // тень несётся сквозь строй
+        { combo: { hits: 3, dmg: 3, range: 32, windup: 0.6, gap: 0.8, recover: 1.4 }, interval: 3.6, move: 'chase' }, // тройной росчерк клинка
         { slam: { dmg: 4, radius: 56, windup: 0.9 }, interval: 2.6, move: 'chase' },
         { pattern: 'aimedTriple', interval: 1.0, move: 'chase' },
       ]},
@@ -130,6 +131,7 @@ export const ENEMIES = {
     phases: [
       { hpAbove: 0.66, steps: [
         { pattern: 'aimedTriple', interval: 1.6, move: 'chase' },
+        { combo: { hits: 2, dmg: 3, range: 30, windup: 0.7, gap: 0.85, recover: 1.5 }, interval: 3.4, move: 'chase' }, // раз-два кулаками
         { charge: { dmg: 3, speed: 320, windup: 1.0 }, interval: 3.6 }, // таранит с разбега
         { pattern: 'ring8', interval: 2.4, move: 'chase' },
       ]},
@@ -396,6 +398,7 @@ export const ENEMIES = {
       ]},
       { hpAbove: 0.25, adds: { kind: 'wolf', n: 3 }, steps: [ // вой созывает стаю
         { charge: { dmg: 3, speed: 400, windup: 0.6 }, interval: 2.2 },
+        { combo: { hits: 3, dmg: 2, range: 26, windup: 0.5, gap: 0.75, recover: 1.3 }, interval: 3.0, move: 'chase' }, // тройной укус
         { slam: { dmg: 3, radius: 44, windup: 0.7 }, interval: 2.4, move: 'chase' },
       ]},
       { hpAbove: 0, adds: { kind: 'wolf', n: 2 }, enrage: true, steps: [

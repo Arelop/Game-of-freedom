@@ -1003,6 +1003,8 @@ export class Game {
     }
     // Конец переката: окно Тени
     if (p.prevRollT > 0 && p.rollT === 0 && this.hasTalent(p, 'shadow')) p.shadowT = 2;
+    // конец переката: короткое окно для РОЛЛИНГ-ВЫПАДА (Боёвка 4.1)
+    if (p.prevRollT > 0 && p.rollT === 0) p.rollEndTick = this.tick;
     // Таран: сбиваем врагов по пути переката
     if (p.rollT > 0 && this.hasTalent(p, 'ram')) {
       for (const e of [...this.entities.values()]) {
@@ -1052,6 +1054,9 @@ export class Game {
     for (const inp of p.inputs) {
       stepPlayer(p, inp, inp.dt, map);
       p.lastSeq = inp.seq;
+      // РАЗБЕГ: непрерывное движение копится — удар с разбега мощнее
+      if (inp.mx || inp.my) p.runT = (p.runT || 0) + inp.dt;
+      else p.runT = 0;
       if (inp.fire) { p.holdT = (p.holdT || 0) + inp.dt; this.tryFire(p, inp.aim); }
       else p.holdT = 0;
     }
@@ -1182,6 +1187,21 @@ export class Game {
       kb = Math.round(kb * H.kb);
       hstun = H.stun || 0;
       r = w.heavy === 'thrust' ? Math.round(r * 1.8) : r + (H.rr || 0);
+    }
+    // ═══ МУВМЕНТ-АТАКИ (Боёвка 4.1): движение вознаграждается ═══
+    if (!heavy && this.tick - (p.rollEndTick ?? -99) <= 10) {
+      // РОЛЛИНГ-ВЫПАД: удар сразу после переката — рывок вперёд, ×1.3 и слом
+      p.rollEndTick = -99;
+      atk.dmg = Math.round(atk.dmg * 1.3 * 10) / 10;
+      poiseMult = Math.max(poiseMult, 1.5);
+      moveWithCollision(p, Math.cos(aim) * 14, Math.sin(aim) * 14, PLAYER_RADIUS, this.mapFor(p.mapId));
+      this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
+    } else if (!heavy && (p.runT || 0) > 0.8) {
+      // УДАР С РАЗБЕГА: инерция в клинок — ×1.25, дальше и злее отброс
+      p.runT = 0;
+      atk.dmg = Math.round(atk.dmg * 1.25 * 10) / 10;
+      r += 6;
+      kb = Math.round(kb * 1.3);
     }
     const half = arcDeg * Math.PI / 360;
     // стихийный заряд («Раскалённый клинок», «Освящение клинка»): тратится ударом
@@ -1676,6 +1696,12 @@ export class Game {
   }
 
   stepEntities(dt) {
+    // ТОКЕНЫ АТАКИ (Боёвка 4.1): кто уже замахивается на какую цель — чтобы
+    // на одного героя одновременно шли максимум двое, остальные кружили
+    const atk = new Map();
+    for (const e of this.entities.values())
+      if (e.entType === 'enemy' && (e.state === 'windup' || e.state === 'lunge') && e.atkTarget)
+        atk.set(e.atkTarget, (atk.get(e.atkTarget) || 0) + 1);
     for (const e of [...this.entities.values()]) {
       if (e.entType === 'drop') {
         e.ttl -= dt;
@@ -1769,6 +1795,49 @@ export class Game {
             e.bombT = 0;
           }
         }
+        // ═══ Боссы 2.0: КОМБО-СЕРИЯ замахов — каждый удар телеграфится,
+        // уворот от первого не значит безопасность; после серии — раскрытие
+        if ((e.comboLeft || 0) > 0) {
+          e.comboT -= dt;
+          if (e.comboT <= 0) {
+            const c = e.comboSpec;
+            const cdef = ENEMIES[e.kind];
+            const range = cdef.radius + (c.range || 26);
+            const half = Math.PI / 1.5 / 2 + 0.25; // широкая боссовая дуга
+            for (const p of this.players.values()) {
+              if (p.dead || p.mapId !== e.mapId) continue;
+              if (dist2(e.x, e.y, p.x, p.y) > (range + PLAYER_RADIUS) ** 2) continue;
+              let da = Math.atan2(p.y - e.y, p.x - e.x) - e.comboA;
+              da = Math.atan2(Math.sin(da), Math.cos(da));
+              if (Math.abs(da) <= half) this.damagePlayer(p, c.dmg, { x: e.x, y: e.y });
+            }
+            this.fx({ t: 'eswing', x: e.x, y: e.y, aim: e.comboA, range }, e.mapId, e.x, e.y);
+            e.comboLeft--;
+            if (e.comboLeft > 0) {
+              // до-наводка на ближайшего героя + телеграф следующего удара
+              let best = null, bd = Infinity;
+              for (const p of this.players.values()) {
+                if (p.dead || p.mapId !== e.mapId) continue;
+                const d = dist2(e.x, e.y, p.x, p.y);
+                if (d < bd) { bd = d; best = p; }
+              }
+              if (best) e.comboA = Math.atan2(best.y - e.y, best.x - e.x);
+              e.comboT = c.gap || 0.5;
+              this.fx({ t: 'meleearc', x: e.x, y: e.y, a: e.comboA, r: range, w: e.comboT }, e.mapId, e.x, e.y);
+            } else {
+              e.recoverT = c.recover ?? 1.4; // выдохся — ОКНО НАКАЗАНИЯ
+              this.fx({ t: 'react', name: 'РАСКРЫТ!', x: e.x, y: e.y - 12 }, e.mapId, e.x, e.y);
+            }
+          }
+          continue; // серия не прерывается — только стойкость её сломает
+        }
+        // punish-окно босса: раскрыт после серии/рывка — входящий ×1.25
+        if ((e.recoverT || 0) > 0) {
+          e.recoverT -= dt;
+          e.state = 'recover';
+          if (e.recoverT <= 0) e.state = 'idle';
+          continue;
+        }
         // слэм босса: телеграф идёт — стоим и караем зазевавшихся
         if ((e.slamT || 0) > 0) {
           e.slamT -= dt;
@@ -1800,16 +1869,28 @@ export class Game {
               this.damagePlayer(p, e.chargeSpec.dmg, { x: e.x - e.chargeVx, y: e.y - e.chargeVy });
             }
           }
-          if (e.chargingT <= 0) this.fx({ t: 'hit', kind: 'wall', x: e.x, y: e.y }, e.mapId, e.x, e.y);
+          if (e.chargingT <= 0) {
+            this.fx({ t: 'hit', kind: 'wall', x: e.x, y: e.y }, e.mapId, e.x, e.y);
+            e.recoverT = 0.8; // промчался — раскрыт (punish-окно)
+          }
           continue; // рывок не прерывается на стрельбу
         }
         const npcs = [...this.entities.values()].filter(n => n.entType === 'npc' && n.mapId === e.mapId);
-        const shots = updateEnemy(e, dt, map, [...this.players.values()], this.rand, npcs);
+        const shots = updateEnemy(e, dt, map, [...this.players.values()], this.rand, npcs, atk);
         for (const s of shots) {
           if (s.slam) { // телеграфированный удар по области
             e.slamT = s.slam.windup;
             e.slamSpec = s.slam;
             this.fx({ t: 'telegraph', x: e.x, y: e.y, r: s.slam.radius, w: s.slam.windup }, e.mapId, e.x, e.y);
+            continue;
+          }
+          if (s.combo) { // комбо-серия: первый замах длинный, дальше — темп
+            const cdef = ENEMIES[e.kind];
+            e.comboSpec = s.combo;
+            e.comboLeft = s.combo.hits;
+            e.comboA = s.aim;
+            e.comboT = s.combo.windup;
+            this.fx({ t: 'meleearc', x: e.x, y: e.y, a: s.aim, r: cdef.radius + (s.combo.range || 26), w: s.combo.windup }, e.mapId, e.x, e.y);
             continue;
           }
           if (s.charge) { // телеграфированный рывок: линия предупреждает о траектории
@@ -3309,11 +3390,20 @@ export class Game {
       e.poiseDmg = (e.poiseDmg || 0) + dmg * (pr.poiseMult || (pr.school === 'melee' ? 1 : 0.6));
       e.poiseHitTick = this.tick;
       if (e.poiseDmg >= e.poise) {
-        // СТАГГЕР: враг оглушён и раскрыт — время добивать
+        // СТАГГЕР: враг оглушён и раскрыт — время добивать.
+        // Слом стойкости — единственное, что прерывает боссовую серию
+        const isBoss = ENEMIES[e.kind]?.archetype === 'boss';
         e.poiseDmg = 0;
-        e.staggerT = ENEMIES[e.kind]?.archetype === 'boss' ? 1.2 : 2;
+        e.staggerT = isBoss ? 1.6 : 2;
         e.stunT = 0; // стаггер главнее
-        this.fx({ t: 'react', name: 'ОГЛУШЁН!', x: e.x, y: e.y - 10 }, e.mapId, e.x, e.y);
+        e.comboLeft = 0; e.slamT = 0; e.chargeT = 0; e.chargingT = 0; e.recoverT = 0;
+        if (isBoss) {
+          this.fx({ t: 'react', name: 'ПАЛ НА КОЛЕНО!', x: e.x, y: e.y - 12 }, e.mapId, e.x, e.y);
+          this.fx({ t: 'boom', x: e.x, y: e.y, r: 34 }, e.mapId, e.x, e.y);
+          this.toastMap(e.mapId, `⚔ ${ENEMIES[e.kind].name} пошатнулся — бейте!`);
+        } else {
+          this.fx({ t: 'react', name: 'ОГЛУШЁН!', x: e.x, y: e.y - 10 }, e.mapId, e.x, e.y);
+        }
         this.fx({ t: 'nova', x: e.x, y: e.y }, e.mapId, e.x, e.y);
       }
     }
