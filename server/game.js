@@ -640,7 +640,8 @@ export class Game {
       for (const m of this.meteors) {
         m.t -= dt;
         if (m.t <= 0) {
-          this.explodeAt(m.mapId, m.x, m.y, m.dmg, 44, m.owner, 2);
+          // метеор — слэм с неба: лучший ломатель стойкости у мага
+          this.explodeAt(m.mapId, m.x, m.y, m.dmg, 44, m.owner, 2, 3);
           this.fx({ t: 'boom', x: m.x, y: m.y, r: 44 }, m.mapId, m.x, m.y);
           // «Тлеющие угли»: место падения горит ещё 3 с
           if (m.burn) {
@@ -1184,16 +1185,19 @@ export class Game {
       arcDeg = H.arc;
       atk.dmg = Math.round(atk.dmg * H.dmg * 10) / 10;
       poiseMult = H.poise;
+      // «Крушитель»: тяжёлые атаки бьют по опоре на 60% сильнее
+      if (this.hasTalent(p, 'heavybreak')) poiseMult *= 1.6;
       kb = Math.round(kb * H.kb);
       hstun = H.stun || 0;
       r = w.heavy === 'thrust' ? Math.round(r * 1.8) : r + (H.rr || 0);
     }
     // ═══ МУВМЕНТ-АТАКИ (Боёвка 4.1): движение вознаграждается ═══
-    // «Клык стаи»: окно роллинг-выпада вдвое шире
-    if (!heavy && this.tick - (p.rollEndTick ?? -99) <= (w.proc === 'packfang' ? 20 : 10)) {
+    // «Клык стаи» / «Хищник»: окно роллинг-выпада шире
+    const pounce = this.hasTalent(p, 'pounce');
+    if (!heavy && this.tick - (p.rollEndTick ?? -99) <= (w.proc === 'packfang' ? 20 : pounce ? 15 : 10)) {
       // РОЛЛИНГ-ВЫПАД: удар сразу после переката — рывок вперёд, ×1.3 и слом
       p.rollEndTick = -99;
-      atk.dmg = Math.round(atk.dmg * 1.3 * 10) / 10;
+      atk.dmg = Math.round(atk.dmg * (pounce ? 1.5 : 1.3) * 10) / 10;
       poiseMult = Math.max(poiseMult, 1.5);
       moveWithCollision(p, Math.cos(aim) * 14, Math.sin(aim) * 14, PLAYER_RADIUS, this.mapFor(p.mapId));
       this.fx({ t: 'dodge', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
@@ -1228,10 +1232,10 @@ export class Game {
           hitEnemy = true;
           if (!this.entities.has(e.id)) continue;
           // slam: тяжёлый молот ошеломляет всех задетых
-          if (hstun > 0) e.stunT = Math.max(e.stunT || 0, hstun);
+          if (hstun > 0) this.applyStun(e, hstun, p);
           // Оглушающий удар: шанс ошеломить врага
           if (this.hasTalent(p, 'stunhit') && this.rand() < 0.15)
-            e.stunT = Math.max(e.stunT || 0, 0.6);
+            this.applyStun(e, 0.6, p);
         }
       } else if (e.entType === 'npc' && e.mapId === p.mapId) {
         if (dist2(p.x, p.y, e.x, e.y) > (r + 5) ** 2) continue;
@@ -1311,6 +1315,8 @@ export class Game {
       this.projectiles.push({
         x: p.x, y: p.y - 4, vx: Math.cos(a) * projSpd, vy: Math.sin(a) * projSpd,
         life: w.projLife, radius: projR, dmg, crit: atk.crit, chg: charged ? 1 : 0,
+        // заряженный выстрел давит на опору; «Таранный сгусток» — таран
+        poiseMult: charged ? (this.hasTalent(p, 'chargebreak') ? 2.5 : 1.2) : undefined,
         knockback: w.knockback, slow, school: w.school,
         explode: w.explode, chain: w.chain, structDmg, fiery,
         holy: (w.holy ? w.holy + (this.hasTalent(p, 'lightheal') ? 1 : 0) : 0) + (imbue?.kind === 'holy' ? 1 : 0),
@@ -2106,7 +2112,7 @@ export class Game {
       }
       case 'freeze_ult': { // криомант: абсолютный лёд
         foesIn(160, e => {
-          e.stunT = Math.max(e.stunT || 0, 1.5);
+          this.applyStun(e, 1.5, p);
           e.chillT = Math.max(e.chillT || 0, 4);
           e.slowT = Math.max(e.slowT || 0, 4); e.slowMult = 0.35;
           this.damageEnemy(e, Math.round(2 * (d.dmgMagic || 1) * 10) / 10,
@@ -2170,9 +2176,9 @@ export class Game {
       case 'wrath_ult': { // кара: гнев Господень
         foesIn(130, e => {
           this.fx({ t: 'chain', pts: [[e.x, e.y - 60], [e.x, e.y]] }, p.mapId, e.x, e.y);
-          e.stunT = Math.max(e.stunT || 0, 1);
+          this.applyStun(e, 1, p);
           this.damageEnemy(e, Math.round(4 * (d.dmgMagic || 1) * 2.5 * 10) / 10,
-            { vx: 0, vy: 0, knockback: 30, owner: p.id, school: 'magic' });
+            { vx: 0, vy: 0, knockback: 30, owner: p.id, school: 'magic', poiseMult: 2 });
         });
         break;
       }
@@ -2332,8 +2338,8 @@ export class Game {
     };
     this.gainArcane(p);
     const map = this.mapFor(p.mapId);
-    // урон всем врагам в радиусе (опц. фильтр по конусу)
-    const hitAround = (cx, cy, radius, dmg, kb, filter) => {
+    // урон всем врагам в радиусе (опц. фильтр по конусу; pm — вес для стойкости)
+    const hitAround = (cx, cy, radius, dmg, kb, filter, pm) => {
       for (const e of [...this.entities.values()]) {
         if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
         const def = ENEMIES[e.kind];
@@ -2343,6 +2349,7 @@ export class Game {
         this.damageEnemy(e, dmg, {
           vx: Math.cos(a), vy: Math.sin(a), knockback: kb, owner: p.id,
           school: p.cls === 'mage' || p.cls === 'priest' ? 'magic' : 'melee',
+          poiseMult: pm,
         });
       }
     };
@@ -2416,13 +2423,13 @@ export class Game {
       case 'power_strike': { // воин Q: сокрушительный удар по площади
         const mult = this.hasTalent(p, 'ab_power') ? 3.5 : 2.5;
         const wDmg = this.weapon(p).melee ? this.weapon(p).damage : 4;
-        hitAround(p.x, p.y, 44, Math.round(wDmg * (d.dmgMelee || 1) * mult * 10) / 10, 200);
+        hitAround(p.x, p.y, 44, Math.round(wDmg * (d.dmgMelee || 1) * mult * 10) / 10, 200, null, 2.5);
         break;
       }
       case 'war_cry': { // воин E: стан вокруг, талант — лечит группу
         for (const e of this.entities.values()) {
           if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
-          if (dist2(p.x, p.y, e.x, e.y) < 95 * 95) { e.stunT = 1.5; e.aggro = true; }
+          if (dist2(p.x, p.y, e.x, e.y) < 95 * 95) this.applyStun(e, 1.5, p);
         }
         if (this.hasTalent(p, 'ab_cryheal')) {
           for (const q of this.players.values()) {
@@ -2486,7 +2493,7 @@ export class Game {
           e.slowMult = deep ? 0.08 : 0.35;
           e.chillT = Math.max(e.chillT || 0, 2.5); // метка льда для реакций
           this.damageEnemy(e, Math.round(4 * (d.dmgMagic || 1) * 10) / 10,
-            { vx: 0, vy: 0, knockback: 0, owner: p.id, school: 'magic' });
+            { vx: 0, vy: 0, knockback: 0, owner: p.id, school: 'magic', poiseMult: 1 });
         }
         break;
       }
@@ -2527,7 +2534,7 @@ export class Game {
           if (dist2(e.x, e.y, lx, ly) < 26 * 26) {
             this.damageEnemy(e, Math.round(5 * (d.dmgMelee || 1) * 10) / 10,
               { vx: Math.cos(aim), vy: Math.sin(aim), knockback: 60, owner: p.id, school: 'melee' });
-            if (this.hasTalent(p, 'ab_dash')) e.stunT = 1;
+            if (this.hasTalent(p, 'ab_dash')) this.applyStun(e, 1, p);
           }
         }
         p.hurtT = Math.max(p.hurtT, 0.35);
@@ -2578,16 +2585,16 @@ export class Game {
             break;
           }
         }
-        hitAround(p.x, p.y, r * 0.7, Math.round(2 * (d.dmgMagic || 1) * 10) / 10, 40);
+        hitAround(p.x, p.y, r * 0.7, Math.round(2 * (d.dmgMagic || 1) * 10) / 10, 40, null, 0.3);
         break;
       }
       case 'judgement': { // жрец X: столб света у прицела — урон и стан
         const r = this.hasTalent(p, 'ab_judgewide') ? 44 : 32;
         const tx = p.x + Math.cos(aim) * Math.min(120, 120), ty = p.y + Math.sin(aim) * 120;
-        hitAround(tx, ty, r, Math.round(4 * (d.dmgMagic || 1) * 2.5 * 10) / 10, 60);
+        hitAround(tx, ty, r, Math.round(4 * (d.dmgMagic || 1) * 2.5 * 10) / 10, 60, null, 2.5); // столб света — слэм
         for (const e of this.entities.values()) {
           if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
-          if (dist2(tx, ty, e.x, e.y) < r * r) { e.stunT = Math.max(e.stunT || 0, 1); e.aggro = true; }
+          if (dist2(tx, ty, e.x, e.y) < r * r) this.applyStun(e, 1, p);
         }
         this.fx({ t: 'chain', pts: [[tx, ty - 60], [tx, ty]] }, p.mapId, tx, ty);
         this.fx({ t: 'boom', x: tx, y: ty, r }, p.mapId, tx, ty);
@@ -2610,7 +2617,7 @@ export class Game {
             if (e.entType !== 'enemy' || e.mapId !== p.mapId || e.chargeHitBy === p.id) continue;
             if (dist2(p.x, p.y, e.x, e.y) < 26 * 26) {
               e.chargeHitBy = p.id;
-              e.stunT = Math.max(e.stunT || 0, 0.8);
+              this.applyStun(e, 0.8, p);
               const wDmg = this.weapon(p).melee ? this.weapon(p).damage : 4;
               this.damageEnemy(e, Math.round(wDmg * (d.dmgMelee || 1) * 2 * 10) / 10,
                 { vx: Math.cos(aim), vy: Math.sin(aim), knockback: 120, owner: p.id, school: 'melee', chargeHit: true });
@@ -2734,14 +2741,14 @@ export class Game {
           let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
           da = Math.atan2(Math.sin(da), Math.cos(da));
           return Math.abs(da) <= Math.PI / 3;
-        });
+        }, 3); // щит в лицо — лучший ломатель стойкости воина
         for (const e of this.entities.values()) {
           if (e.entType !== 'enemy' || e.mapId !== p.mapId) continue;
           if (dist2(p.x, p.y, e.x, e.y) > 34 * 34) continue;
           let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
           da = Math.atan2(Math.sin(da), Math.cos(da));
           if (Math.abs(da) <= Math.PI / 3) {
-            e.stunT = Math.max(e.stunT || 0, this.hasTalent(p, 'ab_bash') ? 2 : 1); e.aggro = true;
+            this.applyStun(e, this.hasTalent(p, 'ab_bash') ? 2 : 1, p);
             // «Несущий щит»: удар щитом злит врага на воина
             if (this.hasTalent(p, 'ab_bashtaunt')) { e.tauntT = Math.max(e.tauntT || 0, 2.5); e.tauntBy = p.id; }
           }
@@ -2816,7 +2823,7 @@ export class Game {
           let da = Math.atan2(e.y - p.y, e.x - p.x) - aim;
           da = Math.atan2(Math.sin(da), Math.cos(da));
           if (Math.abs(da) <= Math.PI / 2.5) {
-            e.stunT = Math.max(e.stunT || 0, sly ? 2 : 1.2); e.aggro = true;
+            this.applyStun(e, sly ? 2 : 1.2, p);
             if (sly) e.vulnBy = p.id; // следующий удар вора — в полтора раза больнее
           }
         }
@@ -2897,6 +2904,7 @@ export class Game {
             x: p.x, y: p.y - 4, vx: Math.cos(a) * 380, vy: Math.sin(a) * 380,
             life: 0.85, radius: 3, dmg: Math.round(4 * (d.dmgMagic || 1) * 2.5 * 10) / 10,
             knockback: 30, school: 'magic', pierce: true, owner: p.id, friendly: true, mapId: p.mapId,
+            poiseMult: this.hasTalent(p, 'marrow') ? 3 : 1.5, // кость бьёт по опоре («Костолом» — вдвое)
           });
         }
         break;
@@ -2921,7 +2929,7 @@ export class Game {
         if (!best) { p.abCd[slot] = 1; this.toast(p, 'Луч не нашёл жертву'); break; }
         const dmg = Math.round(4 * (d.dmgMagic || 1) * 2 * 10) / 10;
         this.fx({ t: 'chain', pts: [[p.x, p.y - 6], [best.x, best.y]] }, p.mapId, p.x, p.y);
-        this.damageEnemy(best, dmg, { vx: 0, vy: 0, knockback: 0, owner: p.id, school: 'magic' });
+        this.damageEnemy(best, dmg, { vx: 0, vy: 0, knockback: 0, owner: p.id, school: 'magic', poiseMult: 0 }); // луч не ломает опору
         const heal = this.hasTalent(p, 'ab_drain2') ? dmg : dmg / 2;
         if (p.hp < p.maxHp) { p.hp = Math.min(p.maxHp, p.hp + Math.max(1, Math.round(heal))); this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y); }
         break;
@@ -3060,14 +3068,14 @@ export class Game {
   }
 
   // Взрыв: урон всем врагам в радиусе + ломает стены (несколько блоков!)
-  explodeAt(mapId, x, y, dmg, radius, owner, structDmg = 0) {
+  explodeAt(mapId, x, y, dmg, radius, owner, structDmg = 0, poiseMult = 0) {
     for (const e of [...this.entities.values()]) {
       if (e.entType !== 'enemy' || e.mapId !== mapId) continue;
       const def = ENEMIES[e.kind];
       const d = Math.sqrt(dist2(x, y, e.x, e.y));
       if (d > radius + def.radius) continue;
       const a = Math.atan2(e.y - y, e.x - x);
-      this.damageEnemy(e, dmg, { vx: Math.cos(a), vy: Math.sin(a), knockback: 90, owner, school: 'magic' });
+      this.damageEnemy(e, dmg, { vx: Math.cos(a), vy: Math.sin(a), knockback: 90, owner, school: 'magic', poiseMult: poiseMult || undefined });
     }
     // friendly fire: взрыв не разбирает своих — бьёт всех игроков в радиусе
     for (const q of this.players.values()) {
@@ -3281,6 +3289,24 @@ export class Game {
         this.fx({ t: 'boom', x: e.x, y: e.y, r: 26 }, e.mapId, e.x, e.y);
         // «Осколок первосердца»: добивание возвращает жизнь
         if (attacker.procs?.firstheart) attacker.hp = Math.min(attacker.maxHp, attacker.hp + 1);
+        // «Мясник»: добивание насыщает — +1 сердце
+        if (this.hasTalent(attacker, 'butcher')) attacker.hp = Math.min(attacker.maxHp, attacker.hp + 2);
+        // «Кровавый танец»: добивание возвращает перекат
+        if (this.hasTalent(attacker, 'dancefinish') && attacker.rollCd > 0) {
+          attacker.rollCd = 0;
+          this.fx({ t: 'react', name: 'ПЕРЕКАТ!', x: attacker.x, y: attacker.y - 10 }, attacker.mapId, attacker.x, attacker.y);
+        }
+        // «Вдохновение»: жрец рядом обращает добивание в свет — отряд лечится
+        for (const q of this.players.values()) {
+          if (q.dead || q.mapId !== e.mapId || !this.hasTalent(q, 'inspire')) continue;
+          if (dist2(q.x, q.y, e.x, e.y) > 140 * 140) continue;
+          for (const t of this.players.values()) {
+            if (t.dead || t.mapId !== e.mapId || dist2(t.x, t.y, e.x, e.y) > 140 * 140 || t.hp >= t.maxHp) continue;
+            t.hp = Math.min(t.maxHp, t.hp + 1);
+            this.fx({ t: 'heal', pid: t.id, x: t.x, y: t.y }, t.mapId, t.x, t.y);
+          }
+          break; // одного вдохновителя достаточно
+        }
         // «Колокол горы»: добивание бьёт ударной волной по соседям
         if (kw?.proc === 'quake') {
           const wave = Math.round(dmg * 0.5);
@@ -3410,25 +3436,12 @@ export class Game {
     e.aggro = true;
     // ═══ СТОЙКОСТЬ: удары игрока ломают позу врага (Боёвка 4.0) ═══
     if (attacker && e.poise && (e.staggerT || 0) <= 0 && e.hp > 0) {
-      e.poiseDmg = (e.poiseDmg || 0) + dmg * (pr.poiseMult || (pr.school === 'melee' ? 1 : 0.6));
-      e.poiseHitTick = this.tick;
-      if (e.poiseDmg >= e.poise) {
-        // СТАГГЕР: враг оглушён и раскрыт — время добивать.
-        // Слом стойкости — единственное, что прерывает боссовую серию
-        const isBoss = ENEMIES[e.kind]?.archetype === 'boss';
-        e.poiseDmg = 0;
-        e.staggerT = isBoss ? 1.6 : 2;
-        e.stunT = 0; // стаггер главнее
-        e.comboLeft = 0; e.slamT = 0; e.chargeT = 0; e.chargingT = 0; e.recoverT = 0;
-        if (isBoss) {
-          this.fx({ t: 'react', name: 'ПАЛ НА КОЛЕНО!', x: e.x, y: e.y - 12 }, e.mapId, e.x, e.y);
-          this.fx({ t: 'boom', x: e.x, y: e.y, r: 34 }, e.mapId, e.x, e.y);
-          this.toastMap(e.mapId, `⚔ ${ENEMIES[e.kind].name} пошатнулся — бейте!`);
-        } else {
-          this.fx({ t: 'react', name: 'ОГЛУШЁН!', x: e.x, y: e.y - 10 }, e.mapId, e.x, e.y);
-        }
-        this.fx({ t: 'nova', x: e.x, y: e.y }, e.mapId, e.x, e.y);
-      }
+      let pMult = pr.poiseMult ?? (pr.school === 'melee' ? 1 : 0.6);
+      // «Хрупкость льда»: метка льда делает стойкость ломкой
+      if ((e.chillT || 0) > 0 && this.hasTalent(attacker, 'brittleice')) pMult *= 2;
+      // «Гнилые жилы»: твой дот разъедает опору врага
+      if ((e.dotT || 0) > 0 && e.dotSrc === attacker.id && this.hasTalent(attacker, 'rotpoise')) pMult *= 1.4;
+      this.addPoiseDmg(e, dmg * pMult);
     }
     if (pr && pr.knockback) {
       const kb = pr.knockback / 60;
@@ -3462,6 +3475,43 @@ export class Game {
     }
     this.fx({ t: 'hurt', id: e.id, x: e.x, y: e.y, dmg: Math.round(dmg * 10) / 10, crit: pr?.crit ? 1 : 0 }, e.mapId, e.x, e.y);
     if (e.hp <= 0) this.killEnemy(e, pr);
+  }
+
+  // Копит урон стойкости и ломает её («Способности 4.0»: единая точка слома)
+  addPoiseDmg(e, amount) {
+    if (!e.poise || (e.staggerT || 0) > 0 || e.hp <= 0 || amount <= 0) return;
+    e.poiseDmg = (e.poiseDmg || 0) + amount;
+    e.poiseHitTick = this.tick;
+    if (e.poiseDmg >= e.poise) {
+      // СТАГГЕР: враг оглушён и раскрыт — время добивать.
+      // Слом стойкости — единственное, что прерывает боссовую серию
+      const isBoss = ENEMIES[e.kind]?.archetype === 'boss';
+      e.poiseDmg = 0;
+      e.staggerT = isBoss ? 1.6 : 2;
+      e.stunT = 0; // стаггер главнее
+      e.comboLeft = 0; e.slamT = 0; e.chargeT = 0; e.chargingT = 0; e.recoverT = 0;
+      if (isBoss) {
+        this.fx({ t: 'react', name: 'ПАЛ НА КОЛЕНО!', x: e.x, y: e.y - 12 }, e.mapId, e.x, e.y);
+        this.fx({ t: 'boom', x: e.x, y: e.y, r: 34 }, e.mapId, e.x, e.y);
+        this.toastMap(e.mapId, `⚔ ${ENEMIES[e.kind].name} пошатнулся — бейте!`);
+      } else {
+        this.fx({ t: 'react', name: 'ОГЛУШЁН!', x: e.x, y: e.y - 10 }, e.mapId, e.x, e.y);
+      }
+      this.fx({ t: 'nova', x: e.x, y: e.y }, e.mapId, e.x, e.y);
+    }
+  }
+
+  // Стан от игрока. Боссы и элита стряхивают контроль (стан-резист в ai.js),
+  // но потрясение ЛОМАЕТ СТОЙКОСТЬ — контроль ценен и против тяжеловесов
+  applyStun(e, sec, p = null) {
+    e.stunT = Math.max(e.stunT || 0, sec);
+    e.aggro = true;
+    const tough = ENEMIES[e.kind]?.archetype === 'boss' || e.elite;
+    if (tough && e.poise) {
+      // «Сокрушающий свет»: станы жреца бьют по опоре вдвое
+      const mult = p && this.hasTalent(p, 'holybreak') ? 2 : 1;
+      this.addPoiseDmg(e, e.poise * 0.15 * sec * mult);
+    }
   }
 
   killEnemy(e, pr) {
