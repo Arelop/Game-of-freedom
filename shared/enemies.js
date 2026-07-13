@@ -8,7 +8,7 @@ export const ENEMIES = {
     sprite: 'enemy_rat', xp: 1, drops: { coin: [0, 2] },
   },
   slime: {
-    id: 'slime', name: 'Слизень', archetype: 'chaser', hp: 6, speed: 40, tier: 1,
+    id: 'slime', touchOnly: true, name: 'Слизень', archetype: 'chaser', hp: 6, speed: 40, tier: 1,
     radius: 5, touchDamage: 1, lungeSpeed: 150, lungeWindup: 0.45, lungeRange: 40,
     sprite: 'enemy_slime', xp: 2, drops: { coin: [1, 3] },
   },
@@ -73,7 +73,7 @@ export const ENEMIES = {
     sprite: 'enemy_mimic', xp: 9, drops: { coin: [8, 16] },
   },
   darkKnight: {
-    id: 'darkKnight', name: 'Рыцарь Тьмы', archetype: 'chaser', hp: 34, speed: 44, tier: 4,
+    id: 'darkKnight', guardUp: true, name: 'Рыцарь Тьмы', archetype: 'chaser', hp: 34, speed: 44, tier: 4,
     radius: 6, touchDamage: 2, lungeSpeed: 200, lungeWindup: 0.5, lungeRange: 55,
     sprite: 'enemy_dark_knight', xp: 14, drops: { coin: [8, 14] }, faction: 'darkness',
   },
@@ -118,7 +118,7 @@ export const ENEMIES = {
     ],
   },
   golem: {
-    id: 'golem', name: 'Каменный голем', archetype: 'shooter', hp: 45, speed: 26, tier: 4,
+    id: 'golem', armored: true, name: 'Каменный голем', archetype: 'shooter', hp: 45, speed: 26, tier: 4,
     radius: 7, touchDamage: 2, preferRange: [50, 100], fireInterval: 2.6,
     pattern: 'ring8', sprite: 'enemy_golem', xp: 18,
     drops: { coin: [10, 18], metal: [1, 3] },
@@ -159,12 +159,12 @@ export const ENEMIES = {
     sprite: 'enemy_hobgoblin', xp: 4, drops: { coin: [2, 4] },
   },
   gnollRaider: {
-    id: 'gnollRaider', name: 'Гнолл-налётчик', archetype: 'chaser', hp: 12, speed: 66, tier: 2,
+    id: 'gnollRaider', packHowl: true, name: 'Гнолл-налётчик', archetype: 'chaser', hp: 12, speed: 66, tier: 2,
     radius: 5, touchDamage: 1, lungeSpeed: 240, lungeWindup: 0.3, lungeRange: 50,
     sprite: 'enemy_gnoll', xp: 5, drops: { coin: [2, 5], hide: [0, 1] },
   },
   orcWarrior: {
-    id: 'orcWarrior', name: 'Орк-рубака', archetype: 'chaser', hp: 18, speed: 55, tier: 3,
+    id: 'orcWarrior', berserkLowHp: true, name: 'Орк-рубака', archetype: 'chaser', hp: 18, speed: 55, tier: 3,
     radius: 5, touchDamage: 2, lungeSpeed: 230, lungeWindup: 0.35, lungeRange: 50,
     sprite: 'enemy_orc_warrior', xp: 8, drops: { coin: [4, 8], metal: [0, 1] },
   },
@@ -174,12 +174,12 @@ export const ENEMIES = {
     sprite: 'enemy_ghoul', xp: 7, drops: { coin: [2, 6] },
   },
   orcKnight: {
-    id: 'orcKnight', name: 'Орк-рыцарь', archetype: 'chaser', hp: 30, speed: 46, tier: 4,
+    id: 'orcKnight', guardUp: true, name: 'Орк-рыцарь', archetype: 'chaser', hp: 30, speed: 46, tier: 4,
     radius: 6, touchDamage: 2, lungeSpeed: 210, lungeWindup: 0.45, lungeRange: 55,
     sprite: 'enemy_orc_knight', xp: 13, drops: { coin: [7, 13], metal: [1, 2] },
   },
   ogre: {
-    id: 'ogre', name: 'Огр', archetype: 'chaser', hp: 42, speed: 36, tier: 4,
+    id: 'ogre', berserkLowHp: true, name: 'Огр', archetype: 'chaser', hp: 42, speed: 36, tier: 4,
     radius: 8, touchDamage: 3, lungeSpeed: 190, lungeWindup: 0.55, lungeRange: 60,
     sprite: 'enemy_ogre', xp: 16, drops: { coin: [8, 16], meat: [1, 2] },
   },
@@ -189,7 +189,7 @@ export const ENEMIES = {
     sprite: 'enemy_minotaur', xp: 28, drops: { coin: [15, 25], metal: [1, 3] },
   },
   orcWarlord: {
-    id: 'orcWarlord', name: 'Орк-вождь', archetype: 'chaser', hp: 75, speed: 50, tier: 5,
+    id: 'orcWarlord', packHowl: true, name: 'Орк-вождь', archetype: 'chaser', hp: 75, speed: 50, tier: 5,
     radius: 7, touchDamage: 3, lungeSpeed: 250, lungeWindup: 0.4, lungeRange: 60,
     sprite: 'enemy_orc_warlord', xp: 35, drops: { coin: [18, 30], weapon: 1 },
   },
@@ -224,7 +224,7 @@ export const ENEMIES = {
 
   // --- живность биомов: у каждого зверя свой дом ---
   boar: {
-    id: 'boar', name: 'Вепрь', archetype: 'chaser', hp: 5, speed: 62, tier: 1,
+    id: 'boar', berserkLowHp: true, name: 'Вепрь', archetype: 'chaser', hp: 5, speed: 62, tier: 1,
     radius: 5, touchDamage: 1, lungeSpeed: 220, lungeWindup: 0.3, lungeRange: 40,
     sprite: 'enemy_boar', xp: 2, drops: { meat: [1, 2] },
   },
@@ -244,7 +244,7 @@ export const ENEMIES = {
     sprite: 'enemy_scorpion', xp: 5, drops: { coin: [1, 4] },
   },
   bear: {
-    id: 'bear', name: 'Бурый медведь', archetype: 'chaser', hp: 26, speed: 52, tier: 3,
+    id: 'bear', berserkLowHp: true, name: 'Бурый медведь', archetype: 'chaser', hp: 26, speed: 52, tier: 3,
     radius: 7, touchDamage: 2, lungeSpeed: 220, lungeWindup: 0.4, lungeRange: 50,
     sprite: 'enemy_bear', xp: 10, drops: { meat: [2, 3], hide: [1, 2] },
   },
@@ -260,7 +260,7 @@ export const ENEMIES = {
     drops: { coin: [6, 12], crystal: [1, 2] },
   },
   ironTroll: {
-    id: 'ironTroll', name: 'Железный тролль', archetype: 'chaser', hp: 50, speed: 34, tier: 4,
+    id: 'ironTroll', berserkLowHp: true, name: 'Железный тролль', archetype: 'chaser', hp: 50, speed: 34, tier: 4,
     radius: 8, touchDamage: 3, lungeSpeed: 180, lungeWindup: 0.55, lungeRange: 55,
     sprite: 'enemy_iron_troll', xp: 18, drops: { coin: [8, 16], metal: [2, 4] },
   },

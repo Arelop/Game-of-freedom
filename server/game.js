@@ -1043,18 +1043,25 @@ export class Game {
       if (tHere === T.TRAP) this.armTrap(p.mapId, ttx, tty, p);
     }
 
-    // применяем накопленные инпуты
+    // применяем накопленные инпуты; заряд тяжёлой атаки замедляет шаг (вес!)
     const w = this.weapon(p);
+    const charging = w.melee && w.heavy && (p.holdT || 0) > 0.15;
+    p.chargeSlow = charging; // для снапшота: клиент-предикт замедляется так же
+    const baseSm = p.speedMult;
+    if (charging) p.speedMult = baseSm * 0.6;
     for (const inp of p.inputs) {
       stepPlayer(p, inp, inp.dt, map);
       p.lastSeq = inp.seq;
       if (inp.fire) { p.holdT = (p.holdT || 0) + inp.dt; this.tryFire(p, inp.aim); }
       else p.holdT = 0;
     }
+    p.speedMult = baseSm;
     p.inputs.length = 0;
-    // заряд посоха мага: держишь атаку — снаряд наливается силой
+    // заряд: посох мага ИЛИ тяжёлая атака мили — кольцо наливается у героя
     p.chg = (p.cls === 'mage' && w.manaCost && (p.holdT || 0) > 0)
-      ? Math.min(1, p.holdT / (this.hasTalent(p, 'chargefast') ? 0.3 : 0.5)) : 0;
+      ? Math.min(1, p.holdT / (this.hasTalent(p, 'chargefast') ? 0.3 : 0.5))
+      : (w.melee && w.heavy && (p.holdT || 0) > 0)
+        ? Math.min(1, p.holdT / 0.45) : 0;
 
     // сначала завершаем идущую перезарядку, потом при нужде запускаем новую
     if (!w.melee && !w.manaCost) {
@@ -1111,7 +1118,14 @@ export class Game {
   tryFire(p, aim) {
     const w = this.weapon(p);
     if (p.fireCd > 0 || p.rollT > 0 || p.dead) return;
-    if (w.melee) { p.combatT = 0; this.meleeSwing(p, w, aim); return; }
+    if (w.melee) {
+      p.combatT = 0;
+      // ТЯЖЁЛАЯ атака: удержание ЛКМ ≥0.45 с (спам-клики = быстрые лёгкие)
+      const heavy = !!w.heavy && (p.holdT || 0) >= 0.45;
+      this.meleeSwing(p, w, aim, heavy);
+      if (heavy) p.holdT = 0; // заряд потрачен — копи заново
+      return;
+    }
     if (w.manaCost) {
       // посохи: кастуют из маны напрямую, без магазина и перезарядки.
       // Маг, удерживающий атаку, выпускает ЗАРЯЖЕННЫЙ снаряд: ×2 урон за ×2 ману
@@ -1141,14 +1155,35 @@ export class Game {
     this.fx({ t: 'shot', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, seed, tick: this.tick }, p.mapId, p.x, p.y);
   }
 
-  // Ближний бой: мгновенный удар по дуге перед игроком.
-  meleeSwing(p, w, aim) {
+  // Ближний бой: лёгкий удар по дуге; ТЯЖЁЛЫЙ (удержание) — форма по оружию:
+  // sweep — полукруг, cleave — узкий клин с отбросом, slam — круг вокруг
+  // точки удара с микростаном, thrust — длинный узкий выпад. Кинжал без
+  // тяжёлой, зато лёгкие на четверть быстрее.
+  meleeSwing(p, w, aim, heavy = false) {
     p.fireCd = 1 / (w.fireRate * (p.derived?.atkSpeed || 1) * (1 + (p.buffs.atkspeed?.mult || 0)));
+    if (!w.heavy) p.fireCd *= 0.8;      // кинжалы/безтяжёлые: юркие лёгкие
+    if (heavy) p.fireCd *= 1.6;         // тяжёлый удар долго восстанавливается
     let arcDeg = (w.arcDeg || 100) + (p.derived?.arcBonus || 0);
     if (this.hasTalent(p, 'whirl')) arcDeg = 360;
-    const half = arcDeg * Math.PI / 360;
-    const r = w.range || 26;
+    let r = w.range || 26;
     const atk = this.rollAttack(p, w);
+    let kb = w.knockback, poiseMult = 1, hstun = 0;
+    if (heavy) {
+      // форма и характер тяжёлого удара
+      const H = {
+        sweep: { arc: 200, dmg: 1.8, poise: 2, kb: 1.2 },
+        cleave: { arc: 70, dmg: 2.2, poise: 2, kb: 1.8 },
+        slam: { arc: 360, dmg: 1.6, poise: 3, kb: 1.3, stun: 0.4, rr: 6 },
+        thrust: { arc: 26, dmg: 2, poise: 2, kb: 1.4, rr: 0.8 },
+      }[w.heavy] || { arc: 180, dmg: 1.8, poise: 2, kb: 1.2 };
+      arcDeg = H.arc;
+      atk.dmg = Math.round(atk.dmg * H.dmg * 10) / 10;
+      poiseMult = H.poise;
+      kb = Math.round(kb * H.kb);
+      hstun = H.stun || 0;
+      r = w.heavy === 'thrust' ? Math.round(r * 1.8) : r + (H.rr || 0);
+    }
+    const half = arcDeg * Math.PI / 360;
     // стихийный заряд («Раскалённый клинок», «Освящение клинка»): тратится ударом
     let imbue = null;
     if (p.imbue?.n > 0) {
@@ -1157,7 +1192,8 @@ export class Game {
       atk.dmg += imbue.dmg;
     }
     let hitEnemy = false; // «Освящение клинка» лечит только когда клинок нашёл врага
-    const hitFake = { vx: Math.cos(aim), vy: Math.sin(aim), knockback: w.knockback, owner: p.id, school: 'melee', crit: atk.crit,
+    const hitFake = { vx: Math.cos(aim), vy: Math.sin(aim), knockback: kb, owner: p.id, school: 'melee', crit: atk.crit,
+      poiseMult, heavy, // вес удара: тяжёлые ломают стойкость
       chill: w.chill, fire: w.fire || imbue?.kind === 'fire', poison: w.poison, slow: w.slow, // стихии клинка
       ignite: imbue?.kind === 'fire' ? { time: 2, dmg: 1 } : undefined };
     for (const e of [...this.entities.values()]) {
@@ -1169,8 +1205,11 @@ export class Game {
         if (arcDeg >= 360 || Math.abs(da) <= half) {
           this.damageEnemy(e, atk.dmg, hitFake);
           hitEnemy = true;
+          if (!this.entities.has(e.id)) continue;
+          // slam: тяжёлый молот ошеломляет всех задетых
+          if (hstun > 0) e.stunT = Math.max(e.stunT || 0, hstun);
           // Оглушающий удар: шанс ошеломить врага
-          if (this.hasTalent(p, 'stunhit') && this.rand() < 0.15 && this.entities.has(e.id))
+          if (this.hasTalent(p, 'stunhit') && this.rand() < 0.15)
             e.stunT = Math.max(e.stunT || 0, 0.6);
         }
       } else if (e.entType === 'npc' && e.mapId === p.mapId) {
@@ -1206,7 +1245,7 @@ export class Game {
       p.hp = Math.min(p.maxHp, p.hp + (imbue.heal || 1));
       this.fx({ t: 'heal', pid: p.id, x: p.x, y: p.y }, p.mapId, p.x, p.y);
     }
-    this.fx({ t: 'swing', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, range: r, arc: arcDeg }, p.mapId, p.x, p.y);
+    this.fx({ t: 'swing', pid: p.id, weapon: w.id, x: p.x, y: p.y, aim, range: r, arc: arcDeg, hv: heavy ? 1 : 0 }, p.mapId, p.x, p.y);
   }
 
   // Сколько снарядов даёт оружие этому игроку (таланты магов/воров)
@@ -1302,6 +1341,11 @@ export class Game {
     }
     // испытание данжей: обитатели усилены ключом и модификаторами
     if (this.mplus && mapId === this.mplus.mapId) this.applyMplusMods(e);
+    // СТОЙКОСТЬ (Боёвка 4.0): запас, который ломают удары — слом даёт СТАГГЕР.
+    // ~Половина пути убийства для рядового, 70% для босса (реже, но окно
+    // ценнее). Элита стойче автоматически через раздутый maxHp.
+    e.poise = def.poise || Math.max(15, Math.round(e.maxHp * (def.archetype === 'boss' ? 0.7 : 0.5)));
+    e.poiseDmg = 0;
     this.entities.set(id, e);
     return id;
   }
@@ -1658,6 +1702,10 @@ export class Game {
       const map = this.mapFor(e.mapId);
       if (e.entType === 'enemy') {
         if ((e.chillT || 0) > 0) e.chillT -= dt; // метка льда тает
+        // стаггер тает; стойкость отдыхает после паузы без ударов (1.5 с)
+        if ((e.staggerT || 0) > 0) e.staggerT -= dt;
+        if ((e.poiseDmg || 0) > 0 && this.tick - (e.poiseHitTick || 0) > 45)
+          e.poiseDmg = Math.max(0, e.poiseDmg - (e.poise || 20) * 0.6 * dt);
         // враг наступил на плиту ловушки — тоже взводит (его можно заманить)
         if (e.mapId !== 'over' && this.chunks.tileAt(e.mapId, Math.floor(e.x / TILE), Math.floor(e.y / TILE)) === T.TRAP)
           this.armTrap(e.mapId, Math.floor(e.x / TILE), Math.floor(e.y / TILE), e);
@@ -1790,11 +1838,60 @@ export class Game {
             }
             continue;
           }
+          // ═══ Боёвка 4.0: события ближнего удара и характеров ═══
+          if (s.windupArc) { // замах: красная дуга-телеграф — читай и уворачивайся
+            this.fx({ t: 'meleearc', x: e.x, y: e.y, a: s.windupArc.aim, r: s.windupArc.range + 10, w: s.windupArc.w }, e.mapId, e.x, e.y);
+            continue;
+          }
+          if (s.strike) { // сам удар: дуга перед врагом (больнее старого касания)
+            const st = s.strike;
+            const sdef = ENEMIES[e.kind];
+            const dmg = Math.max(1, Math.round((sdef.touchDamage + tierTouchBonus(sdef.tier) + (e.dmgBonus || 0)) * 1.3));
+            const half = Math.PI / 3;
+            const inArc = (tx, ty, tr) => {
+              if (dist2(e.x, e.y, tx, ty) > (st.range + tr) ** 2) return false;
+              let da = Math.atan2(ty - e.y, tx - e.x) - st.aim;
+              da = Math.atan2(Math.sin(da), Math.cos(da));
+              return Math.abs(da) <= half;
+            };
+            for (const p of this.players.values()) {
+              if (p.dead || p.mapId !== e.mapId) continue;
+              if (inArc(p.x, p.y, PLAYER_RADIUS)) this.damagePlayer(p, dmg, e);
+            }
+            for (const n of this.entities.values()) { // стража/призывы тоже под ударом
+              if (n.entType !== 'npc' || n.mapId !== e.mapId) continue;
+              if (!['guard', 'soldier', 'minion', 'elemental', 'mercenary'].includes(n.role)) continue;
+              if (inArc(n.x, n.y, 5)) this.damageNpc(n, dmg, null);
+            }
+            this.fx({ t: 'eswing', x: e.x, y: e.y, aim: st.aim, range: st.range }, e.mapId, e.x, e.y);
+            continue;
+          }
+          if (s.aimLine) { // стрелок целится: линия — уйди с траектории
+            this.fx({ t: 'telegraphLine', x: e.x, y: e.y, a: s.aimLine.aim, len: 200, w: s.aimLine.w }, e.mapId, e.x, e.y);
+            continue;
+          }
+          if (s.howl) { // вожак воет — стая рвёт быстрее
+            const myFac = ENEMIES[e.kind].faction || 'monsters';
+            for (const o of this.entities.values()) {
+              if (o.entType !== 'enemy' || o.mapId !== e.mapId) continue;
+              if ((ENEMIES[o.kind]?.faction || 'monsters') !== myFac) continue;
+              if (dist2(e.x, e.y, o.x, o.y) < 140 * 140) o.howlBuffT = 4;
+            }
+            this.fx({ t: 'react', name: 'ВОЙ!', x: e.x, y: e.y - 10 }, e.mapId, e.x, e.y);
+            continue;
+          }
+          if (s.react) { // выкрик характера (СВИРЕПЕЕТ!)
+            this.fx({ t: 'react', name: s.react, x: e.x, y: e.y - 10 }, e.mapId, e.x, e.y);
+            continue;
+          }
           this.enemyFire(e, s);
         }
-        // контактный урон
+        // контактный урон: у гуманоидов/зверей (chaser) тело больше НЕ жжёт —
+        // их урон теперь СТРАЙК с замахом; касание осталось аморфам (touchOnly),
+        // стрелкам-в-упор, дэшерам (рывок = атака) и боссам
         const def = ENEMIES[e.kind];
-        if (def.touchDamage > 0) {
+        const touches = def.touchDamage > 0 && !(def.archetype === 'chaser' && !def.touchOnly);
+        if (touches) {
           const touch = def.touchDamage + tierTouchBonus(def.tier) + (e.dmgBonus || 0);
           for (const p of this.players.values()) {
             if (p.dead || p.mapId !== e.mapId) continue;
@@ -2866,7 +2963,8 @@ export class Game {
       const delay = b * (pat.burstInterval || 0);
       for (const a of dirs) {
         // урон снаряда растёт с тиром монстра (+ аффикс «Свирепый»)
-        const dmg = tierProjDmg(ENEMIES[e.kind]?.tier) + (e.dmgBonus || 0);
+        // прицельный залп стрелка (после телеграфа) бьёт на треть больнее
+        const dmg = Math.round((tierProjDmg(ENEMIES[e.kind]?.tier) + (e.dmgBonus || 0)) * (shot.boost || 1) * 10) / 10;
         this.projectiles.push({
           x: e.x, y: e.y - 3, vx: Math.cos(a) * pat.speed, vy: Math.sin(a) * pat.speed,
           life: pat.life + delay, delay, radius: pat.projRadius, dmg, knockback: 15,
@@ -3069,7 +3167,8 @@ export class Game {
     if ((e.curseT || 0) > 0) dmg *= (e.curseAmp || 1.25);
     // щитоносец: гасит удары в фронтальный конус (оглушённый — нет)
     const defS = ENEMIES[e.kind];
-    if (defS?.shielded && pr && !pr.isDot && (e.stunT || 0) <= 0) {
+    // щит поднят (guardUp) — работает как врождённый фронтальный блок
+    if ((defS?.shielded || (e.guardT || 0) > 0) && pr && !pr.isDot && (e.stunT || 0) <= 0 && (e.staggerT || 0) <= 0) {
       // направление ПРИХОДА атаки: от снаряда/атакующего к врагу
       const from = Math.atan2(-(pr.vy || 0), -(pr.vx || 0)); // куда смотрит источник урона
       let da = from - (e.aim || 0);
@@ -3086,6 +3185,22 @@ export class Game {
     }
     // таланты атакующего: казнь, засада, абсолютный ноль, яды и поджог
     const attacker = pr && !pr.isDot ? this.players.get(pr.owner) : null;
+    // ═══ СТАГГЕР (Боёвка 4.0): оглушённый враг беззащитен ═══
+    if ((e.staggerT || 0) > 0 && pr && !pr.isDot) {
+      if (attacker && pr.school === 'melee') {
+        // ДОБИВАНИЕ: удар мили по сломленному — критический финишер
+        dmg *= 3;
+        e.staggerT = 0; // стаггер потрачен добиванием
+        this.fx({ t: 'react', name: 'ДОБИВАНИЕ!', x: e.x, y: e.y - 10 }, e.mapId, e.x, e.y);
+        this.fx({ t: 'boom', x: e.x, y: e.y, r: 26 }, e.mapId, e.x, e.y);
+      } else {
+        dmg *= 1.5; // прочий урон по оглушённому тоже больнее
+      }
+    }
+    // «Бронированный»: пока стойкость цела — крепок; слом открывает
+    if (defS?.armored && (e.staggerT || 0) <= 0 && pr && !pr.isDot) dmg *= 0.5;
+    // окно наказания после замаха: враг раскрыт
+    if (e.state === 'recover' && pr && !pr.isDot) dmg *= 1.25;
     if (attacker) {
       // классовые ресурсы растут от попаданий
       if (attacker.cls === 'warrior' && pr.school === 'melee')
@@ -3189,6 +3304,19 @@ export class Game {
     }
     e.hp -= dmg;
     e.aggro = true;
+    // ═══ СТОЙКОСТЬ: удары игрока ломают позу врага (Боёвка 4.0) ═══
+    if (attacker && e.poise && (e.staggerT || 0) <= 0 && e.hp > 0) {
+      e.poiseDmg = (e.poiseDmg || 0) + dmg * (pr.poiseMult || (pr.school === 'melee' ? 1 : 0.6));
+      e.poiseHitTick = this.tick;
+      if (e.poiseDmg >= e.poise) {
+        // СТАГГЕР: враг оглушён и раскрыт — время добивать
+        e.poiseDmg = 0;
+        e.staggerT = ENEMIES[e.kind]?.archetype === 'boss' ? 1.2 : 2;
+        e.stunT = 0; // стаггер главнее
+        this.fx({ t: 'react', name: 'ОГЛУШЁН!', x: e.x, y: e.y - 10 }, e.mapId, e.x, e.y);
+        this.fx({ t: 'nova', x: e.x, y: e.y }, e.mapId, e.x, e.y);
+      }
+    }
     if (pr && pr.knockback) {
       const kb = pr.knockback / 60;
       const map = this.mapFor(e.mapId);

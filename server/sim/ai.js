@@ -20,15 +20,43 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
   const def = ENEMIES[e.kind];
   const shots = [];
 
-  // стан (боевой клич, теневой рывок): полная заморозка мозгов
-  if (e.stunT > 0) { e.stunT -= dt; return shots; }
+  // СТАГГЕР (слом стойкости): враг шатается, беззащитен — окно добивания
+  if ((e.staggerT || 0) > 0) return shots;
+  // стан (боевой клич, теневой рывок): полная заморозка мозгов.
+  // Боссы и элита сопротивляются: стан тает для них в 4×/1.7× быстрее —
+  // честный контроль тяжеловесов только через слом СТОЙКОСТИ
+  if (e.stunT > 0) {
+    e.stunT -= dt * (def.archetype === 'boss' ? 4 : e.elite ? 1.7 : 1);
+    return shots;
+  }
 
   // слепота (дымовое облако): не видит целей, бредёт наугад
   if (e.blindT > 0) e.blindT -= dt;
+
+  // ═══ характеры рядовых (Боёвка 4.0, data-флаги в enemies.js) ═══
+  // свирепеет при малом здоровье: быстрее бегает и замахивается
+  if (def.berserkLowHp && !e.berserk && e.hp < e.maxHp * 0.3) {
+    e.berserk = true;
+    e.hasteF = (e.hasteF || 1) * 1.3;
+    shots.push({ react: 'СВИРЕПЕЕТ!' });
+  }
+  // поднимает щит: периодический фронтальный блок (реюз shielded-математики)
+  if (def.guardUp) {
+    e.guardCd = (e.guardCd ?? 2 + rand() * 2) - dt;
+    if ((e.guardT || 0) > 0) e.guardT -= dt;
+    else if (e.guardCd <= 0) { e.guardT = 1.5; e.guardCd = 4 + rand() * 2; }
+  }
+  // вожак воет: стая рядом ускоряется (обрабатывает game.js)
+  if (def.packHowl && e.aggro) {
+    e.howlCd = (e.howlCd ?? 3 + rand() * 4) - dt;
+    if (e.howlCd <= 0) { e.howlCd = 8; shots.push({ howl: true }); }
+  }
+
   // замедление (лёд): множитель скорости, пока действует slowT
   let slowF = 1;
   if (e.slowT > 0) { e.slowT -= dt; slowF = e.slowMult || 0.65; }
   if (e.hasteF) slowF *= e.hasteF; // элита «Стремительный»
+  if ((e.howlBuffT || 0) > 0) { e.howlBuffT -= dt; slowF *= 1.25; } // вой стаи
   e.slowF = slowF;
 
   // цель — ближайший игрок ИЛИ житель (игроки чуть приоритетнее);
@@ -98,16 +126,32 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
 
   switch (def.archetype) {
     case 'chaser': {
+      // Боёвка 4.0: удар — СОБЫТИЕ, а не жгучее тело. Замах (телеграф, стоит,
+      // направление ФИКСИРУЕТСЯ — читаемо для уворота) → выпад по прямой →
+      // СТРАЙК дугой перед собой → раскрытие (recover, +урон по врагу).
       if (e.state === 'windup') {
         e.stateT -= dt;
-        if (e.stateT <= 0) { e.state = 'lunge'; e.stateT = 0.35; e.lungeA = ang; }
+        if (e.stateT <= 0) { e.state = 'lunge'; e.stateT = 0.3; }
       } else if (e.state === 'lunge') {
         e.stateT -= dt;
         moveWithCollision(e, Math.cos(e.lungeA) * def.lungeSpeed * slowF * dt, Math.sin(e.lungeA) * def.lungeSpeed * slowF * dt, def.radius, map);
-        if (e.stateT <= 0) { e.state = 'chase'; e.cd = 0.8; }
+        // долетел до цели — бьёт СРАЗУ (не пролетает сквозь); иначе — в конце выпада
+        const reached = target && dist2(e.x, e.y, target.x, target.y) < (def.radius + 12) ** 2;
+        if (e.stateT <= 0 || reached) {
+          shots.push({ strike: { aim: e.lungeA, range: def.radius + 16 } }); // удар!
+          e.state = 'recover'; e.stateT = 0.5;
+        }
+      } else if (e.state === 'recover') {
+        e.stateT -= dt; // раскрыт после удара — окно наказания
+        if (e.stateT <= 0) { e.state = 'chase'; e.cd = 0.8 * (e.berserk ? 0.55 : 1); }
       } else {
         e.cd = Math.max(0, (e.cd || 0) - dt);
-        if (dist < def.lungeRange && e.cd <= 0) { e.state = 'windup'; e.stateT = def.lungeWindup; }
+        if (dist < def.lungeRange && e.cd <= 0) {
+          e.state = 'windup';
+          e.stateT = def.lungeWindup * (e.berserk ? 0.75 : 1);
+          e.lungeA = ang; // направление удара решено ЗДЕСЬ — уворот читается
+          shots.push({ windupArc: { aim: ang, w: e.stateT + 0.3, range: def.radius + 16 } });
+        }
         else {
           // фланкирование: издали каждый заходит по СВОЕЙ дуге — стая окружает,
           // а не выстраивается в очередь за спиной друг у друга
@@ -130,6 +174,14 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
       break;
     }
     case 'shooter': {
+      // Боёвка 4.0: перед залпом — прицел-телеграф (линия), направление
+      // фиксируется — уход с линии спасает. Залпы реже, но больнее (+30%)
+      if ((e.aimT || 0) > 0) {
+        e.aimT -= dt;
+        e.aim = e.aimA;
+        if (e.aimT <= 0) shots.push({ pattern: def.pattern, aim: e.aimA, boost: 1.3 });
+        break; // целится — стоит
+      }
       const [minR, maxR] = def.preferRange;
       let mx = 0, my = 0;
       if (dist > maxR) { mx = Math.cos(ang); my = Math.sin(ang); }
@@ -142,8 +194,9 @@ export function updateEnemy(e, dt, map, players, rand, npcs = []) {
       moveWithCollision(e, mx * def.speed * slowF * dt, my * def.speed * slowF * dt, def.radius, map);
       e.fireT = (e.fireT ?? def.fireInterval * rand()) - dt;
       if (e.fireT <= 0 && dist < 240) {
-        e.fireT = def.fireInterval;
-        shots.push({ pattern: def.pattern, aim: ang });
+        e.fireT = def.fireInterval * 1.3;
+        e.aimT = 0.35; e.aimA = ang;
+        shots.push({ aimLine: { aim: ang, w: 0.35 } });
       }
       break;
     }

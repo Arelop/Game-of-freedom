@@ -68,6 +68,7 @@ let localMag = 0, localWeapon = '';
 let invRefresh = 0;
 let swingAnim = 0;       // анимация замаха своего игрока
 let atkShowT = 0;        // оружие видно только в момент атаки (не мельтешит в руках)
+let hitStopT = 0;        // hit-stop: короткая заморозка кадра при весомом попадании
 const remoteAtk = new Map(); // pid -> ms, до которого показывать оружие союзника
 const swings = [];       // {x,y,aim,range,arc,t,maxT,color}
 const floatTexts = [];   // летящие цифры урона {x,y,text,color,t,big}
@@ -242,7 +243,7 @@ net.handlers.onFx = (kind, m) => {
     case 'swing':
       remoteAtk.set(m.pid, performance.now() + 350);
       playFx('fx_slash', 6, m.x + Math.cos(m.aim) * (m.range - 10), m.y + Math.sin(m.aim) * (m.range - 10),
-        { dur: 0.22, rot: m.aim + Math.PI / 2, scale: Math.max(0.7, (m.range || 26) / 34) });
+        { dur: m.hv ? 0.3 : 0.22, rot: m.aim + Math.PI / 2, scale: Math.max(0.7, (m.range || 26) / 34) * (m.hv ? 1.5 : 1) });
       if (m.pid !== net.myId) { spawnSwing(m.x, m.y, m.aim, m.range, m.arc, getWeapon(m.weapon)); playWeaponSound(getWeapon(m.weapon)?.sound); }
       break;
     case 'eshot': SFX.enemy_shot(); break;
@@ -332,8 +333,10 @@ net.handlers.onFx = (kind, m) => {
       if (m.pid === net.myId) SFX.ui();
       break;
     case 'react': // реакции стихий и всплески ресурсов: крупный текст + вспышка
-      addFloatText(m.x, m.y - 10, m.name, '#df7126', true);
+      addFloatText(m.x, m.y - 10, m.name, m.name === 'ОГЛУШЁН!' ? '#fbf236' : '#df7126', true);
       playFx('fx_boom', 8, m.x, m.y, { dur: 0.35, scale: 0.8 });
+      if (m.name === 'ДОБИВАНИЕ!') { hitStopT = 0.12; cam.addTrauma(0.6); particles.blood(m.x, m.y, 14); SFX.die(); }
+      else if (m.name === 'ОГЛУШЁН!') { cam.addTrauma(0.3); SFX.hit(); }
       break;
     case 'nova': // ледяная/огненная нова реликвий и сетов
       ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 46, t: 0, dur: 0.4, color: '#df7126' });
@@ -375,6 +378,16 @@ net.handlers.onFx = (kind, m) => {
       SFX.hit();
       break;
     }
+    case 'meleearc':
+      // враг замахнулся: красный конус перед ним — уворачивайся!
+      ringFx.push({ x: m.x, y: m.y, r0: m.r, r1: m.r, t: 0, dur: m.w, color: '#d9574a', arc: Math.PI / 1.5, aim: m.a, fill: true });
+      SFX.enemy_shot();
+      break;
+    case 'eswing':
+      // удар врага: серый слэш по дуге
+      playFx('fx_slash', 6, m.x + Math.cos(m.aim) * (m.range - 8), m.y + Math.sin(m.aim) * (m.range - 8),
+        { dur: 0.18, rot: m.aim + Math.PI / 2, scale: 0.85 });
+      break;
     case 'telegraphLine':
       // босс метит рывок: красная полоса — уйди с траектории!
       ringFx.push({ x: m.x, y: m.y, line: true, aim: m.a, len: m.len, t: 0, dur: m.w, color: '#d9574a' });
@@ -528,6 +541,10 @@ function frame(now) {
   let dtMs = now - last;
   last = now;
   if (dtMs > 250) dtMs = 250;
+
+  // HIT-STOP: весомое попадание замораживает картинку на миг (Боёвка 4.0).
+  // Аккумулятор копится — после стопа сим догоняет рывком, предикт цел
+  if (hitStopT > 0) { hitStopT -= dtMs / 1000; return; }
   acc += dtMs / 1000;
 
   while (acc >= SIM_DT) {
@@ -573,12 +590,26 @@ function simStep() {
     fireCd = Math.max(0, fireCd - SIM_DT);
     const canAct = fire && w && fireCd <= 0 && net.pred.rollT <= 0 && !you.dead;
     if (canAct && w.melee) {
-      fireCd = 1 / w.fireRate;
-      spawnSwing(net.pred.x, net.pred.y, aim, w.range, w.arcDeg, w);
+      const heavyHit = !!w.heavy && (you.chg || 0) >= 1; // тяжёлый удар (заряд полон)
+      fireCd = (1 / w.fireRate) * (heavyHit ? 1.6 : !w.heavy ? 0.8 : 1);
+      spawnSwing(net.pred.x, net.pred.y, aim, heavyHit ? w.range + 6 : w.range, heavyHit ? Math.max(w.arcDeg, 200) : w.arcDeg, w);
       swingAnim = 0.18;
       atkShowT = 0.35;
-      cam.addTrauma(w.recoilShake * 0.5);
-      playWeaponSound(w.sound);
+      cam.addTrauma(w.recoilShake * (heavyHit ? 1.2 : 0.5));
+      playWeaponSound(heavyHit ? 'swing_heavy' : w.sound);
+      // ВЕС УДАРА: враг в дуге — короткий hit-stop (тяжёлый дольше)
+      for (const [, rme] of net.remotes) {
+        if (rme.data.tp !== 'e') continue;
+        const ep = net.lerpEnt(rme);
+        const dx = ep.x - net.pred.x, dy = ep.y - net.pred.y;
+        if (dx * dx + dy * dy > (w.range + 10) ** 2) continue;
+        let da = Math.atan2(dy, dx) - aim;
+        da = Math.atan2(Math.sin(da), Math.cos(da));
+        if (Math.abs(da) <= (w.arcDeg || 100) * Math.PI / 360 + 0.3) {
+          hitStopT = heavyHit ? 0.09 : 0.05;
+          break;
+        }
+      }
     } else if (canAct && (w.manaCost
       ? (you.mp >= w.manaCost || (you.cls === 'mage' && you.hp > 2)) // посох: мана или кровавый каст
       : (you.rt <= 0 && you.mag > 0))) {
@@ -1003,10 +1034,21 @@ function drawEntity(id, r, p, nowMs, timeSec) {
     return;
   }
 
-  // враг или NPC
-  const tint = flash ? '#fff' : (e.st === 'windup' || e.st === 'dash') ? '#d95763' : null;
+  // враг или NPC: замах — красный, СТАГГЕР — жёлтый, раскрыт — зелёный
+  const tint = flash ? '#fff'
+    : (e.st === 'windup' || e.st === 'dash') ? '#d95763'
+    : e.st === 'stagger' ? '#fbf236'
+    : e.st === 'recover' ? '#99e550' : null;
   if (tint) atlas.drawTinted(ctx, e.k, s.x, s.y, tint, { flipX });
   else atlas.draw(ctx, e.k, s.x, s.y, { flipX });
+  // оглушённый шатается: звёзды над головой
+  if (e.st === 'stagger' && e.tp === 'e') {
+    ctx.font = '7px monospace';
+    ctx.fillStyle = '#fbf236';
+    ctx.textAlign = 'center';
+    ctx.fillText('✶', s.x + Math.sin(timeSec * 9) * 4, s.y - 15);
+    ctx.textAlign = 'left';
+  }
 
   // элитный монстр: золотая звезда и полоса
   if (e.tp === 'e' && e.el) {
@@ -1021,6 +1063,13 @@ function drawEntity(id, r, p, nowMs, timeSec) {
     ctx.fillRect(s.x - 7, s.y - 12, 14, 2);
     ctx.fillStyle = e.el ? '#fbf236' : '#d9574a';
     ctx.fillRect(s.x - 7, s.y - 12, Math.max(1, Math.round(14 * e.h / e.hm)), 2);
+  }
+  // повреждённая СТОЙКОСТЬ: жёлтая нить под hp — растёт к слому
+  if (e.tp === 'e' && e.pz) {
+    ctx.fillStyle = '#5a4a10';
+    ctx.fillRect(s.x - 7, s.y - 9, 14, 1);
+    ctx.fillStyle = '#fbf236';
+    ctx.fillRect(s.x - 7, s.y - 9, Math.max(1, Math.round(14 * e.pz)), 1);
   }
 }
 

@@ -16,7 +16,7 @@ export const VIEW_H = 270;
 export const PLAYER_SPEED = 88;       // px/с
 export const PLAYER_RADIUS = 5;
 export const PLAYER_MAX_HP = 6;
-export const PLAYER_HURT_INVULN = 1.0;   // сек неуязвимости после урона
+export const PLAYER_HURT_INVULN = 0.7;   // сек неуязвимости после урона (замахи врагов уворачиваемы — Боёвка 4.0)
 
 export const ROLL_TIME = 0.45;
 export const ROLL_IFRAMES = 0.30;

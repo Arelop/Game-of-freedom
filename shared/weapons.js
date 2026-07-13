@@ -3,12 +3,12 @@
 // Темп боя намеренно размеренный: реже атаки, весомее каждый удар.
 export const WEAPONS = {
   sword: {
-    id: 'sword', structDmg: 2, name: 'Меч', melee: true, school: 'melee', damage: 4, fireRate: 1.8,
+    id: 'sword', structDmg: 2, name: 'Меч', melee: true, heavy: 'sweep', school: 'melee', damage: 4, fireRate: 1.8,
     range: 30, arcDeg: 110, knockback: 90, recoilShake: 0.2, infiniteAmmo: true,
     sprite: 'wpn_sword', sound: 'swing', swingColor: '#eeeeee', price: 30,
   },
   axe: {
-    id: 'axe', structDmg: 6, name: 'Секира', melee: true, school: 'melee', damage: 9, fireRate: 1.0,
+    id: 'axe', structDmg: 6, name: 'Секира', melee: true, heavy: 'cleave', school: 'melee', damage: 9, fireRate: 1.0,
     range: 32, arcDeg: 130, knockback: 150, recoilShake: 0.4, infiniteAmmo: true,
     sprite: 'wpn_axe', sound: 'swing_heavy', swingColor: '#d9a066', price: 90,
   },
@@ -28,7 +28,7 @@ export const WEAPONS = {
   },
   // ═══ фракционный эксклюзив: продаётся только «своим» (репутация 40+) ═══
   sever_axe: { // Северяне: секира со стужей в лезвии
-    id: 'sever_axe', structDmg: 7, name: 'Зов метели', melee: true, school: 'melee', damage: 11, fireRate: 0.95,
+    id: 'sever_axe', structDmg: 7, name: 'Зов метели', melee: true, heavy: 'cleave', school: 'melee', damage: 11, fireRate: 0.95,
     range: 33, arcDeg: 140, knockback: 170, recoilShake: 0.45, infiniteAmmo: true,
     sprite: 'wpn_axe', sound: 'swing_heavy', swingColor: '#9fd8e8', price: 240,
     chill: { time: 2.5 }, slow: { mult: 0.6, time: 2 }, // метка льда для реакций
@@ -97,12 +97,12 @@ export const WEAPONS = {
     chain: { count: 2, radius: 70, falloff: 0.7 }, // молния перескакивает
   },
   spear: {
-    id: 'spear', structDmg: 2, name: 'Копьё', melee: true, school: 'melee', damage: 6, fireRate: 1.4,
+    id: 'spear', structDmg: 2, name: 'Копьё', melee: true, heavy: 'thrust', school: 'melee', damage: 6, fireRate: 1.4,
     range: 42, arcDeg: 40, knockback: 110, recoilShake: 0.25, infiniteAmmo: true,
     sprite: 'wpn_spear', sound: 'swing', swingColor: '#d9a066', price: 55,
   },
   warhammer: {
-    id: 'warhammer', structDmg: 9, name: 'Боевой молот', melee: true, school: 'melee', damage: 13, fireRate: 0.7,
+    id: 'warhammer', structDmg: 9, name: 'Боевой молот', melee: true, heavy: 'slam', school: 'melee', damage: 13, fireRate: 0.7,
     range: 30, arcDeg: 120, knockback: 200, recoilShake: 0.55, infiniteAmmo: true,
     sprite: 'wpn_hammer', sound: 'swing_heavy', swingColor: '#847e87', price: 130,
   },
@@ -146,27 +146,27 @@ export const WEAPONS = {
 
   // --- средневековый арсенал ближнего боя ---
   mace: {
-    id: 'mace', structDmg: 4, name: 'Булава', melee: true, school: 'melee', damage: 7, fireRate: 1.2,
+    id: 'mace', structDmg: 4, name: 'Булава', melee: true, heavy: 'slam', school: 'melee', damage: 7, fireRate: 1.2,
     range: 28, arcDeg: 100, knockback: 130, recoilShake: 0.3, infiniteAmmo: true,
     sprite: 'wpn_mace', sound: 'swing_heavy', swingColor: '#9badb7', price: 75,
   },
   flail: {
-    id: 'flail', structDmg: 3, name: 'Кистень', melee: true, school: 'melee', damage: 6, fireRate: 1.5,
+    id: 'flail', structDmg: 3, name: 'Кистень', melee: true, heavy: 'slam', school: 'melee', damage: 6, fireRate: 1.5,
     range: 34, arcDeg: 140, knockback: 100, recoilShake: 0.25, infiniteAmmo: true,
     sprite: 'wpn_flail', sound: 'swing', swingColor: '#9badb7', price: 85,
   },
   morningstar: {
-    id: 'morningstar', structDmg: 6, name: 'Моргенштерн', melee: true, school: 'melee', damage: 10, fireRate: 0.85,
+    id: 'morningstar', structDmg: 6, name: 'Моргенштерн', melee: true, heavy: 'slam', school: 'melee', damage: 10, fireRate: 0.85,
     range: 30, arcDeg: 110, knockback: 180, recoilShake: 0.45, infiniteAmmo: true,
     sprite: 'wpn_morningstar', sound: 'swing_heavy', swingColor: '#847e87', price: 115,
   },
   greatsword: {
-    id: 'greatsword', structDmg: 5, name: 'Двуручный меч', melee: true, school: 'melee', damage: 12, fireRate: 0.75,
+    id: 'greatsword', structDmg: 5, name: 'Двуручный меч', melee: true, heavy: 'sweep', school: 'melee', damage: 12, fireRate: 0.75,
     range: 38, arcDeg: 150, knockback: 160, recoilShake: 0.5, infiniteAmmo: true,
     sprite: 'wpn_greatsword', sound: 'swing_heavy', swingColor: '#eeeeee', price: 150,
   },
   halberd: {
-    id: 'halberd', structDmg: 4, name: 'Алебарда', melee: true, school: 'melee', damage: 9, fireRate: 0.95,
+    id: 'halberd', structDmg: 4, name: 'Алебарда', melee: true, heavy: 'thrust', school: 'melee', damage: 9, fireRate: 0.95,
     range: 48, arcDeg: 60, knockback: 140, recoilShake: 0.35, infiniteAmmo: true,
     sprite: 'wpn_halberd', sound: 'swing', swingColor: '#d9a066', price: 125,
   },
@@ -182,7 +182,7 @@ export const WEAPONS = {
 
   // --- арсенал Выжженных земель ---
   obsidianblade: {
-    id: 'obsidianblade', structDmg: 6, name: 'Обсидиановый клинок', melee: true, school: 'melee',
+    id: 'obsidianblade', structDmg: 6, name: 'Обсидиановый клинок', melee: true, heavy: 'cleave', school: 'melee',
     damage: 11, fireRate: 1.0, range: 32, arcDeg: 120, knockback: 150, recoilShake: 0.4,
     infiniteAmmo: true, burn: { time: 3, dmg: 1 }, // раны от вулканического стекла горят
     sprite: 'wpn_obsidian', sound: 'swing_heavy', swingColor: '#df7126', price: 220,
@@ -200,7 +200,7 @@ export const WEAPONS = {
   // --- ЛЕГЕНДАРНОЕ оружие: не выпадает в мире — только награда за
   // финал «Войны с Тьмой». Выдаётся с суффиксом @l. У каждого — уникальное свойство.
   sunblade: {
-    id: 'sunblade', structDmg: 6, name: 'Клинок рассвета', melee: true, school: 'melee',
+    id: 'sunblade', structDmg: 6, name: 'Клинок рассвета', melee: true, heavy: 'sweep', school: 'melee',
     damage: 5, fireRate: 1.9, range: 32, arcDeg: 130, knockback: 120, recoilShake: 0.3,
     infiniteAmmo: true, lifeOnKill: 1, // убийство в ближнем бою лечит
     sprite: 'wpn_sunblade', sound: 'swing', swingColor: '#fbf236', price: 400, legendary: true,
@@ -214,7 +214,7 @@ export const WEAPONS = {
     chain: { count: 3, radius: 85, falloff: 0.75 }, // каждая молния скачет трижды
   },
   volcanoheart: {
-    id: 'volcanoheart', structDmg: 10, name: 'Сердце вулкана', melee: true, school: 'melee',
+    id: 'volcanoheart', structDmg: 10, name: 'Сердце вулкана', melee: true, heavy: 'slam', school: 'melee',
     damage: 14, fireRate: 0.85, range: 34, arcDeg: 130, knockback: 190, recoilShake: 0.5,
     infiniteAmmo: true, burn: { time: 3, dmg: 2 }, fire: true, // раны кипят лавой
     sprite: 'wpn_volcano', sound: 'swing_heavy', swingColor: '#df7126', price: 500, legendary: true,

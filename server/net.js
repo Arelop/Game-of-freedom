@@ -183,7 +183,12 @@ export class Net {
         const def = ENEMIES[e.kind];
         ents.push({
           i: e.id, tp: 'e', k: def.sprite, x: r1(e.x), y: r1(e.y), a: r2(e.aim || 0),
-          h: e.hp, hm: e.maxHp || def.hp, st: e.state === 'windup' || e.state === 'dash' ? e.state : undefined,
+          h: e.hp, hm: e.maxHp || def.hp,
+          st: (e.staggerT || 0) > 0 ? 'stagger'
+            : (e.state === 'windup' || e.state === 'dash' || e.state === 'recover' ? e.state : undefined),
+          // повреждённая стойкость (0..1) — жёлтая полоска на клиенте
+          pz: e.poise && (e.poiseDmg || 0) > 0 && (e.staggerT || 0) <= 0
+            ? r2(Math.min(1, e.poiseDmg / e.poise)) : undefined,
           el: e.elite || undefined,
         });
       } else {
@@ -205,7 +210,7 @@ export class Net {
         ammo: p.ammo, inv: p.inventory,
         rt: r2(p.reloadT), dead: p.dead ? 1 : 0, dt: r1(p.downT),
         rc: r2(p.rollCd), map: p.mapId,
-        eq: p.equipment, sm: r2(p.speedMult || 1), rcm: r2(p.rollCdMult || 1),
+        eq: p.equipment, sm: r2((p.speedMult || 1) * (p.chargeSlow ? 0.6 : 1)), rcm: r2(p.rollCdMult || 1),
         bf: Object.fromEntries(Object.entries(p.buffs || {}).map(([k, b]) => [k, Math.ceil(b.t)])),
         cls: p.cls, lvl: p.level, xp: p.xp, xpn: xpNeed(p.level),
         sp: p.statPts, tp2: p.talentPts, st: p.stats, tl: p.talents,
