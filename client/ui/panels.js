@@ -100,6 +100,7 @@ export class Panels {
     if (w.explode) lines.push('<div class="tinfo">Взрывается по области</div>');
     if (w.chain) lines.push('<div class="tinfo">Молния скачет по врагам</div>');
     if (w.structDmg) lines.push(`<div class="tinfo">Ломает постройки (${w.structDmg})</div>`);
+    if (w.procDesc) lines.push(`<div class="tinfo" style="color:#df7126">★ ${w.procDesc}</div>`);
     return `<div class="tname" style="color:${r.color}">${w.name.replace(/ \[.*\]$/, '')}</div>`
       + `<div class="ttype">${school}${r.name ? ' · ' + r.name : ''}</div>`
       + lines.join('')

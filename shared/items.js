@@ -363,6 +363,13 @@ export const ITEMS = {
     proc: { type: 'windrush' },
     procDesc: 'после переката +35% скорости на 2 с',
   },
+  // легендария Хранителя сердца (выдаётся с @l)
+  firstheart: {
+    id: 'firstheart', name: 'Осколок первосердца', slot: 'acc',
+    stats: { maxHp: 1, lck: 1 }, price: 60, icon: 'item_heart_shadow', legendary: true,
+    proc: { type: 'firstheart' },
+    procDesc: 'ДОБИВАНИЕ возвращает 1 hp',
+  },
 
   // --- зелья ---
   heal_potion: {

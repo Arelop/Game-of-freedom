@@ -1189,7 +1189,8 @@ export class Game {
       r = w.heavy === 'thrust' ? Math.round(r * 1.8) : r + (H.rr || 0);
     }
     // ═══ МУВМЕНТ-АТАКИ (Боёвка 4.1): движение вознаграждается ═══
-    if (!heavy && this.tick - (p.rollEndTick ?? -99) <= 10) {
+    // «Клык стаи»: окно роллинг-выпада вдвое шире
+    if (!heavy && this.tick - (p.rollEndTick ?? -99) <= (w.proc === 'packfang' ? 20 : 10)) {
       // РОЛЛИНГ-ВЫПАД: удар сразу после переката — рывок вперёд, ×1.3 и слом
       p.rollEndTick = -99;
       atk.dmg = Math.round(atk.dmg * 1.3 * 10) / 10;
@@ -1301,10 +1302,12 @@ export class Game {
     if (charged) dmg = Math.round(dmg * 2 * 10) / 10;
     const projR = w.projRadius + (charged ? 1.5 : 0);
     const projSpd = w.projectileSpeed * (charged ? 1.2 : 1);
-    for (let i = 0; i < count; i++) {
+    // «Шёпот пустоты»: заряженный выстрел расходится веером из трёх
+    const fan = charged && w.proc === 'voidwhisper' ? 2 : 0;
+    for (let i = 0; i < count + fan; i++) {
       const extraSpread = count > (w.projectilesPerShot || 1) ? Math.max(w.spreadDeg, 10) : w.spreadDeg;
       const spread = (rand() - 0.5) * extraSpread * Math.PI / 180;
-      const a = aim + spread;
+      const a = fan ? aim + (i - (count + fan - 1) / 2) * 0.16 : aim + spread;
       this.projectiles.push({
         x: p.x, y: p.y - 4, vx: Math.cos(a) * projSpd, vy: Math.sin(a) * projSpd,
         life: w.projLife, radius: projR, dmg, crit: atk.crit, chg: charged ? 1 : 0,
@@ -3267,13 +3270,31 @@ export class Game {
     // таланты атакующего: казнь, засада, абсолютный ноль, яды и поджог
     const attacker = pr && !pr.isDot ? this.players.get(pr.owner) : null;
     // ═══ СТАГГЕР (Боёвка 4.0): оглушённый враг беззащитен ═══
-    if ((e.staggerT || 0) > 0 && pr && !pr.isDot) {
+    if ((e.staggerT || 0) > 0 && pr && !pr.isDot && !pr.quake) {
+      const kw = attacker && this.weapon(attacker);
+      if (kw?.proc === 'giantsbane') dmg *= 1.35; // «Погибель великанов»: гроза сломленных
       if (attacker && pr.school === 'melee') {
         // ДОБИВАНИЕ: удар мили по сломленному — критический финишер
         dmg *= 3;
         e.staggerT = 0; // стаггер потрачен добиванием
         this.fx({ t: 'react', name: 'ДОБИВАНИЕ!', x: e.x, y: e.y - 10 }, e.mapId, e.x, e.y);
         this.fx({ t: 'boom', x: e.x, y: e.y, r: 26 }, e.mapId, e.x, e.y);
+        // «Осколок первосердца»: добивание возвращает жизнь
+        if (attacker.procs?.firstheart) attacker.hp = Math.min(attacker.maxHp, attacker.hp + 1);
+        // «Колокол горы»: добивание бьёт ударной волной по соседям
+        if (kw?.proc === 'quake') {
+          const wave = Math.round(dmg * 0.5);
+          for (const o of [...this.entities.values()]) {
+            if (o === e || o.entType !== 'enemy' || o.mapId !== e.mapId) continue;
+            if (dist2(e.x, e.y, o.x, o.y) > 48 * 48) continue;
+            const oa = Math.atan2(o.y - e.y, o.x - e.x);
+            this.damageEnemy(o, wave, {
+              owner: attacker.id, school: 'melee', quake: true, // волна не каскадит, но стойкость ломает
+              vx: Math.cos(oa), vy: Math.sin(oa), knockback: 110, poiseMult: 2,
+            });
+          }
+          this.fx({ t: 'boom', x: e.x, y: e.y, r: 48 }, e.mapId, e.x, e.y);
+        }
       } else {
         dmg *= 1.5; // прочий урон по оглушённому тоже больнее
       }
@@ -3327,10 +3348,12 @@ export class Game {
       {
         let da = Math.atan2(e.y - attacker.y, e.x - attacker.x) - (e.aim || 0);
         da = Math.atan2(Math.sin(da), Math.cos(da));
+        pr.backstab = false; // atk общий на весь свинг — флаг ставится по жертве
         if (Math.abs(da) < Math.PI / 3) {
           let bs = attacker.cls === 'rogue' ? 1.35 : 1.15;
           if (attacker.setFlags?.set_backstab) bs = Math.max(bs, 1.4);
           dmg *= bs;
+          pr.backstab = true;
           if (attacker.cls === 'rogue' && (attacker.bsFxT || 0) <= this.tick) {
             attacker.bsFxT = this.tick + 36; // не чаще раза в 1.2 с
             this.fx({ t: 'react', name: 'В СПИНУ!', x: e.x, y: e.y - 8 }, e.mapId, e.x, e.y);
@@ -3474,6 +3497,11 @@ export class Game {
       const kw = this.weapon(killer);
       if (kw?.lifeOnKill && pr.school === kw.school)
         killer.hp = Math.min(killer.maxHp, killer.hp + kw.lifeOnKill);
+      // «Клык стаи»: убийство в спину возвращает перекат
+      if (kw?.proc === 'packfang' && pr.backstab && killer.rollCd > 0) {
+        killer.rollCd = 0;
+        this.fx({ t: 'react', name: 'ПЕРЕКАТ!', x: killer.x, y: killer.y - 10 }, killer.mapId, killer.x, killer.y);
+      }
     }
     // Мана-всплеск: маг восполняет ману убийствами магией
     if (killer && killer.cls === 'mage' && pr.school === 'magic')
@@ -3578,6 +3606,27 @@ export class Game {
     if (def.archetype === 'boss') {
       this.dropSetPiece(e.mapId, e.x + 6, e.y + 6, luck);
       if (this.rand() < 0.25) this.dropRelic(e.mapId, e.x - 8, e.y + 6);
+    }
+    // ЛЕГЕНДАРИИ: именная вещь хозяина логова. Первый в мире килл —
+    // гарантия; дальше — редкая удача (12%)
+    const LEGEND_DROPS = {
+      rockKing: 'weapon:mountain_bell@l', bossOgre: 'weapon:giantsbane@l',
+      packLeader: 'weapon:packfang@l', darkLord: 'weapon:voidwhisper@l',
+      swampWitch: 'weapon:mirefang@l', heartKeeper: 'firstheart@l',
+    };
+    const legendId = LEGEND_DROPS[e.kind];
+    if (legendId) {
+      this.world.legends = this.world.legends || {};
+      if (!this.world.legends[e.kind] || this.rand() < 0.12) {
+        this.world.legends[e.kind] = true;
+        this.spawnDrop(legendId, 1, e.mapId, e.x + 4, e.y - 6, 600);
+        const nm = (legendId.startsWith('weapon:')
+          ? getWeapon(legendId.slice(7))?.name : getItem(legendId)?.name || '')
+          .replace(/ \[.*\]$/, '');
+        this.fx({ t: 'fanfare' }, e.mapId, e.x, e.y);
+        this.toastMap(e.mapId, `★ ЛЕГЕНДА: «${nm}» — добыча с ${def.name}!`);
+        this.events.push(this.world.day, `Легенда обретена: «${nm}»`, { x: Math.round(e.x / TILE), y: Math.round(e.y / TILE) });
+      }
     }
     if (e.arenaChamp) this.dropSetPiece(e.mapId, e.x, e.y, luck);
     // Выжженные земли: элита щеголяет «Пепельным орденом», всякая тварь — оружием огня

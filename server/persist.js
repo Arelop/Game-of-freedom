@@ -64,6 +64,7 @@ export function saveWorld(game) {
       mq: w.mq || null,     // кампания: мировые последствия выборов
       banditsWeakT: w.banditsWeakT || 0,
       smithBoon: w.smithBoon || false,
+      legends: w.legends || null, // какие легендарии уже обретены (гарантия одноразова)
       arenaRecord: w.arenaRecord || null,
       daily: w.daily || null,
       ashLooted: w.ashLooted || false,
@@ -130,6 +131,7 @@ export function applyWorldData(game, data) {
     }
     if (data.banditsWeakT) w.banditsWeakT = data.banditsWeakT;
     if (data.smithBoon) w.smithBoon = true;
+    if (data.legends) w.legends = data.legends;
     if (data.arenaRecord) w.arenaRecord = data.arenaRecord;
     if (data.daily) w.daily = data.daily;
     if (data.ashLooted) w.ashLooted = true;

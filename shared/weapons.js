@@ -226,6 +226,45 @@ export const WEAPONS = {
     sprite: 'wpn_windbow', projSprite: 'proj_arrow', sound: 'shot_bow',
     projRadius: 2, projLife: 1.8, ammoType: 'arrow', price: 420, legendary: true,
   },
+
+  // --- ЛЕГЕНДАРИИ боссов: именная вещь с уникальной механикой у каждого
+  // хозяина логова. Первый в мире килл гарантирует дроп, дальше — удача.
+  mountain_bell: {
+    id: 'mountain_bell', structDmg: 10, name: 'Колокол горы', melee: true, heavy: 'slam', school: 'melee',
+    damage: 12, fireRate: 0.65, range: 30, arcDeg: 120, knockback: 210, recoilShake: 0.55,
+    infiniteAmmo: true, proc: 'quake',
+    procDesc: 'ДОБИВАНИЕ бьёт ударной волной: 50% урона и слом стойкости соседям',
+    sprite: 'wpn_hammer', sound: 'swing_heavy', swingColor: '#847e87', price: 500, legendary: true,
+  },
+  giantsbane: {
+    id: 'giantsbane', structDmg: 5, name: 'Погибель великанов', melee: true, heavy: 'sweep', school: 'melee',
+    damage: 11, fireRate: 0.75, range: 38, arcDeg: 150, knockback: 160, recoilShake: 0.5,
+    infiniteAmmo: true, proc: 'giantsbane',
+    procDesc: 'по врагам со сломанной стойкостью +35% урона',
+    sprite: 'wpn_greatsword', sound: 'swing_heavy', swingColor: '#eeeeee', price: 480, legendary: true,
+  },
+  packfang: {
+    id: 'packfang', structDmg: 1, name: 'Клык стаи', melee: true, school: 'melee',
+    damage: 2.6, fireRate: 3.6, range: 24, arcDeg: 80, knockback: 40, recoilShake: 0.1,
+    infiniteAmmo: true, proc: 'packfang',
+    procDesc: 'окно роллинг-выпада вдвое шире; убийство в спину возвращает перекат',
+    sprite: 'wpn_dagger', sound: 'swing', swingColor: '#eeeeee', price: 460, legendary: true,
+  },
+  voidwhisper: {
+    id: 'voidwhisper', structDmg: 2, name: 'Шёпот пустоты', school: 'magic', damage: 5.5,
+    projectilesPerShot: 1, spreadDeg: 2, projectileSpeed: 310, fireRate: 1.7, manaCost: 2,
+    knockback: 20, recoilShake: 0.15,
+    proc: 'voidwhisper', procDesc: 'заряженный выстрел выпускает 3 снаряда веером за ту же ману',
+    sprite: 'wpn_bonestaff', projSprite: 'proj_soul', sound: 'shot_laserlike',
+    projRadius: 3, projLife: 1.3, price: 500, legendary: true,
+  },
+  mirefang: {
+    id: 'mirefang', structDmg: 2, name: 'Жало топи', melee: true, heavy: 'thrust', school: 'melee',
+    damage: 5.5, fireRate: 1.35, range: 42, arcDeg: 40, knockback: 110, recoilShake: 0.25,
+    infiniteAmmo: true, slow: { mult: 0.55, time: 2.5 }, chill: true,
+    procDesc: 'раны гниют болотом: замедление и метка льда с каждого укола',
+    sprite: 'wpn_spear', sound: 'swing', swingColor: '#6abe30', price: 460, legendary: true,
+  },
 };
 
 export const AMMO_NAMES = {
