@@ -4336,6 +4336,7 @@ export class Game {
       spawnT: 0, timeLeft: waves * 40 + 30, enemyIds: [], kinds: [...tok.units],
     };
     this.toastAll(`⚔ ${FACTIONS[tok.faction]?.name || 'Враг'} осаждает ${s.name}! Спасите город — отбейте штурм!`, true);
+    this.fx({ t: 'horn' }, 'over', s.x * TILE, s.y * TILE); // осадный горн — слышен у стен
     this.events.push(this.world.day, `Осада ${s.name}: враг у ворот`, { x: s.x, y: s.y });
   }
 

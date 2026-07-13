@@ -15,7 +15,7 @@ import { Particles } from './render/particles.js';
 import { TileRenderer } from './render/tilemap.js';
 import { Hud } from './ui/hud.js';
 import { Panels } from './ui/panels.js';
-import { SFX, playWeaponSound, Music } from './sfx.js';
+import { SFX, playWeaponSound, Music, setListener, toggleMute } from './sfx.js';
 
 // ---------- инициализация ----------
 const screen = document.getElementById('screen');
@@ -69,6 +69,7 @@ let invRefresh = 0;
 let swingAnim = 0;       // анимация замаха своего игрока
 let atkShowT = 0;        // оружие видно только в момент атаки (не мельтешит в руках)
 let hitStopT = 0;        // hit-stop: короткая заморозка кадра при весомом попадании
+let prevChg = 0;         // прошлый заряд — для «динь» при готовности
 const remoteAtk = new Map(); // pid -> ms, до которого показывать оружие союзника
 const swings = [];       // {x,y,aim,range,arc,t,maxT,color}
 const floatTexts = [];   // летящие цифры урона {x,y,text,color,t,big}
@@ -238,15 +239,15 @@ net.handlers.onFx = (kind, m) => {
       particles.muzzle(m.x, m.y, m.aim);
       if (m.chg) particles.burst(m.x, m.y - 4, '#63c5ff', 8, 60, 0.3); // вспышка заряженного выстрела
       remoteAtk.set(m.pid, performance.now() + 350);
-      if (m.pid !== net.myId) playWeaponSound(getWeapon(m.weapon)?.sound);
+      if (m.pid !== net.myId) playWeaponSound(getWeapon(m.weapon)?.sound, m);
       break;
     case 'swing':
       remoteAtk.set(m.pid, performance.now() + 350);
       playFx('fx_slash', 6, m.x + Math.cos(m.aim) * (m.range - 10), m.y + Math.sin(m.aim) * (m.range - 10),
         { dur: m.hv ? 0.3 : 0.22, rot: m.aim + Math.PI / 2, scale: Math.max(0.7, (m.range || 26) / 34) * (m.hv ? 1.5 : 1) });
-      if (m.pid !== net.myId) { spawnSwing(m.x, m.y, m.aim, m.range, m.arc, getWeapon(m.weapon)); playWeaponSound(getWeapon(m.weapon)?.sound); }
+      if (m.pid !== net.myId) { spawnSwing(m.x, m.y, m.aim, m.range, m.arc, getWeapon(m.weapon)); playWeaponSound(getWeapon(m.weapon)?.sound, m); }
       break;
-    case 'eshot': SFX.enemy_shot(); break;
+    case 'eshot': SFX.enemy_shot(m); break;
     case 'hit':
       if (m.kind === 'wall') particles.burst(m.x, m.y, '#847e87', 4, 40, 0.25);
       else particles.blood(m.x, m.y, 4);
@@ -255,7 +256,7 @@ net.handlers.onFx = (kind, m) => {
       flashes.set(m.id, performance.now() + 80);
       particles.blood(m.x, m.y, 5);
       if (m.dmg) addFloatText(m.x, m.y, (m.crit ? '💥' : '') + m.dmg, m.crit ? '#fbf236' : '#eeeeee', !!m.crit);
-      SFX.hit();
+      SFX.hit(m);
       break;
     case 'levelup':
       particles.sparkle(m.x, m.y);
@@ -269,22 +270,22 @@ net.handlers.onFx = (kind, m) => {
     case 'pdown':
       particles.blood(m.x, m.y, 20);
       cam.addTrauma(m.id === net.myId ? 0.9 : 0.3);
-      SFX.die();
+      SFX.die(m);
       break;
-    case 'die': particles.blood(m.x, m.y, 12); SFX.die(); cam.addTrauma(0.15); break;
-    case 'pickup': particles.sparkle(m.x, m.y); SFX.pickup(); break;
-    case 'chest': particles.sparkle(m.x, m.y); SFX.pickup(); break;
+    case 'die': particles.blood(m.x, m.y, 12); SFX.die(m); cam.addTrauma(0.15); break;
+    case 'pickup': particles.sparkle(m.x, m.y); SFX.pickup(m); break;
+    case 'chest': particles.sparkle(m.x, m.y); SFX.pickup(m); break;
     case 'boom':
       playFx('fx_boom', 8, m.x, m.y, { dur: 0.5, scale: Math.max(1, (m.r || 30) / 16) });
       particles.burst(m.x, m.y, '#df7126', 12, 110, 0.5, 2);
       cam.addTrauma(0.45);
-      SFX.boom();
+      SFX.boom(m);
       break;
     case 'rubble':
       particles.burst(m.x, m.y, '#847e87', 10, 70, 0.45, 2);
       particles.burst(m.x, m.y, '#8f563b', 6, 50, 0.4);
       cam.addTrauma(0.2);
-      SFX.die();
+      SFX.die(m);
       break;
     case 'chain':
       chainFx.push({ pts: m.pts, t: 0.22 });
@@ -304,13 +305,13 @@ net.handlers.onFx = (kind, m) => {
     case 'marker': net.mapInfo.markers = net.mapInfo.markers || []; net.mapInfo.markers.push(m); break;
     case 'block':
       particles.burst(m.x, m.y, '#9badb7', 6, 60, 0.2);
-      if (m.pid === net.myId) { addFloatText(m.x, m.y - 8, 'БЛОК', '#9badb7'); SFX.hit(); }
+      if (m.pid === net.myId) { addFloatText(m.x, m.y - 8, 'БЛОК', '#9badb7'); SFX.block(m); }
       break;
     case 'summon':
       playFx('fx_dark', 8, m.x, m.y, { dur: 0.45 });
       playFx('fx_spark', 6, m.x, m.y - 6, { dur: 0.5, scale: 1.4 });
       particles.sparkle(m.x, m.y);
-      SFX.boom();
+      SFX.boom(m);
       break;
     case 'poof':
       particles.burst(m.x, m.y, '#847e87', 10, 50, 0.4);
@@ -326,7 +327,7 @@ net.handlers.onFx = (kind, m) => {
     case 'net':
       ringFx.push({ x: m.x, y: m.y, r0: 55, r1: 40, t: 0, dur: 0.5, color: '#9badb7', fill: true });
       particles.burst(m.x, m.y, '#847e87', 12, 60, 0.35);
-      SFX.roll();
+      SFX.roll(m);
       break;
     case 'loot': // подбор: летящий текст у героя вместо тоста
       addFloatText(m.x, m.y - 12, '+ ' + m.text, '#fbf236');
@@ -335,28 +336,30 @@ net.handlers.onFx = (kind, m) => {
     case 'react': // реакции стихий и всплески ресурсов: крупный текст + вспышка
       addFloatText(m.x, m.y - 10, m.name, m.name === 'ОГЛУШЁН!' ? '#fbf236' : '#df7126', true);
       playFx('fx_boom', 8, m.x, m.y, { dur: 0.35, scale: 0.8 });
-      if (m.name === 'ДОБИВАНИЕ!') { hitStopT = 0.12; cam.addTrauma(0.6); particles.blood(m.x, m.y, 14); SFX.die(); }
-      else if (m.name === 'ОГЛУШЁН!') { cam.addTrauma(0.3); SFX.hit(); }
+      if (m.name === 'ДОБИВАНИЕ!') { hitStopT = 0.12; cam.addTrauma(0.6); particles.blood(m.x, m.y, 14); SFX.finisher(m); }
+      else if (m.name === 'ОГЛУШЁН!') { cam.addTrauma(0.3); SFX.stagger(m); }
+      else if (m.name === 'ПАЛ НА КОЛЕНО!') { cam.addTrauma(0.5); SFX.roar(m); SFX.stagger(m); }
+      else if (m.name === 'ВОЙ!') SFX.howl(m);
       break;
     case 'nova': // ледяная/огненная нова реликвий и сетов
       ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 46, t: 0, dur: 0.4, color: '#df7126' });
       playFx('fx_splash', 6, m.x, m.y, { dur: 0.4, scale: 1.5 });
-      SFX.hit();
+      SFX.hit(m);
       break;
     case 'frostnova': // ледяная стена/нова: всплеск льда
       playFx('fx_splash', 6, m.x, m.y, { dur: 0.45, scale: Math.max(1, (m.r || 30) / 20) });
-      SFX.zap();
+      SFX.zap(m);
       break;
     case 'ability': spawnAbilityFx(m); break;
     case 'zone':
       // живая зона: дым или огненный смерч — частицы, пока живёт
       activeZones.push({ kind: m.kind, x: m.x, y: m.y, vx: m.vx || 0, vy: m.vy || 0, t: m.dur, r: m.r || 44 });
-      if (m.kind === 'firestorm') SFX.boom(); else SFX.zap();
+      if (m.kind === 'firestorm') SFX.boom(m); else SFX.zap(m);
       break;
     case 'telegraph':
       // босс замахнулся / ловушка щёлкнула: красная зона — беги!
       ringFx.push({ x: m.x, y: m.y, r0: 6, r1: m.r, t: 0, dur: m.w, color: '#d9574a', fill: true });
-      SFX.enemy_shot();
+      SFX.windup(m);
       break;
     case 'soul': // душа улетает от трупа к некроманту — зелёный огонёк
       particles.burst(m.x, m.y, '#6abe30', 5, 30, 0.5, 2);
@@ -375,30 +378,31 @@ net.handlers.onFx = (kind, m) => {
       else if (m.kind === 'frost') { playFx('fx_splash', 6, m.x, m.y, { dur: 0.45, scale: 1.4 }); particles.burst(m.x, m.y, c, 10, 60, 0.4); }
       else { playFx('fx_boom', 8, m.x, m.y, { dur: 0.35, scale: 1 }); particles.burst(m.x, m.y, c, 12, 90, 0.35, 2); }
       cam.addTrauma(0.25);
-      SFX.hit();
+      SFX.hit(m);
       break;
     }
     case 'meleearc':
       // враг замахнулся: красный конус перед ним — уворачивайся!
       ringFx.push({ x: m.x, y: m.y, r0: m.r, r1: m.r, t: 0, dur: m.w, color: '#d9574a', arc: Math.PI / 1.5, aim: m.a, fill: true });
-      SFX.enemy_shot();
+      SFX.windup(m);
       break;
     case 'eswing':
-      // удар врага: серый слэш по дуге
+      // удар врага: серый слэш по дуге + свист
       playFx('fx_slash', 6, m.x + Math.cos(m.aim) * (m.range - 8), m.y + Math.sin(m.aim) * (m.range - 8),
         { dur: 0.18, rot: m.aim + Math.PI / 2, scale: 0.85 });
+      SFX.swing(m);
       break;
     case 'telegraphLine':
       // босс метит рывок: красная полоса — уйди с траектории!
       ringFx.push({ x: m.x, y: m.y, line: true, aim: m.a, len: m.len, t: 0, dur: m.w, color: '#d9574a' });
-      SFX.enemy_shot();
+      SFX.windup(m);
       break;
     case 'enrage':
       // босс в ярости: багровая вспышка и дрожь земли
       ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 52, t: 0, dur: 0.5, color: '#d9574a' });
       particles.burst(m.x, m.y, '#d9574a', 22, 100, 0.5, 2);
       cam.addTrauma(0.5);
-      SFX.boom();
+      SFX.roar(m);
       break;
     case 'bloodcast':
       playFx('fx_dark', 8, m.x, m.y, { dur: 0.5, scale: 1.1 });
@@ -420,7 +424,9 @@ net.handlers.onFx = (kind, m) => {
       particles.dust(m.x, m.y);
       break;
     case 'eat': SFX.heal(); break;
-    case 'heal': particles.heal(m.x, m.y); SFX.heal(); break;
+    case 'heal': particles.heal(m.x, m.y); SFX.heal(m); break;
+    case 'fanfare': SFX.fanfare(); break;
+    case 'horn': SFX.horn(); break;
   }
 };
 
@@ -457,6 +463,7 @@ input.onKey = k => {
     else net.send({ t: MSG.BESTIARY });
   }
   if (k === 'KeyN') panels.toast(Music.toggle() ? '🎵 Музыка включена' : '🔇 Музыка выключена');
+  if (k === 'KeyV') panels.toast(toggleMute() ? '🔊 Звук включён' : '🔇 Звук выключен');
   if (k === 'F3') hud.debug = !hud.debug;
   if (k === 'Escape') panels.hideDialog();
   if (/^Digit[1-4]$/.test(k)) net.send({ t: MSG.SWITCH_WEAPON, slot: +k.slice(5) - 1 });
@@ -469,23 +476,23 @@ function spawnAbilityFx(m) {
     case 'power_strike':
       particles.burst(m.x, m.y, '#df7126', 14, 90, 0.35, 2);
       ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 44, t: 0, dur: 0.25, color: '#df7126' });
-      cam.addTrauma(my ? 0.4 : 0.2); SFX.boom();
+      cam.addTrauma(my ? 0.4 : 0.2); SFX.boom(m);
       break;
     case 'war_cry':
       ringFx.push({ x: m.x, y: m.y, r0: 10, r1: 95, t: 0, dur: 0.45, color: '#fbf236' });
       addFloatText(m.x, m.y - 12, 'КЛИЧ!', '#fbf236', true);
-      cam.addTrauma(0.25); SFX.die();
+      cam.addTrauma(0.25); SFX.roar(m);
       break;
     case 'whirlwind':
       for (let i = 0; i < 3; i++)
         ringFx.push({ x: m.x + Math.cos(m.aim) * i * 28, y: m.y + Math.sin(m.aim) * i * 28, r0: 6, r1: 30, t: -i * 0.06, dur: 0.3, color: '#eeeeee' });
-      particles.dust(m.x, m.y); SFX.roll();
+      particles.dust(m.x, m.y); SFX.roll(m);
       break;
     case 'flame_wave':
       ringFx.push({ x: m.x, y: m.y, r0: 12, r1: 110, t: 0, dur: 0.4, color: '#df7126', arc: 1.3, aim: m.aim, fill: true });
       particles.burst(m.x + Math.cos(m.aim) * 30, m.y + Math.sin(m.aim) * 30, '#df7126', 16, 100, 0.4, 2);
       particles.burst(m.x + Math.cos(m.aim) * 60, m.y + Math.sin(m.aim) * 60, '#fbf236', 10, 60, 0.35);
-      SFX.boom();
+      SFX.boom(m);
       break;
     case 'frost_nova':
       ringFx.push({ x: m.x, y: m.y, r0: 8, r1: 85, t: 0, dur: 0.45, color: '#63c5ff' });
@@ -739,12 +746,22 @@ function renderWeather(timeSec) {
   }
 }
 
-// настроение музыки: данж — дрон, ночь — минор, день — мажор
+// настроение музыки: бой — пульс, данж — дрон, ночь — минор, день — мажор.
+// Бой включается мгновенно (враг ближе 170px), выключается через 5 с тишины.
+let lastBattleMs = 0;
 setInterval(() => {
   if (!net.connected) return;
-  Music.setMood(net.mapId !== 'over' ? 'dungeon'
-    : (net.worldTime < 0.22 || net.worldTime > 0.85) ? 'night' : 'day');
-}, 3000);
+  const now = performance.now();
+  for (const r of net.remotes.values()) {
+    const e = r.data;
+    if (e.tp !== 'e') continue;
+    const dx = e.x - net.pred.x, dy = e.y - net.pred.y;
+    if (dx * dx + dy * dy < 170 * 170) { lastBattleMs = now; break; }
+  }
+  Music.setMood(now - lastBattleMs < 5000 ? 'battle'
+    : net.mapId !== 'over' ? 'dungeon'
+      : (net.worldTime < 0.22 || net.worldTime > 0.85) ? 'night' : 'day');
+}, 1500);
 
 // ---------- рендер ----------
 function render(timeSec) {
@@ -752,6 +769,7 @@ function render(timeSec) {
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   if (!net.connected || !net.gotFirstSnap) { blit(); return; }
 
+  setListener(net.pred.x, net.pred.y); // ухо героя — для позиционного звука
   tiles.render(ctx, cam, net.mapId, timeSec);
 
   // входы в данжи (поверх тайлов)
@@ -780,6 +798,10 @@ function render(timeSec) {
     drawEntity(d.id, d.r, d.p, nowMs, timeSec);
   }
 
+  // заряд дозрел — тихий динь (посох мага и тяжёлая атака мили)
+  const chgNow = net.you?.chg || 0;
+  if (chgNow >= 1 && prevChg < 1 && !net.you?.dead) SFX.charged();
+  prevChg = chgNow;
   // кольцо заряда посоха мага: наливается вокруг героя, полное — золотое
   if ((net.you?.chg || 0) > 0 && !net.you.dead) {
     const c = cam.toScreen(net.pred.x, net.pred.y);
