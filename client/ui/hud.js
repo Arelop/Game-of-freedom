@@ -191,6 +191,12 @@ export class Hud {
       const sg = net.sieges[0];
       ctx.fillStyle = '#d9574a';
       ctx.fillText(`⚔ ${sg.name} в осаде: волна ${sg.w}/${sg.wm}`, 5, qy + (you.mq?.t ? 8 : 0));
+    } else if (net.battles?.length) {
+      // ВОЙНА НАРОДОВ рядом: кто на кого
+      const bt = net.battles[0];
+      const FN = { severane: 'Северяне', ozerny: 'Озёрные', stepnyaki: 'Степняки' };
+      ctx.fillStyle = '#d9574a';
+      ctx.fillText(`⚔ ${FN[bt.a] || bt.a} идут на ${bt.name}`, 5, qy + (you.mq?.t ? 8 : 0));
     }
 
     // (стрелку-указатель к цели кампании убрали по просьбе игрока —
@@ -336,6 +342,15 @@ export class Hud {
       ctx.fillStyle = '#d9574a';
       const gx = x0 + Math.round(sg.x * TILE * k), gy = y0 + Math.round(sg.y * TILE * k);
       ctx.fillRect(gx - 2, gy, 5, 1); ctx.fillRect(gx, gy - 2, 1, 5);
+    }
+    // войны народов: оранжевые скрещённые мечи у осаждаемого города
+    for (const bt of net.battles || []) {
+      ctx.fillStyle = '#df7126';
+      const bx = x0 + Math.round(bt.x * TILE * k), by = y0 + Math.round(bt.y * TILE * k);
+      ctx.fillRect(bx - 2, by - 2, 1, 1); ctx.fillRect(bx - 1, by - 1, 1, 1);
+      ctx.fillRect(bx, by, 1, 1); ctx.fillRect(bx + 1, by + 1, 1, 1); ctx.fillRect(bx + 2, by + 2, 1, 1);
+      ctx.fillRect(bx + 2, by - 2, 1, 1); ctx.fillRect(bx + 1, by - 1, 1, 1);
+      ctx.fillRect(bx - 1, by + 1, 1, 1); ctx.fillRect(bx - 2, by + 2, 1, 1);
     }
     ctx.fillStyle = '#fff';
     ctx.fillRect(x0 + Math.round(net.pred.x * k) - 1, y0 + Math.round(net.pred.y * k) - 1, 2, 2);

@@ -2,7 +2,7 @@
 // NPC — сущности { id, kind:'npc', role, x, y, home (поселение), anchor... }.
 import { TILE } from '../../shared/constants.js';
 import { moveWithCollision, dist2 } from '../../shared/simCore.js';
-import { isHostileToPlayer } from './factions.js';
+import { isHostileToPlayer, factionsHostile } from './factions.js';
 
 const NPC_SPEED = 40;
 const GUARD_SPEED = 60;
@@ -139,44 +139,22 @@ export function updateNpc(npc, dt, map, game) {
     return;
   }
 
+  // СОЛДАТ армии народа: марширует к цели, у города рубит гарнизон (нет home)
+  if (npc.role === 'soldier') {
+    const danger = findDanger(npc, game);
+    if (danger) { combatantFight(npc, danger, game, dt, map); return; }
+    // нет боя — идёт к цели похода (центр вражеского города)
+    if (npc.warX !== undefined) walkTo(npc, npc.warX, npc.warY, GUARD_SPEED * 0.9, dt, map);
+    return;
+  }
+
   const s = game.world.settlements.find(x => x.id === npc.home);
   if (!s) return;
 
   // опасность: враги рядом или враждебный игрок
   const danger = findDanger(npc, game);
   if (npc.role === 'guard') {
-    if (danger) {
-      const ang = Math.atan2(danger.y - npc.y, danger.x - npc.x);
-      const d2 = dist2(npc.x, npc.y, danger.x, danger.y);
-      npc.aim = ang;
-      if (npc.melee) {
-        // ополченец/латник: сближается и бьёт в упор
-        const reach = npc.unit === 'veteran' ? 22 : 18;
-        if (d2 > reach * reach)
-          moveWithCollision(npc, Math.cos(ang) * GUARD_SPEED * 1.25 * dt, Math.sin(ang) * GUARD_SPEED * 1.25 * dt, 5, map);
-        npc.swingT = (npc.swingT ?? 0) - dt;
-        if (npc.swingT <= 0 && d2 < (reach + 8) * (reach + 8)) {
-          npc.swingT = npc.unit === 'veteran' ? 1.0 : 0.8;
-          if (danger.entType === 'enemy') {
-            game.damageEnemy(danger, npc.dmg || 3,
-              { vx: Math.cos(ang), vy: Math.sin(ang), knockback: npc.unit === 'veteran' ? 50 : 25, owner: npc.id, school: 'melee' });
-          } else {
-            game.damagePlayer(danger, npc.dmg || 3, npc); // враждебный игрок
-          }
-          game.fx({ t: 'swing', pid: npc.id, weapon: 'sword', x: npc.x, y: npc.y, aim: ang, range: reach, arc: 90 }, npc.mapId, npc.x, npc.y);
-        }
-        return;
-      }
-      // лучник: держит дистанцию и стреляет
-      if (d2 > 30 * 30)
-        moveWithCollision(npc, Math.cos(ang) * GUARD_SPEED * dt, Math.sin(ang) * GUARD_SPEED * dt, 5, map);
-      npc.fireT = (npc.fireT ?? 0.5) - dt;
-      if (npc.fireT <= 0 && d2 < 200 * 200) {
-        npc.fireT = 1.2;
-        game.npcShoot(npc, ang, { dmg: npc.dmg || 2 });
-      }
-      return;
-    }
+    if (danger) { combatantFight(npc, danger, game, dt, map); return; }
     // патруль вокруг центра
     npc.patrolT = (npc.patrolT ?? 0) - dt;
     if (npc.patrolT <= 0) {
@@ -247,6 +225,58 @@ function walkTo(npc, tx, ty, speed, dt, map) {
   npc.aim = ang;
 }
 
+// Бой бойца (страж/солдат) по цели: враг / враждебный игрок / вражеский NPC.
+// Мили (ополченец/латник) — в упор, лучник — стрельба с дистанции.
+function combatantFight(npc, danger, game, dt, map) {
+  const ang = Math.atan2(danger.y - npc.y, danger.x - npc.x);
+  const d2 = dist2(npc.x, npc.y, danger.x, danger.y);
+  npc.aim = ang;
+  const strike = () => {
+    if (danger.entType === 'enemy') {
+      game.damageEnemy(danger, npc.dmg || 3,
+        { vx: Math.cos(ang), vy: Math.sin(ang), knockback: npc.unit === 'veteran' ? 50 : 25, owner: npc.id, school: 'melee' });
+    } else if (danger.entType === 'npc') {
+      game.damageNpc(danger, npc.dmg || 3, npc); // боец чужой фракции
+    } else {
+      game.damagePlayer(danger, npc.dmg || 3, npc); // враждебный игрок
+    }
+  };
+  if (npc.melee) {
+    const reach = npc.unit === 'veteran' ? 22 : 18;
+    if (d2 > reach * reach)
+      moveWithCollision(npc, Math.cos(ang) * GUARD_SPEED * 1.25 * dt, Math.sin(ang) * GUARD_SPEED * 1.25 * dt, 5, map);
+    npc.swingT = (npc.swingT ?? 0) - dt;
+    if (npc.swingT <= 0 && d2 < (reach + 8) * (reach + 8)) {
+      npc.swingT = npc.unit === 'veteran' ? 1.0 : 0.8;
+      strike();
+      game.fx({ t: 'swing', pid: npc.id, weapon: 'sword', x: npc.x, y: npc.y, aim: ang, range: reach, arc: 90 }, npc.mapId, npc.x, npc.y);
+    }
+    return;
+  }
+  // лучник: держит дистанцию и стреляет
+  if (d2 > 30 * 30)
+    moveWithCollision(npc, Math.cos(ang) * GUARD_SPEED * dt, Math.sin(ang) * GUARD_SPEED * dt, 5, map);
+  npc.fireT = (npc.fireT ?? 0.5) - dt;
+  if (npc.fireT <= 0 && d2 < 200 * 200) {
+    npc.fireT = 1.2;
+    if (danger.entType === 'npc') {
+      // по бойцу чужой фракции — прямой урон (стрела-снаряд помечена guard и
+      // своих NPC не бьёт), но со стрелой-визуалом
+      game.damageNpc(danger, npc.dmg || 2, npc);
+      game.fx({ t: 'shot', pid: npc.id, weapon: 'bow', x: npc.x, y: npc.y, aim: ang, seed: 1, tick: game.tick }, npc.mapId, npc.x, npc.y);
+    } else {
+      game.npcShoot(npc, ang, { dmg: npc.dmg || 2 });
+    }
+  }
+}
+
+// фракция NPC: явное поле (солдат) или по родной деревне (страж/житель)
+export function npcFaction(npc, game) {
+  if (npc.faction) return npc.faction;
+  const s = game.world.settlements.find(x => x.id === npc.home);
+  return s?.faction || null;
+}
+
 function findDanger(npc, game) {
   let best = null, bestD = 150 * 150;
   for (const e of game.entities.values()) {
@@ -254,13 +284,21 @@ function findDanger(npc, game) {
     const d = dist2(npc.x, npc.y, e.x, e.y);
     if (d < bestD) { bestD = d; best = e; }
   }
+  const myFac = npcFaction(npc, game);
   // враждебные игроки (низкая репутация или недавно атаковали фракцию)
-  const s = game.world.settlements.find(x => x.id === npc.home);
-  for (const p of game.players.values()) {
+  if (myFac) for (const p of game.players.values()) {
     if (p.dead || p.mapId !== npc.mapId) continue;
-    if (!isHostileToPlayer(s.faction, p.rep) && !p.aggroFactions?.has(s.faction)) continue;
+    if (!isHostileToPlayer(myFac, p.rep) && !p.aggroFactions?.has(myFac)) continue;
     const d = dist2(npc.x, npc.y, p.x, p.y);
     if (d < bestD) { bestD = d; best = p; }
+  }
+  // ВОЙНА НАРОДОВ: бойцы (страж/солдат) враждебной фракции — законная цель
+  if (myFac) for (const o of game.entities.values()) {
+    if (o.entType !== 'npc' || o.mapId !== npc.mapId || o === npc) continue;
+    if (o.role !== 'guard' && o.role !== 'soldier') continue;
+    if (!factionsHostile(myFac, npcFaction(o, game))) continue;
+    const d = dist2(npc.x, npc.y, o.x, o.y);
+    if (d < bestD * 1.4) { const dd = d; if (dd < bestD) { bestD = dd; best = o; } } // чуть дальше видят своих врагов
   }
   return best;
 }

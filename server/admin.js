@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { TILE } from '../shared/constants.js';
 import { getItem, getWeapon, splitId } from '../shared/rarity.js';
+import { RELATIONS } from './sim/factions.js';
 import { saveWorld, applyWorldData, applySavedPlayer, SAVE_FILE, WORLD_VER } from './persist.js';
 
 export class Admin {
@@ -67,6 +68,10 @@ export class Admin {
         ziggurats: (w.citadel.ziggurats || []).length } : null,
       sieges: w.settlements.filter(s => s.siege).map(s =>
         ({ name: s.name, wave: s.siege.wave, waves: s.siege.waves, faction: s.siege.faction })),
+      wars: this.game.abstract.tokens.filter(t => t.army && !t.dead).map(t => {
+        const s = w.settlements.find(x => x.id === t.march);
+        return { faction: t.faction, target: s?.name || '?', units: t.units.length };
+      }),
       daily: w.daily ? { name: w.daily.name } : null,
       players: [...g.players.values()].map(p => ({
         id: p.id, name: p.name, cls: p.cls, level: p.level,
@@ -218,6 +223,30 @@ export class Admin {
         g.startSiege(s, tok);
         chronicle(`наслала осаду на ${s.name}`);
         return { ok: true, name: s.name };
+      }
+      case 'factionwar': { // война народов: чужая фракция идёт на деревню игрока
+        let target = null;
+        if (p) { // ближняя к игроку живая деревня
+          let bd = Infinity;
+          for (const x of g.world.settlements) {
+            if (x.ruined || x.captured) continue;
+            const d = (x.x * TILE - p.x) ** 2 + (x.y * TILE - p.y) ** 2;
+            if (d < bd) { bd = d; target = x; }
+          }
+        } else target = g.world.settlements.find(x => !x.ruined && !x.captured);
+        if (!target) return { error: 'живая деревня не найдена' };
+        // агрессор — богатый город другой фракции
+        const aggr = g.world.settlements.find(x =>
+          !x.ruined && !x.captured && x.faction !== target.faction &&
+          ['severane', 'ozerny', 'stepnyaki'].includes(x.faction));
+        if (!aggr) return { error: 'нет города-агрессора другой фракции' };
+        // разжигаем вражду, чтобы бойцы рубились при встрече, и шлём армию
+        RELATIONS[aggr.faction][target.faction] = -60;
+        RELATIONS[target.faction][aggr.faction] = -60;
+        aggr.prosperity = Math.max(aggr.prosperity, 60);
+        if (!g.civ.musterFactionArmy(aggr, target)) return { error: 'лимит войн (2) исчерпан' };
+        chronicle(`разожгла войну: ${aggr.faction} → ${target.name}`);
+        return { ok: true, from: aggr.name, to: target.name };
       }
       default: return { error: 'неизвестное действие' };
     }

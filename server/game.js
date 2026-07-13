@@ -633,6 +633,7 @@ export class Game {
     this.stepStructures(dt);
     this.stepTraps();
     this.stepSieges(dt);
+    this.stepFactionWars(dt);
     this.checkAscensions();
     // метеоры мага: телеграф догорел — удар с неба
     if (this.meteors?.length) {
@@ -1504,6 +1505,19 @@ export class Game {
     const g = this.entities.get(id);
     const prof = this.GUARD_UNITS[unit] || this.GUARD_UNITS.militia;
     g.unit = unit; g.hp = g.maxHp = prof.hp; g.dmg = prof.dmg; g.melee = prof.melee;
+    return id;
+  }
+
+  // Солдат армии народа: боец фракции с целью-походом на вражеский город
+  spawnSoldier(tok, unit, x, y) {
+    const kind = FACTION_UNIT_SPRITES[tok.faction]?.[unit] || FACTION_KINDS[tok.faction]?.guard;
+    const id = this.spawnNpc('soldier', null, 'over', x, y, kind ? { kind } : {});
+    const g = this.entities.get(id);
+    const prof = this.GUARD_UNITS[unit] || this.GUARD_UNITS.militia;
+    g.faction = tok.faction; g.unit = unit; g.army = tok.id;
+    g.hp = g.maxHp = prof.hp; g.dmg = prof.dmg; g.melee = prof.melee;
+    const t = this.world.settlements.find(s => s.id === tok.march);
+    if (t) { g.warX = t.x * TILE; g.warY = t.y * TILE; } // цель похода — центр города
     return id;
   }
 
@@ -3491,27 +3505,32 @@ export class Game {
     n.hp -= dmg;
     this.fx({ t: 'hurt', id: n.id, x: n.x, y: n.y }, n.mapId, n.x, n.y);
     const s = this.world.settlements.find(x => x.id === n.home);
-    if (attacker && s) {
-      attacker.rep[s.faction] = (attacker.rep[s.faction] || 0) - 6;
-      attacker.aggroFactions.add(s.faction);
-      this.toast(attacker, STR.repDown(FACTIONS[s.faction]?.name || s.faction));
+    // рука убийцы: только ИГРОК ведёт репутацию/розыск (у NPC-солдата нет .rep)
+    const pAtk = attacker?.rep ? attacker : null;
+    // наёмник: игрок бьёт бойца фракции → отмечаем вклад за противника
+    if (pAtk && (n.role === 'soldier' || n.role === 'guard')) this.markWarStake(pAtk, n);
+    if (pAtk && s && n.role !== 'soldier') {
+      pAtk.rep[s.faction] = (pAtk.rep[s.faction] || 0) - 6;
+      pAtk.aggroFactions.add(s.faction);
+      this.toast(pAtk, STR.repDown(FACTIONS[s.faction]?.name || s.faction));
     }
     if (n.hp <= 0) {
       this.entities.delete(n.id);
       this.fx({ t: 'die', id: n.id, kind: n.kind, x: n.x, y: n.y }, n.mapId, n.x, n.y);
       this.spawnDrop('coin', randInt(this.rand, 1, 4), n.mapId, n.x, n.y);
-      if (s) {
+      // население тает только за мирного жителя (не гвардейца/солдата в бою)
+      if (s && n.role !== 'guard' && n.role !== 'soldier') {
         s.population = Math.max(0, s.population - 1);
-        if (attacker) {
-          attacker.rep[s.faction] -= 20;
-          this.addBounty(attacker, 15, `убийство жителя ${s.name}`);
-          this.events.push(this.world.day, `${attacker.name} убил жителя ${s.name}`, { x: s.x, y: s.y });
-        } else {
+        if (pAtk) {
+          pAtk.rep[s.faction] -= 20;
+          this.addBounty(pAtk, 15, `убийство жителя ${s.name}`);
+          this.events.push(this.world.day, `${pAtk.name} убил жителя ${s.name}`, { x: s.x, y: s.y });
+        } else if (!attacker) {
           this.events.push(this.world.day, `Житель ${s.name} погиб от чудовищ`, { x: s.x, y: s.y });
         }
       }
       // тёмный путь: разграбление каравана — груз твой, но мир запомнит
-      if (n.caravan && attacker) {
+      if (n.caravan && pAtk) { const attacker = pAtk;
         const tok = this.abstract.tokens.find(t => t.id === n.caravan);
         if (tok && !tok.dead) {
           attacker.rep[tok.faction] = Math.max(-100, (attacker.rep[tok.faction] || 0) - 12);
@@ -3540,6 +3559,19 @@ export class Game {
         }
       }
     }
+  }
+
+  // фракция NPC: явная (солдат) или по родной деревне (страж/житель)
+  npcFactionOf(n) {
+    return n.faction || this.world.settlements.find(x => x.id === n.home)?.faction || null;
+  }
+
+  // наёмник: игрок ударил бойца фракции F — значит помогает её противнику.
+  // На исходе битвы победившая сторона наградит (см. resolveFactionWar).
+  markWarStake(p, npc) {
+    const fac = this.npcFactionOf(npc);
+    if (!fac || fac === 'monsters') return;
+    p.warStake = { against: fac, t: this.tick };
   }
 
   // ---------- тёмный путь: розыск и охотники за головой ----------
@@ -4159,6 +4191,77 @@ export class Game {
       else if (sg.faction === 'darkness') { this.civ.captureByDarkness(s); if (tok) tok.dead = true; }
       else this.civ.ruinSettlement(s, 'пала под осадой');
       this.abstract.tokens = this.abstract.tokens.filter(t => !t.dead);
+    }
+  }
+
+  // ---------- ВОЙНА НАРОДОВ: армия дошла до города — исход по выжившим ----------
+  stepFactionWars(dt) {
+    if (!this.abstract.tokens.some(t => t.army)) return;
+    for (const tok of this.abstract.tokens) {
+      if (!tok.army || tok.dead) continue;
+      const s = this.world.settlements.find(x => x.id === tok.march);
+      if (!s || s.ruined) { tok.dead = true; continue; }
+      if (s.faction === tok.faction) { tok.dead = true; continue; } // город уже наш
+      // армия у стен?
+      if (dist2(tok.x, tok.y, s.x * TILE, s.y * TILE) > (30 * TILE) ** 2) continue;
+      const nearPlayer = [...this.players.values()].some(p =>
+        !p.dead && p.mapId === 'over' && dist2(p.x, p.y, s.x * TILE, s.y * TILE) < 560 ** 2);
+      if (tok.hydrated && nearPlayer) {
+        // ЖИВАЯ битва: считаем выживших бойцов сторон
+        const attackers = tok.hydrated.filter(id => this.entities.has(id)).length;
+        let defenders = 0;
+        for (const e of this.entities.values())
+          if (e.entType === 'npc' && e.role === 'guard' && e.home === s.id) defenders++;
+        if (attackers === 0) { this.endFactionWar(s, tok, false); continue; }
+        if (defenders === 0) {                 // защитники пали — дожать пару секунд
+          tok.warT = (tok.warT ?? 4) - dt;
+          if (tok.warT <= 0) this.endFactionWar(s, tok, true);
+        } else tok.warT = 4;
+      } else {
+        // фолбэк без игроков: абстрактный расчёт за несколько тиков
+        tok.warAbs = (tok.warAbs ?? 6) - dt;
+        if (tok.warAbs <= 0) {
+          const str = tok.units.length * 2 + (tok.units.includes('veteran') ? 3 : 0);
+          const def = (s.guards || 0) * 2 + (s.towers || 0) * 3;
+          this.endFactionWar(s, tok, str > def + (this.rand() < 0.5 ? 1 : 0));
+        }
+      }
+    }
+  }
+
+  endFactionWar(s, tok, attackersWon) {
+    for (const id of tok.hydrated || []) this.entities.delete(id);
+    tok.dead = true;
+    this.abstract.tokens = this.abstract.tokens.filter(t => !t.dead);
+    const winner = attackersWon ? tok.faction : s.faction;
+    const loser = attackersWon ? s.faction : tok.faction;
+    if (attackersWon) {
+      this.civ.captureByFaction(s, tok.faction); // город сменил флаг
+    } else {
+      s.prosperity = Math.min(100, s.prosperity + 4);
+      this.toastAll(`★ ${s.name} отбил натиск ${FACTIONS[tok.faction]?.name || tok.faction}!`, true);
+      this.events.push(this.world.day, `${s.name} отбил войско ${FACTIONS[tok.faction]?.name || ''}`, { x: s.x, y: s.y });
+    }
+    this.rewardMercenaries(s, winner, loser);
+  }
+
+  // Наёмник: игрокам рядом, бившимся за победителя — монеты/лут/репутация
+  rewardMercenaries(s, winner, loser) {
+    for (const p of this.players.values()) {
+      if (p.dead || p.mapId !== 'over') continue;
+      if (dist2(p.x, p.y, s.x * TILE, s.y * TILE) > 600 ** 2) continue;
+      const st = p.warStake;
+      if (!st || (this.tick - st.t) > 60 * 30) continue; // вклад свеж (≤60 с)
+      if (st.against === loser) {                 // бил проигравшего — помог победителю
+        const coins = 40 + Math.floor(this.rand() * 40);
+        p.coins += coins;
+        this.addXp(p, 80);
+        p.rep[winner] = Math.min(100, (p.rep[winner] || 0) + 12);
+        p.rep[loser] = Math.max(-100, (p.rep[loser] || 0) - 6);
+        this.dropRandomGear('over', p.x + 12, p.y, false, (p.effStats?.lck || 0) + 2);
+        this.toast(p, `🎖 Наёмная плата за ${FACTIONS[winner]?.name || winner}: +${coins} монет, лут и репутация`);
+      }
+      delete p.warStake;
     }
   }
 

@@ -236,6 +236,12 @@ export class Net {
         ({ x: s.x, y: s.y, name: s.name, w: s.siege.wave, wm: s.siege.waves })) : undefined,
       zigs: p.mapId === 'over' && game.world.citadel?.ziggurats?.length
         ? game.world.citadel.ziggurats.map(z => ({ x: z.x, y: z.y })) : undefined,
+      // войны народов: армия-токен у вражеского города (для HUD и меток)
+      battles: p.mapId === 'over'
+        ? game.abstract.tokens.filter(t => t.army && !t.dead && t.march).map(t => {
+          const s = game.world.settlements.find(x => x.id === t.march);
+          return s ? { x: s.x, y: s.y, a: t.faction, b: s.faction, name: s.name } : null;
+        }).filter(Boolean) : undefined,
     };
   }
 }

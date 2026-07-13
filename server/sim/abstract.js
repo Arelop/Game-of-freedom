@@ -306,7 +306,10 @@ export class AbstractSim {
       if (horde) units = [...tok.units, ...tok.units.slice(0, Math.ceil(tok.units.length / 2))];
     }
     for (const unit of units) {
-      if (unit === 'npc' || unit === 'guard' || unit === 'trader') {
+      if (tok.army) { // ВОЙНА НАРОДОВ: юниты — солдаты фракции (militia/archer/veteran)
+        const id = this.game.spawnSoldier(tok, unit, tok.x + (Math.random() - 0.5) * 70, tok.y + (Math.random() - 0.5) * 70);
+        if (id) ids.push(id);
+      } else if (unit === 'npc' || unit === 'guard' || unit === 'trader') {
         const id = this.game.spawnCaravanNpc(tok, unit);
         if (id) ids.push(id);
       } else {

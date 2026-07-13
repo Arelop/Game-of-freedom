@@ -27,6 +27,13 @@ export function isHostileToPlayer(factionId, rep) {
   return (rep[factionId] ?? 0) < -20;
 }
 
+// Враждуют ли две фракции настолько, что их бойцы рубятся при встрече.
+// Динамично: войны сами роняют RELATIONS ниже порога.
+export function factionsHostile(a, b) {
+  if (!a || !b || a === b) return false;
+  return (RELATIONS[a]?.[b] ?? 0) <= -40;
+}
+
 export function priceMultiplier(rep) {
   // репутация 50+ — скидка 20%, отрицательная — наценка
   return Math.max(0.8, Math.min(1.6, 1 - (rep ?? 0) / 250));

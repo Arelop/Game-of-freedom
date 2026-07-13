@@ -422,6 +422,53 @@ export class CivSim {
     g.toastAll(`⚔ ${s.name} захвачена бандитами!`, true); // война — всплывает
   }
 
+  // Народ-агрессор захватил чужой город: флаг сменился, но город ЖИВЁТ
+  // под новым правлением (не руина). homeFaction помнит исходную — реконкиста
+  // вернёт. Реюз идеи captureByDarkness, но для мирных народов.
+  captureByFaction(s, faction) {
+    const g = this.game;
+    const old = s.faction;
+    s.faction = faction;                 // флаг сменился
+    s.guards = 1; s.garrison = { militia: 1, archer: 0, veteran: 0 };
+    s.population = Math.max(2, s.population - 2);
+    s.prosperity = Math.max(10, s.prosperity - 15);
+    // захват разжигает вражду захватчика с прежним владельцем (топливо реконкисты)
+    if (RELATIONS[old]?.[faction] !== undefined) {
+      RELATIONS[old][faction] = Math.max(-100, (RELATIONS[old][faction] || 0) - 25);
+      RELATIONS[faction][old] = Math.max(-100, (RELATIONS[faction][old] || 0) - 10);
+    }
+    this.rehydrate(s);
+    g.events.push(g.world.day, `${FACTIONS_NAME(faction)} захватили ${s.name} у ${FACTIONS_NAME(old)}!`, { x: s.x, y: s.y });
+    g.toastAll(`⚔ ${s.name} пал — теперь под флагом ${FACTIONS_NAME(faction)}!`, true);
+  }
+
+  // Народ снаряжает армию на вражеский город (реюз паттерна tickDarkness)
+  musterFactionArmy(aggressor, target) {
+    const g = this.game;
+    // лимит одновременных войн народов — мир не должен тонуть в битвах
+    const wars = g.abstract.tokens.filter(t => t.army && !t.dead).length;
+    if (wars >= 2) return false;
+    // база вылазки — ближний к цели город агрессора
+    let src = null, sd = Infinity;
+    for (const s of g.world.settlements) {
+      if (s.faction !== aggressor.faction || s.ruined) continue;
+      const d = (s.x - target.x) ** 2 + (s.y - target.y) ** 2;
+      if (d < sd) { sd = d; src = s; }
+    }
+    src = src || aggressor;
+    // состав по достатку: ополченцы + лучник + латник у зажиточных
+    const units = ['militia', 'militia', 'archer'];
+    if (src.prosperity > 60 && (src.garrison?.veteran || src.towers)) units.push('veteran');
+    g.abstract.tokens.push({
+      id: 'tok' + g.abstract.nextId++, type: 'army', name: `войско ${FACTIONS_NAME(aggressor.faction)}`,
+      faction: aggressor.faction, army: true, units, march: target.id,
+      x: src.x * TILE, y: src.y * TILE, hydrated: null,
+    });
+    g.events.push(g.world.day, `⚔ ${FACTIONS_NAME(aggressor.faction)} двинули войско из ${src.name} на ${target.name}!`, { x: src.x, y: src.y });
+    g.toastAll(`⚔ ${FACTIONS_NAME(aggressor.faction)} идут войной на ${target.name}!`, true);
+    return true;
+  }
+
   // Армия Тьмы захватила деревню — теперь это её форт
   captureByDarkness(s) {
     const g = this.game;
@@ -495,6 +542,13 @@ export class CivSim {
         const d2 = (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
         if (d2 > 150 ** 2) continue;
         // обе богатые и близко — трения за лес и землю
+        // открытая война: отношения рухнули — богатый агрессор шлёт АРМИЮ
+        // (зрелищная битва вместо абстрактной стычки)
+        if (RELATIONS[a.faction][b.faction] <= -50 && g.rand() < 0.3) {
+          const aggr = a.prosperity >= b.prosperity ? a : b;
+          const targ = aggr === a ? b : a;
+          if (aggr.prosperity > 55 && this.musterFactionArmy(aggr, targ)) return;
+        }
         if (a.prosperity > 55 && b.prosperity > 55 && g.rand() < 0.35) {
           RELATIONS[a.faction][b.faction] = Math.max(-100, (RELATIONS[a.faction][b.faction] || 0) - 6);
           RELATIONS[b.faction][a.faction] = RELATIONS[a.faction][b.faction];
@@ -516,6 +570,8 @@ export class CivSim {
     }
   }
 }
+
+function FACTIONS_NAME(f) { return FACTIONS[f]?.name || f; }
 
 function cKey(tx, ty) {
   return Math.floor(tx / CHUNK) + ',' + Math.floor(ty / CHUNK);

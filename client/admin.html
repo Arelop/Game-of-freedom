@@ -88,6 +88,7 @@
       <div class="btnrow">
         <button onclick="act({type:'ziggurat'})">⛧ Воздвигнуть зиккурат</button>
         <button class="danger" onclick="act({type:'cleanse'})">✦ Очистить порчу</button>
+        <button onclick="act({type:'factionwar'})">⚔ Война народов</button>
       </div>
       <div class="btnrow">
         <span style="font-size:11px;color:#847e87;align-self:center">Мощь Тьмы:</span>
@@ -190,7 +191,8 @@ async function refresh() {
     ? kv('Мощь Тьмы', `${d.power}${d.dead ? ' · повержена' : d.owned ? ' · подчинена' : ''}`) +
       kv('Форты Тьмы', d.forts) +
       kv('Зиккуратов', d.ziggurats || 0) +
-      kv('Активных осад', nSieges + (nSieges ? ' — ' + s.sieges.map(g => `${esc(g.name)} (${g.wave}/${g.waves})`).join(', ') : ''))
+      kv('Активных осад', nSieges + (nSieges ? ' — ' + s.sieges.map(g => `${esc(g.name)} (${g.wave}/${g.waves})`).join(', ') : '')) +
+      kv('Войны народов', (s.wars || []).length ? s.wars.map(w2 => `${w2.faction} → ${esc(w2.target)}`).join(', ') : '—')
     : '<div class="kv"><span>Цитадели нет</span><b>—</b></div>';
   $('players').innerHTML = '<tr><th>Имя</th><th>Кл.</th><th>Ур.</th><th>HP</th><th>Мон.</th><th>Где</th><th></th></tr>' +
     (s.players.length ? s.players.map(p => `<tr>
